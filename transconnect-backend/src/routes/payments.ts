@@ -3,14 +3,25 @@ import { prisma } from '../index';
 import { authenticateToken } from '../middleware/auth';
 import { body, validationResult } from 'express-validator';
 import { PaymentMethod, PaymentStatus } from '@prisma/client';
+import { 
+  PaymentGatewayFactory, 
+  PaymentError, 
+  PaymentValidationError, 
+  PaymentNetworkError,
+  StandardPaymentRequest 
+} from '../services/payment-gateway.factory';
+import { NotificationService } from '../services/notification.service';
+import crypto from 'crypto';
 
 const router = Router();
+const notificationService = NotificationService.getInstance();
 
 // Initiate payment for a booking
 router.post('/initiate', [
   authenticateToken,
   body('bookingId').notEmpty().withMessage('Booking ID is required'),
-  body('method').isIn(['MTN_MOBILE_MONEY', 'AIRTEL_MONEY', 'FLUTTERWAVE', 'CASH']).withMessage('Valid payment method is required')
+  body('method').isIn(['MTN_MOBILE_MONEY', 'AIRTEL_MONEY', 'FLUTTERWAVE', 'CASH']).withMessage('Valid payment method is required'),
+  body('phoneNumber').optional().isMobilePhone('any').withMessage('Valid phone number is required for mobile money payments')
 ], async (req: Request, res: Response) => {
   try {
     const errors = validationResult(req);
@@ -18,14 +29,22 @@ router.post('/initiate', [
       return res.status(400).json({ errors: errors.array() });
     }
 
-    const { bookingId, method } = req.body;
+    const { bookingId, method, phoneNumber } = req.body;
     const userId = (req as any).user.userId;
 
     // Verify booking exists and belongs to user
     const booking = await prisma.booking.findUnique({
       where: { id: bookingId },
       include: {
-        route: true
+        route: true,
+        user: {
+          select: {
+            id: true,
+            firstName: true,
+            lastName: true,
+            phone: true
+          }
+        }
       }
     });
 
@@ -53,6 +72,25 @@ router.post('/initiate', [
       return res.status(400).json({ error: 'Payment already initiated for this booking' });
     }
 
+    // Validate phone number for mobile money payments
+    if (PaymentGatewayFactory.isOnlinePayment(method as PaymentMethod)) {
+      if (!phoneNumber) {
+        return res.status(400).json({ error: 'Phone number is required for mobile money payments' });
+      }
+
+      const isValidPhone = await PaymentGatewayFactory.validatePaymentMethod(
+        method as PaymentMethod, 
+        phoneNumber, 
+        'UG'
+      );
+
+      if (!isValidPhone) {
+        return res.status(400).json({ 
+          error: `Phone number is not registered for ${PaymentGatewayFactory.getMethodDisplayName(method as PaymentMethod)}` 
+        });
+      }
+    }
+
     // Generate payment reference
     const paymentReference = `PAY${Date.now()}${Math.random().toString(36).substr(2, 4).toUpperCase()}`;
 
@@ -64,31 +102,89 @@ router.post('/initiate', [
         amount: booking.totalAmount,
         method: method as PaymentMethod,
         reference: paymentReference,
-        status: 'PENDING'
+        status: 'PENDING',
+        metadata: {
+          phoneNumber,
+          country: 'UG',
+          currency: 'UGX'
+        }
       }
     });
 
-    // Simulate payment gateway integration
-    const paymentResponse = await simulatePaymentGateway(method, {
-      amount: booking.totalAmount,
-      reference: paymentReference,
-      description: `Bus ticket: ${booking.route.origin} to ${booking.route.destination}`
-    });
+    let paymentResponse;
 
-    // Update payment with gateway response
-    await prisma.payment.update({
-      where: { id: payment.id },
-      data: {
-        transactionId: paymentResponse.transactionId
+    try {
+      if (method === 'CASH') {
+        // For cash payments, just mark as pending for operator confirmation
+        paymentResponse = {
+          transactionId: paymentReference,
+          status: 'PENDING' as const,
+          checkoutUrl: undefined
+        };
+      } else {
+        // Process online payment
+        const provider = PaymentGatewayFactory.getProvider(method as PaymentMethod);
+        
+        const paymentRequest: StandardPaymentRequest = {
+          amount: booking.totalAmount,
+          currency: 'UGX',
+          reference: paymentReference,
+          phoneNumber: phoneNumber || booking.user.phone || '',
+          description: `Bus ticket: ${booking.route.origin} to ${booking.route.destination}`,
+          country: 'UG'
+        };
+
+        paymentResponse = await provider.requestPayment(paymentRequest);
+
+        // Update payment with provider response
+        await prisma.payment.update({
+          where: { id: payment.id },
+          data: {
+            transactionId: paymentResponse.transactionId,
+            metadata: {
+              ...(payment.metadata as object || {}),
+              providerResponse: paymentResponse
+            }
+          }
+        });
       }
-    });
 
-    res.json({
-      paymentId: payment.id,
-      paymentReference,
-      status: payment.status,
-      gatewayResponse: paymentResponse
-    });
+      res.json({
+        paymentId: payment.id,
+        paymentReference,
+        status: payment.status,
+        provider: PaymentGatewayFactory.getMethodDisplayName(method as PaymentMethod),
+        transactionId: paymentResponse.transactionId,
+        checkoutUrl: paymentResponse.checkoutUrl,
+        message: paymentResponse.reason || 'Payment initiated successfully'
+      });
+    } catch (error) {
+      // Handle payment provider errors
+      if (error instanceof PaymentError) {
+        await prisma.payment.update({
+          where: { id: payment.id },
+          data: {
+            status: 'FAILED',
+            metadata: {
+              ...(payment.metadata as object || {}),
+              error: {
+                code: error.code,
+                message: error.message,
+                provider: error.provider
+              }
+            }
+          }
+        });
+
+        return res.status(400).json({
+          error: error.message,
+          code: error.code,
+          retryable: error.retryable
+        });
+      }
+
+      throw error; // Re-throw unexpected errors
+    }
   } catch (error) {
     console.error('Error initiating payment:', error);
     res.status(500).json({ error: 'Failed to initiate payment' });
@@ -121,33 +217,117 @@ router.get('/:paymentId/status', authenticateToken, async (req: Request, res: Re
       return res.status(403).json({ error: 'Not authorized to view this payment' });
     }
 
-    // In real implementation, verify status with payment gateway
-    const gatewayStatus = await verifyPaymentWithGateway(payment.transactionId, payment.method);
+    let currentStatus = payment.status;
+    let statusMessage = 'Payment status checked';
 
-    // Update payment status if changed
-    if (gatewayStatus.status !== payment.status) {
-      await prisma.payment.update({
-        where: { id: paymentId },
-        data: {
-          status: gatewayStatus.status as PaymentStatus
+    // For online payments, verify status with payment gateway
+    if (PaymentGatewayFactory.isOnlinePayment(payment.method) && payment.transactionId) {
+      try {
+        const provider = PaymentGatewayFactory.getProvider(payment.method);
+        
+        const additionalData = payment.method === 'AIRTEL_MONEY' 
+          ? { country: 'UG', currency: 'UGX' }
+          : undefined;
+
+        const gatewayStatus = await provider.getTransactionStatus(
+          payment.transactionId, 
+          additionalData
+        );
+
+        // Map provider status to our status
+        let newStatus: PaymentStatus = payment.status;
+        if (gatewayStatus.status === 'SUCCESSFUL') {
+          newStatus = 'COMPLETED';
+        } else if (gatewayStatus.status === 'FAILED') {
+          newStatus = 'FAILED';
         }
-      });
 
-      // If payment completed, update booking status
-      if (gatewayStatus.status === 'COMPLETED') {
-        await prisma.booking.update({
-          where: { id: payment.bookingId },
-          data: { status: 'CONFIRMED' }
-        });
+        // Update payment status if changed
+        if (newStatus !== payment.status) {
+          await prisma.payment.update({
+            where: { id: paymentId },
+            data: {
+              status: newStatus,
+              metadata: {
+                ...(payment.metadata as object || {}),
+                lastStatusCheck: new Date().toISOString(),
+                providerTransactionId: gatewayStatus.providerTransactionId
+              }
+            }
+          });
+
+          currentStatus = newStatus;
+
+          // If payment completed, update booking status
+          if (newStatus === 'COMPLETED') {
+            const booking = await prisma.booking.update({
+              where: { id: payment.bookingId },
+              data: { status: 'CONFIRMED' },
+              include: {
+                user: true,
+                route: true
+              }
+            });
+            
+            statusMessage = 'Payment completed successfully';
+            
+            // Send payment success notification
+            try {
+              await notificationService.sendPaymentConfirmation({
+                userId: payment.userId,
+                bookingId: payment.bookingId,
+                passengerName: `${booking.user.firstName} ${booking.user.lastName}`,
+                amount: payment.amount,
+                method: PaymentGatewayFactory.getMethodDisplayName(payment.method),
+                transactionId: payment.transactionId || payment.reference || payment.id,
+              });
+            } catch (notificationError) {
+              console.error('Error sending payment confirmation notification:', notificationError);
+            }
+          } else if (newStatus === 'FAILED') {
+            const booking = await prisma.booking.update({
+              where: { id: payment.bookingId },
+              data: { status: 'CANCELLED' },
+              include: {
+                user: true
+              }
+            });
+            
+            statusMessage = 'Payment failed';
+            
+            // Send payment failed notification
+            try {
+              await notificationService.sendPaymentFailed({
+                userId: payment.userId,
+                bookingId: payment.bookingId,
+                amount: payment.amount,
+                method: PaymentGatewayFactory.getMethodDisplayName(payment.method),
+                reason: gatewayStatus.message || 'Payment processing failed',
+              });
+            } catch (notificationError) {
+              console.error('Error sending payment failed notification:', notificationError);
+            }
+          }
+        }
+
+        statusMessage = gatewayStatus.message || statusMessage;
+      } catch (error) {
+        console.error('Error checking payment status with provider:', error);
+        // Continue with current status if provider check fails
+        statusMessage = 'Unable to verify with payment provider';
       }
     }
 
     res.json({
       paymentId: payment.id,
-      status: gatewayStatus.status,
+      status: currentStatus,
       amount: payment.amount,
       method: payment.method,
-      createdAt: payment.createdAt
+      methodDisplayName: PaymentGatewayFactory.getMethodDisplayName(payment.method),
+      reference: payment.reference,
+      transactionId: payment.transactionId,
+      createdAt: payment.createdAt,
+      message: statusMessage
     });
   } catch (error) {
     console.error('Error checking payment status:', error);
@@ -160,53 +340,236 @@ router.post('/webhook/:gateway', async (req: Request, res: Response) => {
   try {
     const { gateway } = req.params;
     const webhookData = req.body;
+    const signature = req.headers['x-signature'] || req.headers['authorization'] || '';
 
-    console.log(`Received webhook from ${gateway}:`, webhookData);
+    console.log(`Received webhook from ${gateway}:`, {
+      headers: req.headers,
+      body: webhookData
+    });
 
-    // Verify webhook signature (implementation depends on gateway)
-    if (!verifyWebhookSignature(gateway, webhookData, req.headers)) {
+    // Get webhook secret for the specific gateway
+    const webhookSecrets: Record<string, string> = {
+      'mtn': process.env.MTN_WEBHOOK_SECRET || '',
+      'airtel': process.env.AIRTEL_WEBHOOK_SECRET || '',
+      'flutterwave': process.env.FLUTTERWAVE_WEBHOOK_SECRET || ''
+    };
+
+    const secret = webhookSecrets[gateway.toLowerCase()];
+    if (!secret) {
+      console.error(`No webhook secret configured for gateway: ${gateway}`);
+      return res.status(500).json({ error: 'Webhook configuration error' });
+    }
+
+    // Verify webhook signature
+    let isValidSignature = false;
+    try {
+      const provider = PaymentGatewayFactory.getProvider(getPaymentMethodFromGateway(gateway));
+      const payload = typeof req.body === 'string' ? req.body : JSON.stringify(req.body);
+      isValidSignature = provider.verifyWebhookSignature(payload, signature as string, secret);
+    } catch (error) {
+      console.error('Error verifying webhook signature:', error);
+    }
+
+    if (!isValidSignature) {
+      console.error(`Invalid webhook signature for ${gateway}`);
       return res.status(401).json({ error: 'Invalid webhook signature' });
     }
 
-    // Find payment by transaction ID
-    const transactionId = extractTransactionId(gateway, webhookData);
-    const payment = await prisma.payment.findFirst({
-      where: { transactionId: transactionId }
-    });
-
-    if (!payment) {
-      return res.status(404).json({ error: 'Payment not found' });
+    // Extract transaction information based on gateway
+    const transactionInfo = extractTransactionInfo(gateway, webhookData);
+    
+    if (!transactionInfo.transactionId) {
+      console.error(`No transaction ID found in ${gateway} webhook`);
+      return res.status(400).json({ error: 'Invalid webhook data' });
     }
 
-    // Update payment status based on webhook
-    const newStatus = mapGatewayStatus(gateway, webhookData.status);
-    
-    await prisma.payment.update({
-      where: { id: payment.id },
-      data: {
-        status: newStatus as PaymentStatus
+    // Find payment by transaction ID or reference
+    const payment = await prisma.payment.findFirst({
+      where: {
+        OR: [
+          { transactionId: transactionInfo.transactionId },
+          { reference: transactionInfo.transactionId }
+        ]
+      },
+      include: {
+        booking: true
       }
     });
 
-    // Update booking status if payment completed
-    if (newStatus === 'COMPLETED') {
-      await prisma.booking.update({
-        where: { id: payment.bookingId },
-        data: { status: 'CONFIRMED' }
-      });
-    } else if (newStatus === 'FAILED') {
-      await prisma.booking.update({
-        where: { id: payment.bookingId },
-        data: { status: 'CANCELLED' }
-      });
+    if (!payment) {
+      console.error(`Payment not found for transaction: ${transactionInfo.transactionId}`);
+      return res.status(404).json({ error: 'Payment not found' });
     }
 
-    res.json({ success: true });
+    // Map gateway status to our standard status
+    const newStatus = mapGatewayStatusToPaymentStatus(gateway, transactionInfo.status);
+    
+    // Only update if status has changed
+    if (newStatus !== payment.status) {
+      await prisma.payment.update({
+        where: { id: payment.id },
+        data: {
+          status: newStatus,
+          metadata: {
+            ...(payment.metadata as object || {}),
+            webhookData: webhookData,
+            webhookReceivedAt: new Date().toISOString(),
+            providerTransactionId: transactionInfo.providerTransactionId
+          }
+        }
+      });
+
+      // Update booking status based on payment status
+      let bookingStatus = payment.booking.status;
+      if (newStatus === 'COMPLETED') {
+        bookingStatus = 'CONFIRMED';
+        
+        // Send payment success notification via webhook
+        try {
+          const user = await prisma.user.findUnique({
+            where: { id: payment.userId }
+          });
+          
+          if (user) {
+            await notificationService.sendPaymentConfirmation({
+              userId: payment.userId,
+              bookingId: payment.bookingId,
+              passengerName: `${user.firstName} ${user.lastName}`,
+              amount: payment.amount,
+              method: PaymentGatewayFactory.getMethodDisplayName(payment.method),
+              transactionId: transactionInfo.transactionId,
+            });
+          }
+        } catch (notificationError) {
+          console.error('Error sending webhook payment confirmation notification:', notificationError);
+        }
+      } else if (newStatus === 'FAILED') {
+        bookingStatus = 'CANCELLED';
+        
+        // Send payment failed notification via webhook
+        try {
+          const user = await prisma.user.findUnique({
+            where: { id: payment.userId }
+          });
+          
+          if (user) {
+            await notificationService.sendPaymentFailed({
+              userId: payment.userId,
+              bookingId: payment.bookingId,
+              amount: payment.amount,
+              method: PaymentGatewayFactory.getMethodDisplayName(payment.method),
+              reason: transactionInfo.status === 'FAILED' ? 'Payment was declined' : 'Payment processing failed',
+            });
+          }
+        } catch (notificationError) {
+          console.error('Error sending webhook payment failed notification:', notificationError);
+        }
+      }
+
+      if (bookingStatus !== payment.booking.status) {
+        await prisma.booking.update({
+          where: { id: payment.bookingId },
+          data: { status: bookingStatus }
+        });
+      }
+
+      console.log(`Payment ${payment.id} status updated: ${payment.status} -> ${newStatus}`);
+    }
+
+    // Log webhook for audit trail
+    await prisma.webhookLog.create({
+      data: {
+        gateway,
+        transactionId: transactionInfo.transactionId,
+        paymentId: payment.id,
+        status: transactionInfo.status,
+        payload: webhookData,
+        processedAt: new Date()
+      }
+    }).catch(error => {
+      console.error('Error logging webhook:', error);
+      // Don't fail webhook processing if logging fails
+    });
+
+    res.json({ 
+      success: true, 
+      message: 'Webhook processed successfully',
+      paymentId: payment.id,
+      status: newStatus
+    });
   } catch (error) {
     console.error('Error processing webhook:', error);
     res.status(500).json({ error: 'Failed to process webhook' });
   }
 });
+
+// Helper functions for webhook processing
+function getPaymentMethodFromGateway(gateway: string): PaymentMethod {
+  const gatewayMap: Record<string, PaymentMethod> = {
+    'mtn': 'MTN_MOBILE_MONEY',
+    'airtel': 'AIRTEL_MONEY',
+    'flutterwave': 'FLUTTERWAVE'
+  };
+
+  const method = gatewayMap[gateway.toLowerCase()];
+  if (!method) {
+    throw new Error(`Unknown gateway: ${gateway}`);
+  }
+  
+  return method;
+}
+
+function extractTransactionInfo(gateway: string, webhookData: any): {
+  transactionId: string;
+  status: string;
+  providerTransactionId?: string;
+} {
+  switch (gateway.toLowerCase()) {
+    case 'mtn':
+      return {
+        transactionId: webhookData.referenceId || webhookData.externalId,
+        status: webhookData.status || 'PENDING',
+        providerTransactionId: webhookData.financialTransactionId
+      };
+    
+    case 'airtel':
+      return {
+        transactionId: webhookData.transaction?.id || webhookData.data?.transaction?.id,
+        status: webhookData.transaction?.status || webhookData.data?.transaction?.status || 'PENDING',
+        providerTransactionId: webhookData.transaction?.airtel_money_id || webhookData.data?.transaction?.airtel_money_id
+      };
+    
+    case 'flutterwave':
+      return {
+        transactionId: webhookData.data?.tx_ref || webhookData.tx_ref,
+        status: webhookData.data?.status || webhookData.status || 'PENDING',
+        providerTransactionId: webhookData.data?.id || webhookData.id
+      };
+    
+    default:
+      throw new Error(`Unsupported gateway: ${gateway}`);
+  }
+}
+
+function mapGatewayStatusToPaymentStatus(gateway: string, gatewayStatus: string): PaymentStatus {
+  const status = gatewayStatus.toUpperCase();
+  
+  // Common status mappings
+  const commonMappings: Record<string, PaymentStatus> = {
+    'SUCCESS': 'COMPLETED',
+    'SUCCESSFUL': 'COMPLETED',
+    'COMPLETED': 'COMPLETED',
+    'FAILED': 'FAILED',
+    'CANCELLED': 'FAILED',
+    'EXPIRED': 'FAILED',
+    'REJECTED': 'FAILED',
+    'PENDING': 'PENDING',
+    'INITIATED': 'PENDING',
+    'IN_PROGRESS': 'PENDING'
+  };
+
+  return commonMappings[status] || 'PENDING';
+}
 
 // Get payment history for user
 router.get('/history', authenticateToken, async (req: Request, res: Response) => {
@@ -287,7 +650,12 @@ router.post('/:paymentId/complete', authenticateToken, async (req: Request, res:
     await prisma.payment.update({
       where: { id: paymentId },
       data: {
-        status: 'COMPLETED'
+        status: 'COMPLETED',
+        metadata: {
+          ...(payment.metadata as object || {}),
+          completedManually: true,
+          completedAt: new Date().toISOString()
+        }
       }
     });
 
@@ -297,68 +665,70 @@ router.post('/:paymentId/complete', authenticateToken, async (req: Request, res:
       data: { status: 'CONFIRMED' }
     });
 
-    res.json({ message: 'Payment completed successfully' });
+    res.json({ 
+      message: 'Payment completed successfully',
+      paymentId: payment.id,
+      status: 'COMPLETED'
+    });
   } catch (error) {
     console.error('Error completing payment:', error);
     res.status(500).json({ error: 'Failed to complete payment' });
   }
 });
 
-// Helper functions for payment gateway simulation
-async function simulatePaymentGateway(method: string, paymentData: any) {
-  // Simulate API call delay
-  await new Promise(resolve => setTimeout(resolve, 1000));
+// Validate payment method and phone number
+router.post('/validate', [
+  authenticateToken,
+  body('method').isIn(['MTN_MOBILE_MONEY', 'AIRTEL_MONEY', 'FLUTTERWAVE']).withMessage('Valid payment method is required'),
+  body('phoneNumber').isMobilePhone('any').withMessage('Valid phone number is required')
+], async (req: Request, res: Response) => {
+  try {
+    const errors = validationResult(req);
+    if (!errors.isEmpty()) {
+      return res.status(400).json({ errors: errors.array() });
+    }
 
-  const transactionId = `TXN${Date.now()}${Math.random().toString(36).substr(2, 6).toUpperCase()}`;
+    const { method, phoneNumber } = req.body;
 
-  return {
-    transactionId,
-    status: 'PENDING',
-    gatewayReference: `${method}_${transactionId}`,
-    message: 'Payment initiated successfully',
-    checkoutUrl: `https://sandbox.${method.toLowerCase()}.com/checkout/${transactionId}`
-  };
-}
+    const isValid = await PaymentGatewayFactory.validatePaymentMethod(
+      method as PaymentMethod,
+      phoneNumber,
+      'UG'
+    );
 
-async function verifyPaymentWithGateway(transactionId: string | null, method: PaymentMethod) {
-  if (!transactionId) {
-    return { status: 'FAILED' };
+    res.json({
+      valid: isValid,
+      method,
+      methodDisplayName: PaymentGatewayFactory.getMethodDisplayName(method as PaymentMethod),
+      phoneNumber,
+      message: isValid 
+        ? `Phone number is registered for ${PaymentGatewayFactory.getMethodDisplayName(method as PaymentMethod)}`
+        : `Phone number is not registered for ${PaymentGatewayFactory.getMethodDisplayName(method as PaymentMethod)}`
+    });
+  } catch (error) {
+    console.error('Error validating payment method:', error);
+    res.status(500).json({ error: 'Failed to validate payment method' });
   }
+});
 
-  // Simulate gateway verification
-  await new Promise(resolve => setTimeout(resolve, 500));
+// Get supported payment methods
+router.get('/methods', async (req: Request, res: Response) => {
+  try {
+    const methods = PaymentGatewayFactory.getSupportedMethods().map(method => ({
+      value: method,
+      label: PaymentGatewayFactory.getMethodDisplayName(method),
+      isOnline: PaymentGatewayFactory.isOnlinePayment(method)
+    }));
 
-  // Randomly simulate payment success/failure for demo
-  const isSuccess = Math.random() > 0.3; // 70% success rate
-  
-  return {
-    status: isSuccess ? 'COMPLETED' : 'FAILED',
-    verifiedAt: new Date()
-  };
-}
-
-function verifyWebhookSignature(gateway: string, data: any, headers: any): boolean {
-  // In real implementation, verify webhook signature
-  // This is gateway-specific implementation
-  return true; // Simplified for demo
-}
-
-function extractTransactionId(gateway: string, webhookData: any): string {
-  // Extract transaction ID based on gateway format
-  return webhookData.transaction_id || webhookData.transactionId || webhookData.id;
-}
-
-function mapGatewayStatus(gateway: string, gatewayStatus: string): string {
-  // Map gateway-specific status to our standard status
-  const statusMap: { [key: string]: string } = {
-    'success': 'COMPLETED',
-    'completed': 'COMPLETED',
-    'failed': 'FAILED',
-    'cancelled': 'FAILED',
-    'pending': 'PENDING'
-  };
-
-  return statusMap[gatewayStatus.toLowerCase()] || 'PENDING';
-}
+    res.json({
+      supportedMethods: methods,
+      defaultCurrency: 'UGX',
+      country: 'UG'
+    });
+  } catch (error) {
+    console.error('Error getting payment methods:', error);
+    res.status(500).json({ error: 'Failed to get payment methods' });
+  }
+});
 
 export default router;

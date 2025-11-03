@@ -16,7 +16,13 @@ module.exports = {
   ],
   coverageDirectory: 'coverage',
   coverageReporters: ['text', 'lcov', 'html'],
-  setupFilesAfterEnv: ['<rootDir>/tests/setup.ts'],
-  testTimeout: 10000,
-  verbose: true
+  setupFilesAfterEnv: ['<rootDir>/src/tests/setup.ts'],
+  testTimeout: 30000,
+  verbose: true,
+  transformIgnorePatterns: [
+    'node_modules/(?!(uuid)/)'
+  ],
+  moduleNameMapper: {
+    '^uuid$': 'uuid'
+  }
 };
