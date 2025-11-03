@@ -1,0 +1,93 @@
+# ===============================================
+# TransConnect Web - .gitignore
+# ===============================================
+
+# Environment Variables
+.env
+.env.local
+.env.development.local
+.env.test.local
+.env.production.local
+.env.*.local
+
+# Next.js build outputs
+.next/
+out/
+build/
+dist/
+
+# Node.js
+node_modules/
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+pnpm-debug.log*
+
+# TypeScript
+*.tsbuildinfo
+next-env.d.ts
+
+# Testing
+coverage/
+*.lcov
+.nyc_output
+test-results/
+jest-results.xml
+/playwright-report/
+/test-results/
+
+# Vercel deployment
+.vercel
+
+# ESLint and Prettier
+.eslintcache
+.prettiercache
+
+# Styling
+*.css.map
+.sass-cache/
+
+# IDE and editors
+.vscode/
+.idea/
+*.swp
+*.swo
+
+# OS generated files
+.DS_Store
+.DS_Store?
+._*
+.Spotlight-V100
+.Trashes
+ehthumbs.db
+Thumbs.db
+
+# Logs
+logs/
+*.log
+
+# Cache directories
+.cache/
+.parcel-cache/
+.turbo/
+
+# Storybook
+storybook-static/
+
+# Local development
+.local/
+.temp/
+
+# Bundle analyzer
+.next-bundle-analyze/
+
+# PWA files
+public/sw.js
+public/workbox-*.js
+
+# Sentry
+.sentryclirc
+
+# Miscellaneous
+*.tgz
+*.tar.gz
