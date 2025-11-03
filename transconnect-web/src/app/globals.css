@@ -79,11 +79,11 @@
   }
   
   .form-input {
-    @apply w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-colors;
+    @apply w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-colors text-base;
   }
   
   .form-select {
-    @apply w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 bg-white transition-colors;
+    @apply w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 bg-white transition-colors text-base;
   }
   
   .badge {
@@ -100,6 +100,54 @@
   
   .badge-warning {
     @apply bg-yellow-100 text-yellow-800;
+  }
+
+  /* Mobile-specific optimizations */
+  .mobile-touch-target {
+    @apply min-h-[44px] min-w-[44px]; /* Apple's recommended touch target size */
+  }
+
+  .mobile-input {
+    @apply text-base; /* Prevents zoom on iOS */
+  }
+
+  .mobile-card {
+    @apply mobile:mx-4 mobile:rounded-lg mobile:shadow-sm;
+  }
+
+  .mobile-grid {
+    @apply mobile:grid-cols-1 mobile:gap-3;
+  }
+
+  .mobile-padding {
+    @apply mobile:px-4 mobile:py-3;
+  }
+
+  .mobile-text {
+    @apply mobile:text-sm mobile:leading-6;
+  }
+
+  .mobile-button {
+    @apply mobile-touch-target mobile:w-full mobile:justify-center;
+  }
+
+  /* Responsive search form */
+  .search-form {
+    @apply flex mobile:flex-col mobile:space-y-4 mobile:space-x-0 md:flex-row md:space-x-4 md:space-y-0;
+  }
+
+  /* Responsive navigation */
+  .nav-mobile {
+    @apply mobile:fixed mobile:bottom-0 mobile:left-0 mobile:right-0 mobile:bg-white mobile:border-t mobile:z-50;
+  }
+
+  /* Safe area handling for iOS */
+  .safe-area-bottom {
+    @apply pb-[env(safe-area-inset-bottom)];
+  }
+
+  .safe-area-top {
+    @apply pt-[env(safe-area-inset-top)];
   }
 }
 

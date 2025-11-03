@@ -44,19 +44,19 @@ export default function LoginPage() {
     <div className="min-h-screen bg-gradient-to-br from-blue-50 to-indigo-100 flex items-center justify-center p-4">
       <div className="w-full max-w-md">
         {/* Header */}
-        <div className="text-center mb-8">
+        <div className="text-center mb-6 sm:mb-8">
           <div className="flex items-center justify-center mb-4">
-            <Bus className="h-12 w-12 text-blue-600" />
-            <h1 className="ml-3 text-3xl font-bold text-gray-900">TransConnect</h1>
+            <Bus className="h-10 w-10 sm:h-12 sm:w-12 text-blue-600" />
+            <h1 className="ml-3 text-2xl sm:text-3xl font-bold text-gray-900">TransConnect</h1>
           </div>
-          <p className="text-gray-600">Sign in to your account</p>
+          <p className="text-gray-600 text-sm sm:text-base">Sign in to your account</p>
         </div>
 
         <Card>
-          <CardHeader>
-            <CardTitle className="text-center">Welcome Back</CardTitle>
+          <CardHeader className="text-center pb-4">
+            <CardTitle className="text-xl sm:text-2xl">Welcome Back</CardTitle>
           </CardHeader>
-          <CardContent>
+          <CardContent className="px-4 sm:px-6 pb-6">
             <form onSubmit={handleSubmit} className="space-y-4">
               <div>
                 <label htmlFor="email" className="block text-sm font-medium text-gray-700 mb-1">
@@ -68,7 +68,7 @@ export default function LoginPage() {
                   value={email}
                   onChange={(e) => setEmail(e.target.value)}
                   placeholder="Enter your email"
-                  className="form-input"
+                  className="form-input text-base"
                   required
                 />
               </div>
@@ -84,13 +84,14 @@ export default function LoginPage() {
                     value={password}
                     onChange={(e) => setPassword(e.target.value)}
                     placeholder="Enter your password"
-                    className="form-input pr-10"
+                    className="form-input pr-12 text-base"
                     required
                   />
                   <button
                     type="button"
                     onClick={() => setShowPassword(!showPassword)}
-                    className="absolute right-3 top-1/2 transform -translate-y-1/2 text-gray-400 hover:text-gray-600"
+                    className="absolute right-3 top-1/2 transform -translate-y-1/2 text-gray-400 hover:text-gray-600 touch-manipulation min-h-[44px] min-w-[44px] flex items-center justify-center"
+                    aria-label={showPassword ? 'Hide password' : 'Show password'}
                   >
                     {showPassword ? <EyeOff className="h-5 w-5" /> : <Eye className="h-5 w-5" />}
                   </button>
@@ -99,7 +100,7 @@ export default function LoginPage() {
 
               <Button 
                 type="submit" 
-                className="w-full btn-primary" 
+                className="w-full btn-primary py-3 text-base font-semibold touch-manipulation" 
                 disabled={loading}
               >
                 {loading ? 'Signing In...' : 'Sign In'}
@@ -119,7 +120,7 @@ export default function LoginPage() {
                 variant="outline" 
                 size="sm" 
                 onClick={fillTestCredentials}
-                className="mt-2 w-full"
+                className="mt-3 w-full touch-manipulation"
               >
                 Fill Test Credentials
               </Button>
@@ -128,7 +129,7 @@ export default function LoginPage() {
             <div className="mt-6 text-center">
               <p className="text-sm text-gray-600">
                 Don't have an account?{' '}
-                <Link href="/register" className="text-blue-600 hover:text-blue-700 font-medium">
+                <Link href="/register" className="text-blue-600 hover:text-blue-700 font-medium touch-manipulation inline-block p-1">
                   Sign up here
                 </Link>
               </p>
@@ -137,7 +138,7 @@ export default function LoginPage() {
         </Card>
 
         <div className="mt-6 text-center">
-          <Link href="/" className="text-sm text-gray-500 hover:text-gray-700">
+          <Link href="/" className="text-sm text-gray-500 hover:text-gray-700 touch-manipulation inline-block p-2">
             ← Back to Home
           </Link>
         </div>
