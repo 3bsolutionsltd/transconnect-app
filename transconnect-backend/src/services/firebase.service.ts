@@ -9,28 +9,54 @@ interface FirebaseConfig {
 
 export class FirebaseService {
   private static instance: FirebaseService;
-  private app: admin.app.App;
+  private app: admin.app.App | null = null;
+  private isConfigured: boolean = false;
 
   private constructor() {
-    if (!admin.apps.length) {
-      const config: FirebaseConfig = {
-        projectId: process.env.FIREBASE_PROJECT_ID!,
-        privateKey: process.env.FIREBASE_PRIVATE_KEY?.replace(/\\n/g, '\n')!,
-        clientEmail: process.env.FIREBASE_CLIENT_EMAIL!,
-      };
+    this.initializeFirebase();
+  }
 
-      const serviceAccount: ServiceAccount = {
-        projectId: config.projectId,
-        privateKey: config.privateKey,
-        clientEmail: config.clientEmail,
-      };
+  private initializeFirebase(): void {
+    try {
+      // Check if Firebase environment variables are provided
+      const projectId = process.env.FIREBASE_PROJECT_ID;
+      const privateKey = process.env.FIREBASE_PRIVATE_KEY;
+      const clientEmail = process.env.FIREBASE_CLIENT_EMAIL;
 
-      this.app = admin.initializeApp({
-        credential: admin.credential.cert(serviceAccount),
-        projectId: config.projectId,
-      });
-    } else {
-      this.app = admin.apps[0]!;
+      if (!projectId || !privateKey || !clientEmail) {
+        console.log('🔥 Firebase credentials not provided - notifications will be disabled');
+        this.isConfigured = false;
+        return;
+      }
+
+      if (!admin.apps.length) {
+        const config: FirebaseConfig = {
+          projectId,
+          privateKey: privateKey.replace(/\\n/g, '\n'),
+          clientEmail,
+        };
+
+        const serviceAccount: ServiceAccount = {
+          projectId: config.projectId,
+          privateKey: config.privateKey,
+          clientEmail: config.clientEmail,
+        };
+
+        this.app = admin.initializeApp({
+          credential: admin.credential.cert(serviceAccount),
+          projectId: config.projectId,
+        });
+
+        this.isConfigured = true;
+        console.log('🔥 Firebase initialized successfully');
+      } else {
+        this.app = admin.app();
+        this.isConfigured = true;
+      }
+    } catch (error) {
+      console.error('🔥 Firebase initialization failed:', error);
+      this.isConfigured = false;
+      this.app = null;
     }
   }
 
@@ -42,6 +68,13 @@ export class FirebaseService {
   }
 
   /**
+   * Check if Firebase is properly configured
+   */
+  public isFirebaseConfigured(): boolean {
+    return this.isConfigured && this.app !== null;
+  }
+
+  /**
    * Send push notification to a single device
    */
   async sendToDevice(
@@ -50,6 +83,11 @@ export class FirebaseService {
     body: string,
     data?: Record<string, string>
   ): Promise<{ success: boolean; messageId?: string; error?: string }> {
+    if (!this.isConfigured || !this.app) {
+      console.log('🔥 Firebase not configured - notification skipped');
+      return { success: false, error: 'Firebase not configured' };
+    }
+
     try {
       const message: admin.messaging.Message = {
         token,
@@ -142,6 +180,11 @@ export class FirebaseService {
     body: string,
     data?: Record<string, string>
   ): Promise<{ successCount: number; failureCount: number; responses: any[] }> {
+    if (!this.isConfigured || !this.app) {
+      console.log('🔥 Firebase not configured - batch notification skipped');
+      return { successCount: 0, failureCount: tokens.length, responses: [] };
+    }
+
     try {
       const message: admin.messaging.MulticastMessage = {
         tokens,
