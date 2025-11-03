@@ -3,8 +3,10 @@ import { prisma } from '../index';
 import { authenticateToken } from '../middleware/auth';
 import { body, validationResult } from 'express-validator';
 import QRCode from 'qrcode';
+import { NotificationService } from '../services/notification.service';
 
 const router = Router();
+const notificationService = NotificationService.getInstance();
 
 // Get user's bookings
 router.get('/my-bookings', authenticateToken, async (req: Request, res: Response) => {
@@ -135,9 +137,28 @@ router.post('/', [
             bus: true,
             operator: true
           }
-        }
+        },
+        user: true
       }
     });
+
+    // Send booking confirmation notification
+    try {
+      await notificationService.sendBookingConfirmation({
+        userId: booking.userId,
+        bookingId: booking.id,
+        passengerName: `${booking.user.firstName} ${booking.user.lastName}`,
+        route: `${booking.route.origin} to ${booking.route.destination}`,
+        date: booking.travelDate.toLocaleDateString(),
+        time: booking.route.departureTime,
+        seatNumber: booking.seatNumber,
+        amount: booking.totalAmount,
+        qrCode: booking.id,
+      });
+    } catch (notificationError) {
+      console.error('Error sending booking confirmation notification:', notificationError);
+      // Don't fail the booking if notification fails
+    }
 
     res.status(201).json(booking);
   } catch (error) {

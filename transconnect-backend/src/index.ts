@@ -9,6 +9,11 @@ import { createServer } from 'http';
 import { Server } from 'socket.io';
 import dotenv from 'dotenv';
 
+// Import services
+import { DatabaseService } from './services/database.service';
+import { BackupService } from './services/backup.service';
+import { MonitoringService } from './services/monitoring.service';
+
 // Import routes
 import authRoutes from './routes/auth';
 import userRoutes from './routes/users';
@@ -19,6 +24,8 @@ import operatorRoutes from './routes/operators';
 import busRoutes from './routes/buses';
 import rideRoutes from './routes/rides';
 import qrRoutes from './routes/qr';
+import notificationRoutes from './routes/notifications';
+import databaseAdminRoutes from './routes/admin/database';
 
 dotenv.config();
 
@@ -31,8 +38,22 @@ const io = new Server(server, {
   }
 });
 
-// Initialize Prisma Client
-export const prisma = new PrismaClient();
+// Initialize Database Service (replaces direct Prisma Client)
+const dbService = DatabaseService.getInstance();
+export const prisma = dbService.getPrismaClient();
+
+// Initialize Production Services
+let backupService: BackupService;
+let monitoringService: MonitoringService;
+
+// Initialize services only in production or when explicitly enabled
+if (process.env.NODE_ENV === 'production' || process.env.ENABLE_PRODUCTION_FEATURES === 'true') {
+  backupService = BackupService.getInstance();
+  monitoringService = MonitoringService.getInstance();
+  console.log('🔧 Production database services initialized');
+} else {
+  console.log('⚠️  Production database services disabled (development mode)');
+}
 
 // Rate limiting
 const limiter = rateLimit({
@@ -60,14 +81,64 @@ app.use('/api/qr', qrRoutes);
 app.use('/api/operators', operatorRoutes);
 app.use('/api/buses', busRoutes);
 app.use('/api/rides', rideRoutes);
+app.use('/api/notifications', notificationRoutes);
+app.use('/api/admin/database', databaseAdminRoutes);
 
 // Health check endpoint
-app.get('/health', (req, res) => {
-  res.status(200).json({ 
-    status: 'OK', 
-    message: 'TransConnect Backend API is running',
-    timestamp: new Date().toISOString()
-  });
+app.get('/health', async (req, res) => {
+  try {
+    // Basic health check
+    const basicHealth = {
+      status: 'OK',
+      message: 'TransConnect Backend API is running',
+      timestamp: new Date().toISOString(),
+      environment: process.env.NODE_ENV || 'development',
+    };
+
+    // Enhanced health check with database status
+    if (process.env.NODE_ENV === 'production' || process.env.ENABLE_PRODUCTION_FEATURES === 'true') {
+      const dbHealth = await dbService.performHealthCheck();
+      res.status(200).json({
+        ...basicHealth,
+        database: {
+          connected: dbHealth.database,
+          redis: dbHealth.redis,
+          connectionPool: dbHealth.connectionPool,
+        },
+        services: {
+          backup: backupService ? 'enabled' : 'disabled',
+          monitoring: monitoringService ? 'enabled' : 'disabled',
+        },
+      });
+    } else {
+      res.status(200).json(basicHealth);
+    }
+  } catch (error: any) {
+    res.status(503).json({
+      status: 'ERROR',
+      message: 'Service health check failed',
+      error: error.message,
+      timestamp: new Date().toISOString(),
+    });
+  }
+});
+
+// API health check endpoint (for Render)
+app.get('/api/health', async (req, res) => {
+  try {
+    res.status(200).json({
+      status: 'OK',
+      timestamp: new Date().toISOString(),
+      service: 'TransConnect Backend API',
+      version: '1.0.0'
+    });
+  } catch (error: any) {
+    res.status(503).json({
+      status: 'ERROR',
+      error: error.message,
+      timestamp: new Date().toISOString(),
+    });
+  }
 });
 
 // WebSocket for real-time features
@@ -113,8 +184,55 @@ server.listen(PORT, () => {
 // Graceful shutdown
 process.on('SIGTERM', async () => {
   console.log('SIGTERM received, shutting down gracefully');
-  await prisma.$disconnect();
-  process.exit(0);
+  
+  try {
+    // Stop production services
+    if (monitoringService) {
+      await monitoringService.stop();
+      console.log('✅ Monitoring service stopped');
+    }
+    
+    if (backupService) {
+      backupService.stopScheduledBackups();
+      console.log('✅ Backup service stopped');
+    }
+    
+    // Disconnect database
+    await dbService.disconnect();
+    console.log('✅ Database disconnected');
+    
+    // Close server
+    server.close(() => {
+      console.log('✅ HTTP server closed');
+      process.exit(0);
+    });
+  } catch (error) {
+    console.error('❌ Error during shutdown:', error);
+    process.exit(1);
+  }
+});
+
+process.on('SIGINT', async () => {
+  console.log('SIGINT received, shutting down gracefully');
+  
+  try {
+    // Stop production services
+    if (monitoringService) {
+      await monitoringService.stop();
+    }
+    
+    if (backupService) {
+      backupService.stopScheduledBackups();
+    }
+    
+    // Disconnect database
+    await dbService.disconnect();
+    
+    process.exit(0);
+  } catch (error) {
+    console.error('Error during shutdown:', error);
+    process.exit(1);
+  }
 });
 
 export { io };

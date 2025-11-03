@@ -55,6 +55,9 @@ model User {
   rides        Ride[]
   payments     Payment[]
   operator     Operator?
+  notifications Notification[]
+  notificationPreferences UserNotificationPreference?
+  deviceTokens DeviceToken[]
 
   @@map("users")
 }
@@ -146,14 +149,31 @@ model Payment {
   status        PaymentStatus @default(PENDING)
   transactionId String?       @unique
   reference     String?       @unique
+  metadata      Json?         // Store additional payment data
   createdAt     DateTime      @default(now())
   updatedAt     DateTime      @updatedAt
 
   // Relations
-  booking Booking @relation(fields: [bookingId], references: [id], onDelete: Cascade)
-  user    User    @relation(fields: [userId], references: [id], onDelete: Cascade)
+  booking    Booking      @relation(fields: [bookingId], references: [id], onDelete: Cascade)
+  user       User         @relation(fields: [userId], references: [id], onDelete: Cascade)
+  webhookLogs WebhookLog[]
 
   @@map("payments")
+}
+
+model WebhookLog {
+  id            String   @id @default(cuid())
+  gateway       String   // mtn, airtel, flutterwave
+  transactionId String
+  paymentId     String?
+  status        String
+  payload       Json     // The webhook payload
+  processedAt   DateTime @default(now())
+
+  // Relations
+  payment Payment? @relation(fields: [paymentId], references: [id], onDelete: SetNull)
+
+  @@map("webhook_logs")
 }
 
 model Ride {
@@ -186,4 +206,120 @@ model Verification {
   booking Booking @relation(fields: [bookingId], references: [id], onDelete: Cascade)
 
   @@map("verifications")
+}
+
+// Notification Models
+model NotificationTemplate {
+  id          String   @id @default(cuid())
+  name        String   @unique
+  type        NotificationType
+  channel     NotificationChannel[]
+  subject     String?  // For email notifications
+  title       String   // Push notification title / SMS subject
+  body        String   // Notification content with placeholders
+  variables   Json?    // Available template variables
+  isActive    Boolean  @default(true)
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  // Relations
+  notifications Notification[]
+
+  @@map("notification_templates")
+}
+
+model Notification {
+  id          String   @id @default(cuid())
+  userId      String
+  templateId  String
+  type        NotificationType
+  channel     NotificationChannel
+  recipient   String   // Phone number, email, or FCM token
+  subject     String?
+  title       String
+  body        String
+  data        Json?    // Additional data for the notification
+  status      NotificationStatus @default(PENDING)
+  sentAt      DateTime?
+  readAt      DateTime?
+  errorMessage String?
+  retryCount  Int      @default(0)
+  maxRetries  Int      @default(3)
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  // Relations
+  user     User                 @relation(fields: [userId], references: [id], onDelete: Cascade)
+  template NotificationTemplate @relation(fields: [templateId], references: [id])
+
+  @@map("notifications")
+}
+
+model UserNotificationPreference {
+  id       String   @id @default(cuid())
+  userId   String   @unique
+  email    Boolean  @default(true)
+  sms      Boolean  @default(true)
+  push     Boolean  @default(true)
+  marketing Boolean @default(false)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  // Relations
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@map("user_notification_preferences")
+}
+
+model DeviceToken {
+  id        String   @id @default(cuid())
+  userId    String
+  token     String   @unique
+  platform  DevicePlatform
+  isActive  Boolean  @default(true)
+  lastUsed  DateTime @default(now())
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  // Relations
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@map("device_tokens")
+}
+
+// Enums for notifications
+enum NotificationType {
+  BOOKING_CONFIRMATION
+  PAYMENT_SUCCESS
+  PAYMENT_FAILED
+  TRIP_REMINDER
+  BUS_DELAYED
+  BUS_CANCELLED
+  RIDE_MATCHED
+  ACCOUNT_VERIFICATION
+  PROMOTIONAL
+  SYSTEM_MAINTENANCE
+  GENERAL
+}
+
+enum NotificationChannel {
+  EMAIL
+  SMS
+  PUSH
+  IN_APP
+}
+
+enum NotificationStatus {
+  PENDING
+  SENT
+  DELIVERED
+  READ
+  FAILED
+  CANCELLED
+}
+
+enum DevicePlatform {
+  ANDROID
+  IOS
+  WEB
 }
