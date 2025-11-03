@@ -173,12 +173,14 @@ app.use('*', (req, res) => {
 });
 
 const PORT = process.env.PORT || 5000;
-console.log('Starting TransConnect Backend...');
-console.log('Port cleared, restarting...');
+const HOST = process.env.HOST || '0.0.0.0';
 
-server.listen(PORT, () => {
-  console.log(`🚀 TransConnect Backend server running on port ${PORT}`);
-  console.log(`📊 Health check: http://localhost:${PORT}/health`);
+console.log('Starting TransConnect Backend...');
+console.log(`Port: ${PORT}, Host: ${HOST}`);
+
+server.listen(PORT, HOST, () => {
+  console.log(`🚀 TransConnect Backend server running on ${HOST}:${PORT}`);
+  console.log(`📊 Health check: http://${HOST}:${PORT}/health`);
 });
 
 // Graceful shutdown
