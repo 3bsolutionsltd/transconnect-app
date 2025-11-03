@@ -17,17 +17,19 @@
 2. Sign up or login
 3. Connect your GitHub account
 
-### Step 2: Push Code to GitHub
+### Step 2: Push Code to GitHub (if not already done)
 ```bash
-# If you haven't already, push your code to GitHub
-git add .
-git commit -m "Ready for Render deployment"
+# Your repository is already configured:
+# Repository: https://github.com/3bsolutionsltd/transconnect-app.git
+
+# If you haven't pushed yet, run:
+git push origin develop
 git push origin main
 ```
 
 ### Step 3: Create Web Service
 1. **Dashboard** → **New** → **Web Service**
-2. **Connect Repository**: Select your TransConnect repository
+2. **Connect Repository**: Select `3bsolutionsltd/transconnect-app`
 3. **Configure Service:**
    - **Name**: `transconnect-backend`
    - **Region**: `Oregon (US West)`
