@@ -56,7 +56,7 @@ echo 2. 📁 Connect your GitHub repository
 echo 3. 🚀 Create a new Web Service
 echo 4. ⚙️  Configure the following:
 echo.
-echo    Repository: YOUR_GITHUB_USERNAME/transconnect-mvp1
+echo    Repository: 3bsolutionsltd/transconnect-app
 echo    Branch: main
 echo    Root Directory: transconnect-backend
 echo    Environment: Node
