@@ -1,0 +1,174 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer base {
+  html {
+    font-family: 'Inter', system-ui, sans-serif;
+  }
+  
+  body {
+    @apply bg-gray-100 text-gray-900;
+  }
+}
+
+@layer components {
+  /* Mobile-first button styles */
+  .btn-primary {
+    @apply bg-blue-600 hover:bg-blue-700 text-white font-medium py-3 px-5 rounded-lg transition-all duration-200 shadow-sm hover:shadow-md;
+    min-height: 44px; /* Apple's recommended touch target size */
+  }
+  
+  .btn-secondary {
+    @apply bg-gray-200 hover:bg-gray-300 text-gray-900 font-medium py-3 px-5 rounded-lg transition-all duration-200;
+    min-height: 44px;
+  }
+  
+  .btn-outline {
+    @apply border-2 border-blue-600 text-blue-600 hover:bg-blue-600 hover:text-white font-medium py-2 px-4 rounded-lg transition-all duration-200;
+    min-height: 44px;
+  }
+  
+  /* Card styles with mobile optimization */
+  .card {
+    @apply bg-white rounded-xl shadow-sm border border-gray-200 p-4 sm:p-6 hover:shadow-md transition-shadow duration-200;
+  }
+  
+  /* Form input styles */
+  .form-input {
+    @apply w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-colors text-base;
+    min-height: 44px;
+  }
+  
+  .form-select {
+    @apply w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 bg-white transition-colors text-base;
+    min-height: 44px;
+  }
+  
+  /* Table responsive styles */
+  .table-responsive {
+    @apply overflow-x-auto;
+  }
+  
+  .table-responsive table {
+    @apply min-w-full;
+  }
+  
+  /* Navigation styles */
+  .nav-item {
+    @apply flex items-center px-3 py-3 text-sm font-medium rounded-md transition-colors;
+    min-height: 44px;
+  }
+  
+  .nav-item-active {
+    @apply bg-blue-100 text-blue-700;
+  }
+  
+  .nav-item-inactive {
+    @apply text-gray-600 hover:bg-gray-50 hover:text-gray-900;
+  }
+  
+  /* Mobile sidebar styles */
+  .mobile-sidebar {
+    @apply fixed inset-y-0 left-0 z-50 w-64 bg-white shadow-lg transform transition-transform duration-300 ease-in-out;
+  }
+  
+  .mobile-sidebar-open {
+    @apply translate-x-0;
+  }
+  
+  .mobile-sidebar-closed {
+    @apply -translate-x-full;
+  }
+  
+  /* Touch-friendly styles */
+  .touch-target {
+    min-height: 44px;
+    min-width: 44px;
+  }
+  
+  /* Safe area handling for mobile devices */
+  .safe-area-top {
+    padding-top: env(safe-area-inset-top);
+  }
+  
+  .safe-area-bottom {
+    padding-bottom: env(safe-area-inset-bottom);
+  }
+  
+  /* Mobile-optimized grid */
+  .mobile-grid {
+    @apply grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4;
+  }
+  
+  /* Text styles for mobile */
+  .text-mobile {
+    @apply text-sm leading-6;
+  }
+  
+  /* Spacing utilities for mobile */
+  .mobile-spacing {
+    @apply px-4 py-3 sm:px-6 sm:py-4;
+  }
+}
+
+@layer utilities {
+  /* Utility for preventing zoom on iOS */
+  .prevent-zoom {
+    font-size: 16px;
+  }
+  
+  /* Utility for smooth scrolling */
+  .smooth-scroll {
+    scroll-behavior: smooth;
+  }
+  
+  /* Utility for touch manipulation */
+  .touch-manipulation {
+    touch-action: manipulation;
+  }
+  
+  /* Utility for handling long text on mobile */
+  .mobile-text-wrap {
+    word-wrap: break-word;
+    overflow-wrap: break-word;
+  }
+}
+
+/* Mobile-specific media queries */
+@media (max-width: 640px) {
+  /* Hide less important columns on mobile */
+  .mobile-hide {
+    display: none;
+  }
+  
+  /* Stack elements vertically on mobile */
+  .mobile-stack {
+    flex-direction: column;
+    align-items: stretch;
+  }
+  
+  /* Full width on mobile */
+  .mobile-full {
+    width: 100%;
+  }
+  
+  /* Adjust padding for mobile */
+  .mobile-padding {
+    padding: 1rem;
+  }
+}
+
+/* Tablet-specific styles */
+@media (min-width: 641px) and (max-width: 1024px) {
+  .tablet-grid {
+    grid-template-columns: repeat(2, 1fr);
+  }
+}
+
+/* Desktop-specific styles */
+@media (min-width: 1025px) {
+  .desktop-grid {
+    grid-template-columns: repeat(4, 1fr);
+  }
+}
