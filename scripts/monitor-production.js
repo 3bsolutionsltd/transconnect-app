@@ -13,7 +13,7 @@ console.log('🔍 TransConnect Production Status Monitor\n');
 
 const services = {
   backend: 'https://transconnect-app-44ie.onrender.com/health',
-  web: 'https://transconnect-app-yh7k.vercel.app',
+  web: 'https://transconnect-app.vercel.app',
   admin: 'https://transconnect-admin.vercel.app'
 };
 
