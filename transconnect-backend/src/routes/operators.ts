@@ -1,6 +1,7 @@
 import { Router, Request, Response } from 'express';
 import { prisma } from '../index';
 import { authenticateToken } from '../middleware/auth';
+import bcrypt from 'bcryptjs';
 
 const router = Router();
 
@@ -51,22 +52,41 @@ router.get('/', async (req: Request, res: Response) => {
 // Create operator
 router.post('/', authenticateToken, async (req: Request, res: Response) => {
   try {
-    const { companyName, license, contactPerson, email, phone, password } = req.body;
+    const { companyName, license, firstName, lastName, email, phone, password, approved } = req.body;
 
-    if (!companyName || !license || !contactPerson || !email || !phone) {
+    if (!companyName || !license || !firstName || !lastName || !email || !phone) {
       return res.status(400).json({ 
-        error: 'Company name, license, contact person, email, and phone are required' 
+        error: 'Company name, license, first name, last name, email, and phone are required' 
       });
     }
+
+    // Check if email or phone already exists
+    const existingUser = await prisma.user.findFirst({
+      where: {
+        OR: [
+          { email },
+          { phone }
+        ]
+      }
+    });
+
+    if (existingUser) {
+      return res.status(400).json({ 
+        error: 'A user with this email or phone number already exists' 
+      });
+    }
+
+    // Hash password
+    const hashedPassword = await bcrypt.hash(password || 'defaultpass123', 10);
 
     // First create the user
     const user = await prisma.user.create({
       data: {
-        firstName: contactPerson.split(' ')[0] || contactPerson,
-        lastName: contactPerson.split(' ').slice(1).join(' ') || '',
+        firstName,
+        lastName,
         email,
         phone,
-        password: password || 'defaultpass123', // Should be hashed in production
+        password: hashedPassword,
         role: 'OPERATOR',
         verified: true
       }
@@ -78,7 +98,7 @@ router.post('/', authenticateToken, async (req: Request, res: Response) => {
         companyName,
         license,
         userId: user.id,
-        approved: true // Auto-approve for MVP
+        approved: approved || false
       },
       include: {
         user: {
@@ -97,6 +117,165 @@ router.post('/', authenticateToken, async (req: Request, res: Response) => {
   } catch (error) {
     console.error('Error creating operator:', error);
     res.status(500).json({ error: 'Failed to create operator' });
+  }
+});
+
+// Get operator by ID
+router.get('/:id', async (req: Request, res: Response) => {
+  try {
+    const { id } = req.params;
+    const operator = await prisma.operator.findUnique({
+      where: { id: parseInt(id) },
+      include: {
+        user: {
+          select: {
+            id: true,
+            firstName: true,
+            lastName: true,
+            email: true,
+            phone: true
+          }
+        },
+        buses: {
+          select: {
+            id: true,
+            plateNumber: true,
+            model: true,
+            capacity: true
+          }
+        },
+        routes: {
+          select: {
+            id: true,
+            origin: true,
+            destination: true,
+            price: true,
+            active: true
+          }
+        }
+      }
+    });
+
+    if (!operator) {
+      return res.status(404).json({ error: 'Operator not found' });
+    }
+
+    res.json(operator);
+  } catch (error) {
+    console.error('Error fetching operator:', error);
+    res.status(500).json({ error: 'Failed to fetch operator' });
+  }
+});
+
+// Update operator
+router.put('/:id', authenticateToken, async (req: Request, res: Response) => {
+  try {
+    const { id } = req.params;
+    const { companyName, license, firstName, lastName, email, phone, approved } = req.body;
+
+    // Get the existing operator with user info
+    const existingOperator = await prisma.operator.findUnique({
+      where: { id: parseInt(id) },
+      include: { user: true }
+    });
+
+    if (!existingOperator) {
+      return res.status(404).json({ error: 'Operator not found' });
+    }
+
+    // Check if email or phone conflicts with other users
+    if (email || phone) {
+      const conflictingUser = await prisma.user.findFirst({
+        where: {
+          AND: [
+            { id: { not: existingOperator.userId } },
+            {
+              OR: [
+                ...(email ? [{ email }] : []),
+                ...(phone ? [{ phone }] : [])
+              ]
+            }
+          ]
+        }
+      });
+
+      if (conflictingUser) {
+        return res.status(400).json({ 
+          error: 'A user with this email or phone number already exists' 
+        });
+      }
+    }
+
+    // Update user information if provided
+    if (firstName || lastName || email || phone) {
+      await prisma.user.update({
+        where: { id: existingOperator.userId },
+        data: {
+          ...(firstName && { firstName }),
+          ...(lastName && { lastName }),
+          ...(email && { email }),
+          ...(phone && { phone })
+        }
+      });
+    }
+
+    // Update operator information
+    const operator = await prisma.operator.update({
+      where: { id: parseInt(id) },
+      data: {
+        ...(companyName && { companyName }),
+        ...(license && { license }),
+        ...(approved !== undefined && { approved })
+      },
+      include: {
+        user: {
+          select: {
+            id: true,
+            firstName: true,
+            lastName: true,
+            email: true,
+            phone: true
+          }
+        }
+      }
+    });
+
+    res.json(operator);
+  } catch (error) {
+    console.error('Error updating operator:', error);
+    res.status(500).json({ error: 'Failed to update operator' });
+  }
+});
+
+// Delete operator
+router.delete('/:id', authenticateToken, async (req: Request, res: Response) => {
+  try {
+    const { id } = req.params;
+
+    // Get the operator with user info
+    const operator = await prisma.operator.findUnique({
+      where: { id: parseInt(id) },
+      include: { user: true }
+    });
+
+    if (!operator) {
+      return res.status(404).json({ error: 'Operator not found' });
+    }
+
+    // Delete operator first (due to foreign key constraint)
+    await prisma.operator.delete({
+      where: { id: parseInt(id) }
+    });
+
+    // Then delete the associated user
+    await prisma.user.delete({
+      where: { id: operator.userId }
+    });
+
+    res.json({ message: 'Operator deleted successfully' });
+  } catch (error) {
+    console.error('Error deleting operator:', error);
+    res.status(500).json({ error: 'Failed to delete operator' });
   }
 });
 
