@@ -18,6 +18,7 @@ interface Route {
   id: string;
   origin: string;
   destination: string;
+  via?: string;
   distance: number;
   duration: number;
   price: number;
@@ -37,6 +38,8 @@ interface Route {
 
 const RouteManagement: React.FC = () => {
   const [routes, setRoutes] = useState<Route[]>([]);
+  const [operators, setOperators] = useState<any[]>([]);
+  const [buses, setBuses] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
   const [searchTerm, setSearchTerm] = useState('');
   const [showAddModal, setShowAddModal] = useState(false);
@@ -44,10 +47,13 @@ const RouteManagement: React.FC = () => {
   const [formData, setFormData] = useState({
     origin: '',
     destination: '',
+    via: '',
     distance: '',
     duration: '',
     price: '',
     departureTime: '',
+    operatorId: '',
+    busId: '',
     active: true
   });
 
@@ -55,6 +61,8 @@ const RouteManagement: React.FC = () => {
 
   useEffect(() => {
     fetchRoutes();
+    fetchOperators();
+    fetchBuses();
   }, []);
 
   const fetchRoutes = async () => {
@@ -75,6 +83,44 @@ const RouteManagement: React.FC = () => {
       console.error('Error fetching routes:', error);
     } finally {
       setLoading(false);
+    }
+  };
+
+  const fetchOperators = async () => {
+    try {
+      const token = localStorage.getItem('admin_token');
+      const response = await fetch(`${API_BASE_URL}/operators`, {
+        headers: {
+          'Authorization': `Bearer ${token}`,
+          'Content-Type': 'application/json'
+        }
+      });
+
+      if (response.ok) {
+        const data = await response.json();
+        setOperators(data);
+      }
+    } catch (error) {
+      console.error('Error fetching operators:', error);
+    }
+  };
+
+  const fetchBuses = async () => {
+    try {
+      const token = localStorage.getItem('admin_token');
+      const response = await fetch(`${API_BASE_URL}/buses`, {
+        headers: {
+          'Authorization': `Bearer ${token}`,
+          'Content-Type': 'application/json'
+        }
+      });
+
+      if (response.ok) {
+        const data = await response.json();
+        setBuses(data);
+      }
+    } catch (error) {
+      console.error('Error fetching buses:', error);
     }
   };
 
@@ -157,10 +203,13 @@ const RouteManagement: React.FC = () => {
     setFormData({
       origin: '',
       destination: '',
+      via: '',
       distance: '',
       duration: '',
       price: '',
       departureTime: '',
+      operatorId: '',
+      busId: '',
       active: true
     });
   };
@@ -170,10 +219,13 @@ const RouteManagement: React.FC = () => {
     setFormData({
       origin: route.origin,
       destination: route.destination,
+      via: route.via || '',
       distance: route.distance.toString(),
       duration: route.duration.toString(),
       price: route.price.toString(),
       departureTime: route.departureTime,
+      operatorId: route.operator.id,
+      busId: route.bus.id,
       active: route.active
     });
     setShowAddModal(true);
@@ -182,6 +234,7 @@ const RouteManagement: React.FC = () => {
   const filteredRoutes = routes.filter(route =>
     route.origin.toLowerCase().includes(searchTerm.toLowerCase()) ||
     route.destination.toLowerCase().includes(searchTerm.toLowerCase()) ||
+    (route.via && route.via.toLowerCase().includes(searchTerm.toLowerCase())) ||
     route.operator.companyName.toLowerCase().includes(searchTerm.toLowerCase())
   );
 
@@ -322,6 +375,11 @@ const RouteManagement: React.FC = () => {
                     <div>
                       <div className="font-medium text-gray-900">
                         {route.origin} → {route.destination}
+                        {route.via && (
+                          <span className="text-sm font-normal text-blue-600 ml-2">
+                            (via {route.via})
+                          </span>
+                        )}
                       </div>
                       <div className="text-sm text-gray-600">
                         Departure: {route.departureTime}
@@ -453,6 +511,22 @@ const RouteManagement: React.FC = () => {
                 </div>
               </div>
               
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">
+                  Via (Optional)
+                </label>
+                <input
+                  type="text"
+                  value={formData.via}
+                  onChange={(e) => setFormData({...formData, via: e.target.value})}
+                  placeholder="e.g., Jinja, Mukono (intermediate towns/stops)"
+                  className="w-full px-3 py-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                />
+                <p className="text-xs text-gray-500 mt-1">
+                  List intermediate towns or stops separated by commas
+                </p>
+              </div>
+              
               <div className="grid grid-cols-2 gap-4">
                 <div>
                   <label className="block text-sm font-medium text-gray-700 mb-1">
@@ -505,6 +579,49 @@ const RouteManagement: React.FC = () => {
                     className="w-full px-3 py-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-blue-500 focus:border-transparent"
                     required
                   />
+                </div>
+              </div>
+
+              <div className="grid grid-cols-2 gap-4">
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">
+                    Operator
+                  </label>
+                  <select
+                    value={formData.operatorId}
+                    onChange={(e) => setFormData({...formData, operatorId: e.target.value, busId: ''})}
+                    className="w-full px-3 py-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                    required
+                  >
+                    <option value="">Select Operator</option>
+                    {operators.map((operator) => (
+                      <option key={operator.id} value={operator.id}>
+                        {operator.companyName}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">
+                    Bus
+                  </label>
+                  <select
+                    value={formData.busId}
+                    onChange={(e) => setFormData({...formData, busId: e.target.value})}
+                    className="w-full px-3 py-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                    required
+                    disabled={!formData.operatorId}
+                  >
+                    <option value="">Select Bus</option>
+                    {buses
+                      .filter(bus => bus.operatorId === formData.operatorId)
+                      .map((bus) => (
+                        <option key={bus.id} value={bus.id}>
+                          {bus.plateNumber} - {bus.model} ({bus.capacity} seats)
+                        </option>
+                      ))
+                    }
+                  </select>
                 </div>
               </div>
 
