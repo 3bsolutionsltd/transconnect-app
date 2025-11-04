@@ -225,6 +225,7 @@ const OperatorManagement: React.FC = () => {
   };
 
   const deleteOperator = async (operatorId: string) => {
+    // eslint-disable-next-line no-restricted-globals
     if (!confirm('Are you sure you want to delete this operator? This action cannot be undone.')) {
       return;
     }
@@ -252,6 +253,7 @@ const OperatorManagement: React.FC = () => {
   };
 
   const deleteBus = async (busId: string) => {
+    // eslint-disable-next-line no-restricted-globals
     if (!confirm('Are you sure you want to delete this bus? This action cannot be undone.')) {
       return;
     }
