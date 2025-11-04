@@ -293,7 +293,8 @@ router.post('/', async (req: Request, res: Response) => {
   try {
     const { 
       origin, 
-      destination, 
+      destination,
+      via, 
       distance, 
       duration, 
       price, 
@@ -332,6 +333,7 @@ router.post('/', async (req: Request, res: Response) => {
       data: {
         origin,
         destination,
+        via: via || null,
         distance: parseFloat(distance),
         duration: parseInt(duration),
         price: parseFloat(price),
@@ -371,7 +373,8 @@ router.put('/:id', async (req: Request, res: Response) => {
     const { id } = req.params;
     const { 
       origin, 
-      destination, 
+      destination,
+      via, 
       distance, 
       duration, 
       price, 
@@ -392,6 +395,7 @@ router.put('/:id', async (req: Request, res: Response) => {
     const updateData: any = {};
     if (origin !== undefined) updateData.origin = origin;
     if (destination !== undefined) updateData.destination = destination;
+    if (via !== undefined) updateData.via = via || null;
     if (distance !== undefined) updateData.distance = parseFloat(distance);
     if (duration !== undefined) updateData.duration = parseInt(duration);
     if (price !== undefined) updateData.price = parseFloat(price);

@@ -101,6 +101,7 @@ model Route {
   id          String   @id @default(cuid())
   origin      String
   destination String
+  via         String?  // Optional intermediate stops/towns
   distance    Float // in kilometers
   duration    Int   // in minutes
   price       Float
