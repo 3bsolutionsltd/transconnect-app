@@ -13,8 +13,8 @@ import {
   Bell,
   LogOut
 } from 'lucide-react';
-import { AuthProvider, useAuth } from './contexts/AuthContext';
-import LoginPage from './components/LoginPage';
+import { AuthProvider, useAuth } from './contexts/AuthContext.tsx';
+import LoginPage from './components/LoginPage.tsx';
 
 // Dashboard Component
 const Dashboard = () => {
