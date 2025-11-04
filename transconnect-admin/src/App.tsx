@@ -14,12 +14,14 @@ import {
   LogOut,
   Calendar,
   DollarSign,
-  TrendingUp
+  TrendingUp,
+  Building2
 } from 'lucide-react';
 import { AuthProvider, useAuth } from './contexts/AuthContext.tsx';
 import LoginPage from './components/LoginPage.tsx';
 import RouteManagement from './components/RouteManagement.tsx';
 import UserManagement from './components/UserManagement.tsx';
+import OperatorManagement from './components/OperatorManagement.tsx';
 
 // Dashboard Component
 const Dashboard = () => {
@@ -515,6 +517,7 @@ const AuthenticatedApp = () => {
   const navigation = [
     { name: 'Dashboard', href: '/', icon: Home },
     { name: 'Routes', href: '/routes', icon: MapPin },
+    { name: 'Operators', href: '/operators', icon: Building2 },
     { name: 'Analytics', href: '/analytics', icon: BarChart3 },
     { name: 'Users', href: '/users', icon: Users },
     { name: 'Settings', href: '/settings', icon: Settings },
@@ -626,6 +629,7 @@ const AuthenticatedApp = () => {
             <Routes>
               <Route path="/" element={<Dashboard />} />
               <Route path="/routes" element={<RouteManagement />} />
+              <Route path="/operators" element={<OperatorManagement />} />
               <Route path="/analytics" element={<Analytics />} />
               <Route path="/users" element={<UserManagement />} />
               <Route path="/settings" element={<div>Settings page coming soon...</div>} />
