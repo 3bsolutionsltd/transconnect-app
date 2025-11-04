@@ -2,6 +2,7 @@
   "name": "transconnect-admin",
   "version": "0.1.0",
   "description": "TransConnect Admin Dashboard - Operator and System Management",
+  "homepage": ".",
   "private": true,
   "dependencies": {
     "react": "^18.2.0",
