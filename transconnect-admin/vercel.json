@@ -1,40 +1,12 @@
 {
-  "version": 2,
-  "name": "transconnect-admin",
   "rewrites": [
     {
       "source": "/api/(.*)",
       "destination": "https://transconnect-app-44ie.onrender.com/api/$1"
-    }
-  ],
-  "redirects": [
+    },
     {
       "source": "/(.*)",
-      "destination": "/index.html",
-      "permanent": false
-    }
-  ],
-  "env": {
-    "REACT_APP_API_URL": "https://transconnect-app-44ie.onrender.com",
-    "REACT_APP_ENVIRONMENT": "production"
-  },
-  "headers": [
-    {
-      "source": "/(.*)",
-      "headers": [
-        {
-          "key": "X-Content-Type-Options",
-          "value": "nosniff"
-        },
-        {
-          "key": "X-Frame-Options",
-          "value": "DENY"
-        },
-        {
-          "key": "X-XSS-Protection",
-          "value": "1; mode=block"
-        }
-      ]
+      "destination": "/index.html"
     }
   ]
 }
