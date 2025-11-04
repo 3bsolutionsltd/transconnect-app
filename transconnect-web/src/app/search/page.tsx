@@ -100,6 +100,11 @@ export default function SearchPage() {
                   <div className="flex-1">
                     <div className="text-lg sm:text-xl font-semibold text-gray-900 mb-3 sm:mb-2">
                       {route.origin} → {route.destination}
+                      {route.via && (
+                        <span className="text-sm font-normal text-blue-600 ml-2">
+                          (via {route.via})
+                        </span>
+                      )}
                     </div>
                     <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3 sm:gap-4 text-sm text-gray-600 mb-4">
                       <div>
