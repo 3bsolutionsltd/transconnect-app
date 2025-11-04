@@ -10,96 +10,113 @@ import {
   Home,
   CreditCard,
   MapPin,
-  Bell
+  Bell,
+  LogOut
 } from 'lucide-react';
+import { AuthProvider, useAuth } from './contexts/AuthContext';
+import LoginPage from './components/LoginPage';
 
 // Dashboard Component
-const Dashboard = () => (
-  <div className="space-y-6">
-    <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between">
-      <h1 className="text-2xl sm:text-3xl font-bold text-gray-900 mb-4 sm:mb-0">Dashboard</h1>
-      <div className="text-sm text-gray-500">
-        Last updated: {new Date().toLocaleDateString()}
-      </div>
-    </div>
-    
-    {/* Stats Grid */}
-    <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 sm:gap-6">
-      <div className="bg-white p-4 sm:p-6 rounded-lg shadow border">
-        <div className="flex items-center">
-          <div className="p-2 bg-blue-100 rounded-lg">
-            <Bus className="h-6 w-6 text-blue-600" />
-          </div>
-          <div className="ml-4">
-            <p className="text-sm font-medium text-gray-600">Total Routes</p>
-            <p className="text-2xl font-semibold text-gray-900">24</p>
-          </div>
-        </div>
-      </div>
-      
-      <div className="bg-white p-4 sm:p-6 rounded-lg shadow border">
-        <div className="flex items-center">
-          <div className="p-2 bg-green-100 rounded-lg">
-            <Users className="h-6 w-6 text-green-600" />
-          </div>
-          <div className="ml-4">
-            <p className="text-sm font-medium text-gray-600">Active Users</p>
-            <p className="text-2xl font-semibold text-gray-900">1,234</p>
-          </div>
-        </div>
-      </div>
-      
-      <div className="bg-white p-4 sm:p-6 rounded-lg shadow border">
-        <div className="flex items-center">
-          <div className="p-2 bg-yellow-100 rounded-lg">
-            <CreditCard className="h-6 w-6 text-yellow-600" />
-          </div>
-          <div className="ml-4">
-            <p className="text-sm font-medium text-gray-600">Today's Revenue</p>
-            <p className="text-2xl font-semibold text-gray-900">UGX 2.1M</p>
-          </div>
-        </div>
-      </div>
-      
-      <div className="bg-white p-4 sm:p-6 rounded-lg shadow border">
-        <div className="flex items-center">
-          <div className="p-2 bg-purple-100 rounded-lg">
-            <BarChart3 className="h-6 w-6 text-purple-600" />
-          </div>
-          <div className="ml-4">
-            <p className="text-sm font-medium text-gray-600">Bookings Today</p>
-            <p className="text-2xl font-semibold text-gray-900">89</p>
-          </div>
-        </div>
-      </div>
-    </div>
+const Dashboard = () => {
+  const { user } = useAuth();
 
-    {/* Recent Activity */}
-    <div className="bg-white rounded-lg shadow border">
-      <div className="p-4 sm:p-6 border-b border-gray-200">
-        <h2 className="text-lg font-semibold text-gray-900">Recent Activity</h2>
+  return (
+    <div className="space-y-6">
+      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between">
+        <h1 className="text-2xl sm:text-3xl font-bold text-gray-900 mb-4 sm:mb-0">Dashboard</h1>
+        <div className="text-sm text-gray-500">
+          Last updated: {new Date().toLocaleDateString()}
+        </div>
       </div>
-      <div className="p-4 sm:p-6">
-        <div className="space-y-4">
-          {[
-            { action: 'New booking', details: 'Kampala to Jinja', time: '2 minutes ago' },
-            { action: 'Route updated', details: 'Entebbe Airport Express', time: '15 minutes ago' },
-            { action: 'Payment processed', details: 'UGX 45,000', time: '23 minutes ago' },
-            { action: 'User registered', details: 'John Doe', time: '1 hour ago' },
-          ].map((item, index) => (
-            <div key={index} className="flex flex-col sm:flex-row sm:items-center sm:justify-between py-2 border-b border-gray-100 last:border-b-0">
-              <div>
-                <p className="font-medium text-gray-900">{item.action}</p>
-                <p className="text-sm text-gray-600">{item.details}</p>
-              </div>
-              <span className="text-xs text-gray-500 mt-1 sm:mt-0">{item.time}</span>
+      
+      {/* Welcome Message */}
+      <div className="bg-blue-50 border border-blue-200 rounded-lg p-4">
+        <h2 className="text-lg font-semibold text-blue-900 mb-2">
+          Welcome back, {user?.firstName}!
+        </h2>
+        <p className="text-blue-700">
+          You're logged in as {user?.role}. Here's your business overview.
+        </p>
+      </div>
+      
+      {/* Stats Grid */}
+      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 sm:gap-6">
+        <div className="bg-white p-4 sm:p-6 rounded-lg shadow border">
+          <div className="flex items-center">
+            <div className="p-2 bg-blue-100 rounded-lg">
+              <Bus className="h-6 w-6 text-blue-600" />
             </div>
-          ))}
+            <div className="ml-4">
+              <p className="text-sm font-medium text-gray-600">Total Routes</p>
+              <p className="text-2xl font-semibold text-gray-900">4</p>
+            </div>
+          </div>
+        </div>
+        
+        <div className="bg-white p-4 sm:p-6 rounded-lg shadow border">
+          <div className="flex items-center">
+            <div className="p-2 bg-green-100 rounded-lg">
+              <Users className="h-6 w-6 text-green-600" />
+            </div>
+            <div className="ml-4">
+              <p className="text-sm font-medium text-gray-600">Active Users</p>
+              <p className="text-2xl font-semibold text-gray-900">1,234</p>
+            </div>
+          </div>
+        </div>
+        
+        <div className="bg-white p-4 sm:p-6 rounded-lg shadow border">
+          <div className="flex items-center">
+            <div className="p-2 bg-yellow-100 rounded-lg">
+              <CreditCard className="h-6 w-6 text-yellow-600" />
+            </div>
+            <div className="ml-4">
+              <p className="text-sm font-medium text-gray-600">Today's Revenue</p>
+              <p className="text-2xl font-semibold text-gray-900">UGX 2.1M</p>
+            </div>
+          </div>
+        </div>
+        
+        <div className="bg-white p-4 sm:p-6 rounded-lg shadow border">
+          <div className="flex items-center">
+            <div className="p-2 bg-purple-100 rounded-lg">
+              <BarChart3 className="h-6 w-6 text-purple-600" />
+            </div>
+            <div className="ml-4">
+              <p className="text-sm font-medium text-gray-600">Bookings Today</p>
+              <p className="text-2xl font-semibold text-gray-900">89</p>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      {/* Recent Activity */}
+      <div className="bg-white rounded-lg shadow border">
+        <div className="p-4 sm:p-6 border-b border-gray-200">
+          <h2 className="text-lg font-semibold text-gray-900">Recent Activity</h2>
+        </div>
+        <div className="p-4 sm:p-6">
+          <div className="space-y-4">
+            {[
+              { action: 'New booking', details: 'Kampala to Jinja', time: '2 minutes ago' },
+              { action: 'Route updated', details: 'Entebbe Airport Express', time: '15 minutes ago' },
+              { action: 'Payment processed', details: 'UGX 45,000', time: '23 minutes ago' },
+              { action: 'User registered', details: 'John Doe', time: '1 hour ago' },
+            ].map((item, index) => (
+              <div key={index} className="flex flex-col sm:flex-row sm:items-center sm:justify-between py-2 border-b border-gray-100 last:border-b-0">
+                <div>
+                  <p className="font-medium text-gray-900">{item.action}</p>
+                  <p className="text-sm text-gray-600">{item.details}</p>
+                </div>
+                <span className="text-xs text-gray-500 mt-1 sm:mt-0">{item.time}</span>
+              </div>
+            ))}
+          </div>
         </div>
       </div>
     </div>
-  </div>
-);
+  );
+};
 
 // Bus Routes Component
 const BusRoutes = () => (
@@ -187,9 +204,10 @@ const Analytics = () => (
   </div>
 );
 
-// Main App Component
-function App() {
+// Main App Component with Authentication
+const AuthenticatedApp = () => {
   const [sidebarOpen, setSidebarOpen] = useState(false);
+  const { user, logout } = useAuth();
   const location = useLocation();
 
   const navigation = [
@@ -253,6 +271,28 @@ function App() {
             })}
           </div>
         </nav>
+
+        {/* Sidebar Footer - User Info & Logout */}
+        <div className="absolute bottom-0 left-0 right-0 p-4 border-t border-gray-200 bg-white">
+          <div className="flex items-center space-x-3 mb-3">
+            <div className="bg-blue-100 rounded-full p-2">
+              <Users className="h-5 w-5 text-blue-600" />
+            </div>
+            <div className="flex-1 min-w-0">
+              <p className="text-sm font-medium text-gray-900 truncate">
+                {user?.firstName} {user?.lastName}
+              </p>
+              <p className="text-xs text-gray-500 truncate">{user?.role}</p>
+            </div>
+          </div>
+          <button
+            onClick={logout}
+            className="w-full flex items-center px-3 py-2 text-sm text-gray-600 hover:text-gray-900 hover:bg-gray-50 rounded-md transition-colors"
+          >
+            <LogOut className="mr-3 h-4 w-4" />
+            Sign Out
+          </button>
+        </div>
       </div>
 
       {/* Main content */}
@@ -269,7 +309,7 @@ function App() {
             
             <div className="flex items-center space-x-4">
               <span className="text-sm text-gray-500 hidden sm:block">
-                Welcome back, Admin
+                Welcome back, {user?.firstName}
               </span>
               <button className="p-2 text-gray-400 hover:text-gray-600">
                 <Bell className="h-5 w-5" />
@@ -293,6 +333,35 @@ function App() {
       </div>
     </div>
   );
+};
+
+function App() {
+  return (
+    <AuthProvider>
+      <AppContent />
+    </AuthProvider>
+  );
 }
+
+const AppContent = () => {
+  const { isAuthenticated, loading } = useAuth();
+
+  if (loading) {
+    return (
+      <div className="min-h-screen bg-gray-100 flex items-center justify-center">
+        <div className="text-center">
+          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600 mx-auto mb-4"></div>
+          <p className="text-gray-600">Loading...</p>
+        </div>
+      </div>
+    );
+  }
+
+  if (!isAuthenticated) {
+    return <LoginPage />;
+  }
+
+  return <AuthenticatedApp />;
+};
 
 export default App;
