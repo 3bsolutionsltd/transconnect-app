@@ -59,6 +59,7 @@ export default function Analytics() {
       { date: '2024-01-06', bookings: 55, revenue: 825000 },
       { date: '2024-01-07', bookings: 43, revenue: 645000 }
     ],
+    // Routes data for analytics dashboard
     routes: [
       { route: 'Kampala → Jinja', bookings: 89, revenue: 1335000, occupancy: 85 },
       { route: 'Kampala → Mbarara', bookings: 67, revenue: 1675000, occupancy: 78 },
