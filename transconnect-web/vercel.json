@@ -1,12 +1,6 @@
 {
   "version": 2,
   "name": "transconnect-web",
-  "builds": [
-    {
-      "src": "next.config.js",
-      "use": "@vercel/next"
-    }
-  ],
   "rewrites": [
     {
       "source": "/api/(.*)",

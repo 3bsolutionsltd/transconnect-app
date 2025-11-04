@@ -13,9 +13,8 @@ console.log('🔍 TransConnect Production Status Monitor\n');
 
 const services = {
   backend: 'https://transconnect-app-44ie.onrender.com/health',
-  // Add frontend URLs after deployment
-  web: null, // Will be: https://transconnect-web-xxx.vercel.app
-  admin: null // Will be: https://transconnect-admin-xxx.vercel.app
+  web: 'https://transconnect-app-yh7k.vercel.app',
+  admin: 'https://transconnect-admin.vercel.app'
 };
 
 async function checkService(name, url) {
