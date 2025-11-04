@@ -11,7 +11,10 @@ import {
   CreditCard,
   MapPin,
   Bell,
-  LogOut
+  LogOut,
+  Calendar,
+  DollarSign,
+  TrendingUp
 } from 'lucide-react';
 import { AuthProvider, useAuth } from './contexts/AuthContext.tsx';
 import LoginPage from './components/LoginPage.tsx';
