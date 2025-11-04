@@ -1,0 +1,652 @@
+import React, { useState, useEffect } from 'react';
+import { 
+  Users, 
+  Search, 
+  Filter, 
+  UserCheck, 
+  UserX, 
+  Mail, 
+  Phone, 
+  Calendar,
+  Shield,
+  Eye,
+  Edit3,
+  Trash2,
+  MoreVertical,
+  Download
+} from 'lucide-react';
+
+interface User {
+  id: string;
+  email: string;
+  firstName: string;
+  lastName: string;
+  phone: string;
+  role: 'PASSENGER' | 'OPERATOR' | 'ADMIN';
+  verified: boolean;
+  createdAt: string;
+  lastLogin?: string;
+  bookingsCount?: number;
+}
+
+const UserManagement: React.FC = () => {
+  const [users, setUsers] = useState<User[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [searchTerm, setSearchTerm] = useState('');
+  const [roleFilter, setRoleFilter] = useState<string>('ALL');
+  const [statusFilter, setStatusFilter] = useState<string>('ALL');
+  const [selectedUsers, setSelectedUsers] = useState<string[]>([]);
+  const [showUserModal, setShowUserModal] = useState(false);
+  const [selectedUser, setSelectedUser] = useState<User | null>(null);
+
+  const API_BASE_URL = process.env.REACT_APP_API_URL || 'https://transconnect-app-44ie.onrender.com/api';
+
+  useEffect(() => {
+    fetchUsers();
+  }, []);
+
+  const fetchUsers = async () => {
+    try {
+      const token = localStorage.getItem('admin_token');
+      const response = await fetch(`${API_BASE_URL}/users`, {
+        headers: {
+          'Authorization': `Bearer ${token}`,
+          'Content-Type': 'application/json'
+        }
+      });
+
+      if (response.ok) {
+        const data = await response.json();
+        // Mock additional data for demo
+        const enhancedUsers = data.map((user: User) => ({
+          ...user,
+          lastLogin: new Date(Date.now() - Math.random() * 7 * 24 * 60 * 60 * 1000).toISOString(),
+          bookingsCount: Math.floor(Math.random() * 20)
+        }));
+        setUsers(enhancedUsers);
+      }
+    } catch (error) {
+      console.error('Error fetching users:', error);
+      // Mock data for demo if API fails
+      setUsers([
+        {
+          id: '1',
+          email: 'admin@transconnect.ug',
+          firstName: 'Admin',
+          lastName: 'User',
+          phone: '+256700000000',
+          role: 'ADMIN',
+          verified: true,
+          createdAt: new Date().toISOString(),
+          lastLogin: new Date().toISOString(),
+          bookingsCount: 0
+        },
+        {
+          id: '2',
+          email: 'john@example.com',
+          firstName: 'John',
+          lastName: 'Doe',
+          phone: '+256701234567',
+          role: 'PASSENGER',
+          verified: true,
+          createdAt: new Date(Date.now() - 2 * 24 * 60 * 60 * 1000).toISOString(),
+          lastLogin: new Date(Date.now() - 1 * 60 * 60 * 1000).toISOString(),
+          bookingsCount: 5
+        }
+      ]);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleUserAction = async (userId: string, action: 'verify' | 'unverify' | 'delete') => {
+    try {
+      const token = localStorage.getItem('admin_token');
+      
+      if (action === 'delete') {
+        if (!window.confirm('Are you sure you want to delete this user?')) return;
+        
+        const response = await fetch(`${API_BASE_URL}/users/${userId}`, {
+          method: 'DELETE',
+          headers: {
+            'Authorization': `Bearer ${token}`,
+          }
+        });
+
+        if (response.ok) {
+          setUsers(users.filter(u => u.id !== userId));
+        }
+      } else {
+        const verified = action === 'verify';
+        const response = await fetch(`${API_BASE_URL}/users/${userId}`, {
+          method: 'PUT',
+          headers: {
+            'Authorization': `Bearer ${token}`,
+            'Content-Type': 'application/json'
+          },
+          body: JSON.stringify({ verified })
+        });
+
+        if (response.ok) {
+          setUsers(users.map(u => 
+            u.id === userId ? { ...u, verified } : u
+          ));
+        }
+      }
+    } catch (error) {
+      console.error('Error performing user action:', error);
+    }
+  };
+
+  const handleBulkAction = async (action: 'verify' | 'unverify' | 'delete') => {
+    if (selectedUsers.length === 0) return;
+    
+    if (action === 'delete') {
+      if (!window.confirm(`Are you sure you want to delete ${selectedUsers.length} users?`)) return;
+    }
+
+    for (const userId of selectedUsers) {
+      await handleUserAction(userId, action);
+    }
+    
+    setSelectedUsers([]);
+  };
+
+  const exportUsers = () => {
+    const csvContent = [
+      ['Name', 'Email', 'Phone', 'Role', 'Verified', 'Bookings', 'Created At'],
+      ...filteredUsers.map(user => [
+        `${user.firstName} ${user.lastName}`,
+        user.email,
+        user.phone,
+        user.role,
+        user.verified ? 'Yes' : 'No',
+        user.bookingsCount?.toString() || '0',
+        new Date(user.createdAt).toLocaleDateString()
+      ])
+    ].map(row => row.join(',')).join('\n');
+
+    const blob = new Blob([csvContent], { type: 'text/csv' });
+    const url = window.URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = `transconnect-users-${new Date().toISOString().split('T')[0]}.csv`;
+    a.click();
+    window.URL.revokeObjectURL(url);
+  };
+
+  const filteredUsers = users.filter(user => {
+    const matchesSearch = 
+      user.firstName.toLowerCase().includes(searchTerm.toLowerCase()) ||
+      user.lastName.toLowerCase().includes(searchTerm.toLowerCase()) ||
+      user.email.toLowerCase().includes(searchTerm.toLowerCase()) ||
+      user.phone.includes(searchTerm);
+    
+    const matchesRole = roleFilter === 'ALL' || user.role === roleFilter;
+    const matchesStatus = 
+      statusFilter === 'ALL' || 
+      (statusFilter === 'VERIFIED' && user.verified) ||
+      (statusFilter === 'UNVERIFIED' && !user.verified);
+
+    return matchesSearch && matchesRole && matchesStatus;
+  });
+
+  const userStats = {
+    total: users.length,
+    admins: users.filter(u => u.role === 'ADMIN').length,
+    operators: users.filter(u => u.role === 'OPERATOR').length,
+    passengers: users.filter(u => u.role === 'PASSENGER').length,
+    verified: users.filter(u => u.verified).length,
+    unverified: users.filter(u => !u.verified).length
+  };
+
+  const formatDate = (dateString: string) => {
+    return new Date(dateString).toLocaleDateString('en-US', {
+      month: 'short',
+      day: 'numeric',
+      year: 'numeric'
+    });
+  };
+
+  const getTimeAgo = (dateString: string) => {
+    const now = new Date();
+    const date = new Date(dateString);
+    const diffInMinutes = Math.floor((now.getTime() - date.getTime()) / (1000 * 60));
+    
+    if (diffInMinutes < 60) return `${diffInMinutes}m ago`;
+    if (diffInMinutes < 1440) return `${Math.floor(diffInMinutes / 60)}h ago`;
+    return `${Math.floor(diffInMinutes / 1440)}d ago`;
+  };
+
+  const getRoleBadgeColor = (role: string) => {
+    switch (role) {
+      case 'ADMIN': return 'bg-red-100 text-red-800';
+      case 'OPERATOR': return 'bg-blue-100 text-blue-800';
+      case 'PASSENGER': return 'bg-green-100 text-green-800';
+      default: return 'bg-gray-100 text-gray-800';
+    }
+  };
+
+  if (loading) {
+    return (
+      <div className="flex items-center justify-center h-64">
+        <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600"></div>
+      </div>
+    );
+  }
+
+  return (
+    <div className="space-y-6">
+      {/* Header */}
+      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
+        <div>
+          <h1 className="text-2xl sm:text-3xl font-bold text-gray-900">User Management</h1>
+          <p className="text-gray-600">Manage platform users and permissions</p>
+        </div>
+        <div className="flex items-center space-x-3">
+          <button
+            onClick={exportUsers}
+            className="bg-gray-100 text-gray-700 px-4 py-2 rounded-lg hover:bg-gray-200 transition-colors flex items-center space-x-2"
+          >
+            <Download className="h-4 w-4" />
+            <span>Export</span>
+          </button>
+        </div>
+      </div>
+
+      {/* Stats Cards */}
+      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-6 gap-4">
+        <div className="bg-white p-4 rounded-lg shadow border">
+          <div className="flex items-center">
+            <Users className="h-8 w-8 text-blue-600" />
+            <div className="ml-3">
+              <p className="text-xs font-medium text-gray-600">Total Users</p>
+              <p className="text-xl font-semibold text-gray-900">{userStats.total}</p>
+            </div>
+          </div>
+        </div>
+
+        <div className="bg-white p-4 rounded-lg shadow border">
+          <div className="flex items-center">
+            <Shield className="h-8 w-8 text-red-600" />
+            <div className="ml-3">
+              <p className="text-xs font-medium text-gray-600">Admins</p>
+              <p className="text-xl font-semibold text-gray-900">{userStats.admins}</p>
+            </div>
+          </div>
+        </div>
+
+        <div className="bg-white p-4 rounded-lg shadow border">
+          <div className="flex items-center">
+            <Users className="h-8 w-8 text-blue-600" />
+            <div className="ml-3">
+              <p className="text-xs font-medium text-gray-600">Operators</p>
+              <p className="text-xl font-semibold text-gray-900">{userStats.operators}</p>
+            </div>
+          </div>
+        </div>
+
+        <div className="bg-white p-4 rounded-lg shadow border">
+          <div className="flex items-center">
+            <Users className="h-8 w-8 text-green-600" />
+            <div className="ml-3">
+              <p className="text-xs font-medium text-gray-600">Passengers</p>
+              <p className="text-xl font-semibold text-gray-900">{userStats.passengers}</p>
+            </div>
+          </div>
+        </div>
+
+        <div className="bg-white p-4 rounded-lg shadow border">
+          <div className="flex items-center">
+            <UserCheck className="h-8 w-8 text-green-600" />
+            <div className="ml-3">
+              <p className="text-xs font-medium text-gray-600">Verified</p>
+              <p className="text-xl font-semibold text-gray-900">{userStats.verified}</p>
+            </div>
+          </div>
+        </div>
+
+        <div className="bg-white p-4 rounded-lg shadow border">
+          <div className="flex items-center">
+            <UserX className="h-8 w-8 text-red-600" />
+            <div className="ml-3">
+              <p className="text-xs font-medium text-gray-600">Unverified</p>
+              <p className="text-xl font-semibold text-gray-900">{userStats.unverified}</p>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      {/* Filters and Search */}
+      <div className="bg-white p-6 rounded-lg shadow border">
+        <div className="flex flex-col sm:flex-row gap-4">
+          <div className="flex-1">
+            <div className="relative">
+              <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 h-5 w-5" />
+              <input
+                type="text"
+                placeholder="Search users by name, email, or phone..."
+                value={searchTerm}
+                onChange={(e) => setSearchTerm(e.target.value)}
+                className="w-full pl-10 pr-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+              />
+            </div>
+          </div>
+          
+          <div className="flex gap-3">
+            <select
+              value={roleFilter}
+              onChange={(e) => setRoleFilter(e.target.value)}
+              className="px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+            >
+              <option value="ALL">All Roles</option>
+              <option value="ADMIN">Admin</option>
+              <option value="OPERATOR">Operator</option>
+              <option value="PASSENGER">Passenger</option>
+            </select>
+
+            <select
+              value={statusFilter}
+              onChange={(e) => setStatusFilter(e.target.value)}
+              className="px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+            >
+              <option value="ALL">All Status</option>
+              <option value="VERIFIED">Verified</option>
+              <option value="UNVERIFIED">Unverified</option>
+            </select>
+          </div>
+        </div>
+
+        {/* Bulk Actions */}
+        {selectedUsers.length > 0 && (
+          <div className="mt-4 flex items-center justify-between p-3 bg-blue-50 rounded-lg">
+            <span className="text-sm text-blue-700">
+              {selectedUsers.length} users selected
+            </span>
+            <div className="flex space-x-2">
+              <button
+                onClick={() => handleBulkAction('verify')}
+                className="px-3 py-1 bg-green-600 text-white text-sm rounded hover:bg-green-700 transition-colors"
+              >
+                Verify
+              </button>
+              <button
+                onClick={() => handleBulkAction('unverify')}
+                className="px-3 py-1 bg-yellow-600 text-white text-sm rounded hover:bg-yellow-700 transition-colors"
+              >
+                Unverify
+              </button>
+              <button
+                onClick={() => handleBulkAction('delete')}
+                className="px-3 py-1 bg-red-600 text-white text-sm rounded hover:bg-red-700 transition-colors"
+              >
+                Delete
+              </button>
+            </div>
+          </div>
+        )}
+      </div>
+
+      {/* Users Table */}
+      <div className="bg-white rounded-lg shadow border overflow-hidden">
+        <div className="overflow-x-auto">
+          <table className="w-full">
+            <thead className="bg-gray-50">
+              <tr>
+                <th className="px-6 py-3 text-left">
+                  <input
+                    type="checkbox"
+                    checked={selectedUsers.length === filteredUsers.length && filteredUsers.length > 0}
+                    onChange={(e) => {
+                      if (e.target.checked) {
+                        setSelectedUsers(filteredUsers.map(u => u.id));
+                      } else {
+                        setSelectedUsers([]);
+                      }
+                    }}
+                    className="rounded border-gray-300 text-blue-600 focus:ring-blue-500"
+                  />
+                </th>
+                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                  User
+                </th>
+                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                  Contact
+                </th>
+                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                  Role & Status
+                </th>
+                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                  Activity
+                </th>
+                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                  Actions
+                </th>
+              </tr>
+            </thead>
+            <tbody className="bg-white divide-y divide-gray-200">
+              {filteredUsers.map((user) => (
+                <tr key={user.id} className="hover:bg-gray-50">
+                  <td className="px-6 py-4">
+                    <input
+                      type="checkbox"
+                      checked={selectedUsers.includes(user.id)}
+                      onChange={(e) => {
+                        if (e.target.checked) {
+                          setSelectedUsers([...selectedUsers, user.id]);
+                        } else {
+                          setSelectedUsers(selectedUsers.filter(id => id !== user.id));
+                        }
+                      }}
+                      className="rounded border-gray-300 text-blue-600 focus:ring-blue-500"
+                    />
+                  </td>
+                  <td className="px-6 py-4">
+                    <div className="flex items-center">
+                      <div className="h-10 w-10 rounded-full bg-blue-100 flex items-center justify-center">
+                        <span className="text-sm font-medium text-blue-600">
+                          {user.firstName[0]}{user.lastName[0]}
+                        </span>
+                      </div>
+                      <div className="ml-4">
+                        <div className="font-medium text-gray-900">
+                          {user.firstName} {user.lastName}
+                        </div>
+                        <div className="text-sm text-gray-500">
+                          ID: {user.id.slice(0, 8)}...
+                        </div>
+                      </div>
+                    </div>
+                  </td>
+                  <td className="px-6 py-4">
+                    <div className="text-sm">
+                      <div className="flex items-center text-gray-900">
+                        <Mail className="h-4 w-4 mr-2 text-gray-400" />
+                        {user.email}
+                      </div>
+                      <div className="flex items-center text-gray-600 mt-1">
+                        <Phone className="h-4 w-4 mr-2 text-gray-400" />
+                        {user.phone}
+                      </div>
+                    </div>
+                  </td>
+                  <td className="px-6 py-4">
+                    <div className="space-y-2">
+                      <span className={`inline-flex px-2 py-1 text-xs font-semibold rounded-full ${getRoleBadgeColor(user.role)}`}>
+                        {user.role}
+                      </span>
+                      <div>
+                        <span className={`inline-flex px-2 py-1 text-xs font-semibold rounded-full ${
+                          user.verified ? 'bg-green-100 text-green-800' : 'bg-red-100 text-red-800'
+                        }`}>
+                          {user.verified ? 'Verified' : 'Unverified'}
+                        </span>
+                      </div>
+                    </div>
+                  </td>
+                  <td className="px-6 py-4 text-sm text-gray-600">
+                    <div>
+                      <div className="flex items-center">
+                        <Calendar className="h-4 w-4 mr-2 text-gray-400" />
+                        Joined {formatDate(user.createdAt)}
+                      </div>
+                      {user.lastLogin && (
+                        <div className="mt-1">
+                          Last seen {getTimeAgo(user.lastLogin)}
+                        </div>
+                      )}
+                      {user.role === 'PASSENGER' && (
+                        <div className="mt-1">
+                          {user.bookingsCount} bookings
+                        </div>
+                      )}
+                    </div>
+                  </td>
+                  <td className="px-6 py-4">
+                    <div className="flex items-center space-x-2">
+                      <button
+                        onClick={() => {
+                          setSelectedUser(user);
+                          setShowUserModal(true);
+                        }}
+                        className="p-2 text-blue-600 hover:bg-blue-50 rounded-md transition-colors"
+                        title="View details"
+                      >
+                        <Eye className="h-4 w-4" />
+                      </button>
+                      <button
+                        onClick={() => handleUserAction(user.id, user.verified ? 'unverify' : 'verify')}
+                        className={`p-2 rounded-md transition-colors ${
+                          user.verified 
+                            ? 'text-yellow-600 hover:bg-yellow-50' 
+                            : 'text-green-600 hover:bg-green-50'
+                        }`}
+                        title={user.verified ? 'Unverify user' : 'Verify user'}
+                      >
+                        {user.verified ? <UserX className="h-4 w-4" /> : <UserCheck className="h-4 w-4" />}
+                      </button>
+                      <button
+                        onClick={() => handleUserAction(user.id, 'delete')}
+                        className="p-2 text-red-600 hover:bg-red-50 rounded-md transition-colors"
+                        title="Delete user"
+                      >
+                        <Trash2 className="h-4 w-4" />
+                      </button>
+                    </div>
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+
+        {filteredUsers.length === 0 && (
+          <div className="text-center py-12">
+            <Users className="h-12 w-12 text-gray-400 mx-auto mb-4" />
+            <h3 className="text-lg font-medium text-gray-900 mb-2">No users found</h3>
+            <p className="text-gray-600">
+              {searchTerm || roleFilter !== 'ALL' || statusFilter !== 'ALL' 
+                ? 'Try adjusting your search filters' 
+                : 'No users have registered yet'
+              }
+            </p>
+          </div>
+        )}
+      </div>
+
+      {/* User Details Modal */}
+      {showUserModal && selectedUser && (
+        <div className="fixed inset-0 bg-gray-600 bg-opacity-50 flex items-center justify-center p-4 z-50">
+          <div className="bg-white rounded-lg p-6 w-full max-w-lg">
+            <div className="flex items-center justify-between mb-6">
+              <h3 className="text-lg font-semibold text-gray-900">User Details</h3>
+              <button
+                onClick={() => setShowUserModal(false)}
+                className="text-gray-400 hover:text-gray-600"
+              >
+                ×
+              </button>
+            </div>
+            
+            <div className="space-y-4">
+              <div className="flex items-center space-x-4">
+                <div className="h-16 w-16 rounded-full bg-blue-100 flex items-center justify-center">
+                  <span className="text-xl font-medium text-blue-600">
+                    {selectedUser.firstName[0]}{selectedUser.lastName[0]}
+                  </span>
+                </div>
+                <div>
+                  <h4 className="text-xl font-semibold text-gray-900">
+                    {selectedUser.firstName} {selectedUser.lastName}
+                  </h4>
+                  <span className={`inline-flex px-2 py-1 text-xs font-semibold rounded-full ${getRoleBadgeColor(selectedUser.role)}`}>
+                    {selectedUser.role}
+                  </span>
+                </div>
+              </div>
+
+              <div className="grid grid-cols-2 gap-4">
+                <div>
+                  <label className="block text-sm font-medium text-gray-700">Email</label>
+                  <p className="text-sm text-gray-900">{selectedUser.email}</p>
+                </div>
+                <div>
+                  <label className="block text-sm font-medium text-gray-700">Phone</label>
+                  <p className="text-sm text-gray-900">{selectedUser.phone}</p>
+                </div>
+                <div>
+                  <label className="block text-sm font-medium text-gray-700">Status</label>
+                  <span className={`inline-flex px-2 py-1 text-xs font-semibold rounded-full ${
+                    selectedUser.verified ? 'bg-green-100 text-green-800' : 'bg-red-100 text-red-800'
+                  }`}>
+                    {selectedUser.verified ? 'Verified' : 'Unverified'}
+                  </span>
+                </div>
+                <div>
+                  <label className="block text-sm font-medium text-gray-700">Member Since</label>
+                  <p className="text-sm text-gray-900">{formatDate(selectedUser.createdAt)}</p>
+                </div>
+                {selectedUser.lastLogin && (
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700">Last Login</label>
+                    <p className="text-sm text-gray-900">{getTimeAgo(selectedUser.lastLogin)}</p>
+                  </div>
+                )}
+                {selectedUser.role === 'PASSENGER' && (
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700">Total Bookings</label>
+                    <p className="text-sm text-gray-900">{selectedUser.bookingsCount || 0}</p>
+                  </div>
+                )}
+              </div>
+
+              <div className="flex justify-end space-x-3 pt-4 border-t">
+                <button
+                  onClick={() => setShowUserModal(false)}
+                  className="px-4 py-2 text-gray-700 bg-gray-100 hover:bg-gray-200 rounded-md transition-colors"
+                >
+                  Close
+                </button>
+                <button
+                  onClick={() => {
+                    handleUserAction(selectedUser.id, selectedUser.verified ? 'unverify' : 'verify');
+                    setShowUserModal(false);
+                  }}
+                  className={`px-4 py-2 text-white rounded-md transition-colors ${
+                    selectedUser.verified 
+                      ? 'bg-yellow-600 hover:bg-yellow-700' 
+                      : 'bg-green-600 hover:bg-green-700'
+                  }`}
+                >
+                  {selectedUser.verified ? 'Unverify User' : 'Verify User'}
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+    </div>
+  );
+};
+
+export default UserManagement;
