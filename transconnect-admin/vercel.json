@@ -10,14 +10,17 @@
       }
     }
   ],
-  "routes": [
+  "rewrites": [
     {
-      "src": "/api/(.*)",
-      "dest": "https://transconnect-app-44ie.onrender.com/api/$1"
-    },
+      "source": "/api/(.*)",
+      "destination": "https://transconnect-app-44ie.onrender.com/api/$1"
+    }
+  ],
+  "redirects": [
     {
-      "src": "/(.*)",
-      "dest": "/index.html"
+      "source": "/(.*)",
+      "destination": "/index.html",
+      "permanent": false
     }
   ],
   "env": {
