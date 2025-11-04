@@ -178,9 +178,30 @@ const HOST = process.env.HOST || '0.0.0.0';
 console.log('Starting TransConnect Backend...');
 console.log(`Port: ${PORT}, Host: ${HOST}`);
 
-server.listen(PORT, HOST, () => {
-  console.log(`🚀 TransConnect Backend server running on ${HOST}:${PORT}`);
-  console.log(`📊 Health check: http://${HOST}:${PORT}/health`);
+// Deploy database migrations on startup in production
+async function deployMigrations() {
+  if (process.env.NODE_ENV === 'production') {
+    console.log('🗄️ Deploying database migrations...');
+    try {
+      const { exec } = require('child_process');
+      const util = require('util');
+      const execAsync = util.promisify(exec);
+      
+      await execAsync('npx prisma migrate deploy');
+      console.log('✅ Database migrations deployed successfully');
+    } catch (error) {
+      console.error('❌ Migration deployment failed:', error);
+      // Don't exit - let the server start anyway in case migrations aren't needed
+    }
+  }
+}
+
+// Deploy migrations before starting server
+deployMigrations().then(() => {
+  server.listen(PORT, HOST, () => {
+    console.log(`🚀 TransConnect Backend server running on ${HOST}:${PORT}`);
+    console.log(`📊 Health check: http://${HOST}:${PORT}/health`);
+  });
 });
 
 // Graceful shutdown
