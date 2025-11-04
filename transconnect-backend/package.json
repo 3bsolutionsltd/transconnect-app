@@ -15,6 +15,8 @@
     "db:studio": "prisma studio",
     "db:seed": "ts-node prisma/seed.ts",
     "db:reset": "prisma migrate reset --force",
+    "db:deploy": "prisma db push",
+    "db:setup:production": "node scripts/setup-production-db.js",
     "db:test-connection": "ts-node scripts/test-db-connection.ts",
     "db:backup": "node scripts/backup.js",
     "db:optimize": "ts-node scripts/optimize-db.ts",
