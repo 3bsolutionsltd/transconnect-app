@@ -12,7 +12,7 @@ router.post('/register', [
   body('password').isLength({ min: 6 }),
   body('firstName').isLength({ min: 2 }),
   body('lastName').isLength({ min: 2 }),
-  body('phone').isMobilePhone('any'),
+  body('phone').isLength({ min: 10 }).matches(/^[\+]?[0-9\-\(\)\s]+$/),
   body('role').optional().isIn(['PASSENGER', 'ADMIN', 'OPERATOR'])
 ], async (req: Request, res: Response) => {
   try {
