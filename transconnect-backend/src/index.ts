@@ -193,7 +193,7 @@ async function deployMigrations() {
       // Seed database with initial data
       console.log('🌱 Seeding database with initial data...');
       try {
-        await execAsync('npx prisma db seed');
+        await execAsync('node scripts/seed-production.js');
         console.log('✅ Database seeded successfully');
       } catch (seedError) {
         console.log('⚠️ Database seeding skipped (already seeded or seed failed):', seedError.message);

@@ -34,7 +34,7 @@
     "logs:errors": "grep -i error logs/app.log | tail -20"
   },
   "prisma": {
-    "seed": "ts-node prisma/seed.ts"
+    "seed": "node scripts/seed-production.js"
   },
   "keywords": [
     "transconnect",
