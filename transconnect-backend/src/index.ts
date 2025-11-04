@@ -189,6 +189,15 @@ async function deployMigrations() {
       
       await execAsync('npx prisma migrate deploy');
       console.log('✅ Database migrations deployed successfully');
+      
+      // Seed database with initial data
+      console.log('🌱 Seeding database with initial data...');
+      try {
+        await execAsync('npx prisma db seed');
+        console.log('✅ Database seeded successfully');
+      } catch (seedError) {
+        console.log('⚠️ Database seeding skipped (already seeded or seed failed):', seedError.message);
+      }
     } catch (error) {
       console.error('❌ Migration deployment failed:', error);
       // Don't exit - let the server start anyway in case migrations aren't needed
