@@ -22,10 +22,10 @@ In your `transconnect-app` service on Render:
 
 ```bash
 # Database
-DATABASE_URL=postgresql://your_connection_string_here
+DATABASE_URL=postgresql://transconnect_user:yTYkYJYUaYCIm5iVME6jonZPG2AcKAy3@dpg-d44cvgje5dus73b21l70-a/transconnect_r162
 
 # Security
-JWT_SECRET=your_super_secure_jwt_secret_at_least_32_chars
+JWT_SECRET=7a9f8e3d2c1b5a6f9e8d7c4b2a1f8e5d3c2b9a7f6e5d4c3b2a1f9e8d7c6b5a4f
 BCRYPT_ROUNDS=12
 NODE_ENV=production
 

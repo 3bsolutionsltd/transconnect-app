@@ -101,8 +101,8 @@ const Dashboard = () => (
   </div>
 );
 
-// Routes Component
-const Routes = () => (
+// Bus Routes Component
+const BusRoutes = () => (
   <div className="space-y-6">
     <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between">
       <h1 className="text-2xl sm:text-3xl font-bold text-gray-900 mb-4 sm:mb-0">Bus Routes</h1>
@@ -283,7 +283,7 @@ function App() {
           <div className="p-4 sm:p-6 lg:p-8">
             <Routes>
               <Route path="/" element={<Dashboard />} />
-              <Route path="/routes" element={<Routes />} />
+              <Route path="/routes" element={<BusRoutes />} />
               <Route path="/analytics" element={<Analytics />} />
               <Route path="/users" element={<div>Users page coming soon...</div>} />
               <Route path="/settings" element={<div>Settings page coming soon...</div>} />
