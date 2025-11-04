@@ -62,7 +62,7 @@ export default function Analytics() {
     routes: [
       { route: 'Kampala → Jinja', bookings: 89, revenue: 1335000, occupancy: 85 },
       { route: 'Kampala → Mbarara', bookings: 67, revenue: 1675000, occupancy: 78 },
-      { route: 'Entebbe → Kampala', route: 'Entebbe → Kampala', bookings: 76, revenue: 912000, occupancy: 92 },
+      { route: 'Entebbe → Kampala', bookings: 76, revenue: 912000, occupancy: 92 },
       { route: 'Jinja → Kampala', bookings: 72, revenue: 1080000, occupancy: 81 }
     ]
   });
