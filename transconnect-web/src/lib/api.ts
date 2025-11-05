@@ -122,4 +122,41 @@ export async function getBookingStatus(bookingId: string, token: string | null) 
   return res.data;
 }
 
+// Payment API functions
+export const paymentApi = {
+  async initiate(paymentData: {
+    bookingId: string;
+    method: string;
+    phoneNumber?: string;
+  }) {
+    const response = await api.post('/payments/initiate', paymentData);
+    return response.data;
+  },
+
+  async getStatus(paymentId: string) {
+    const response = await api.get(`/payments/${paymentId}/status`);
+    return response.data;
+  },
+
+  async getHistory(page = 1, limit = 10) {
+    const response = await api.get('/payments/history', { params: { page, limit } });
+    return response.data;
+  },
+
+  async getSupportedMethods() {
+    const response = await api.get('/payments/methods');
+    return response.data;
+  },
+
+  async validatePaymentMethod(method: string, phoneNumber: string) {
+    const response = await api.post('/payments/validate', { method, phoneNumber });
+    return response.data;
+  },
+
+  async completePayment(paymentId: string) {
+    const response = await api.post(`/payments/${paymentId}/complete`);
+    return response.data;
+  }
+};
+
 export default api;
