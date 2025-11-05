@@ -130,7 +130,8 @@ app.get('/api/health', async (req, res) => {
       status: 'OK',
       timestamp: new Date().toISOString(),
       service: 'TransConnect Backend API',
-      version: '1.0.0'
+      version: '1.0.1', // Updated for deployment test
+      message: 'Backend is running properly'
     });
   } catch (error: any) {
     res.status(503).json({
