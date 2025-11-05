@@ -42,6 +42,7 @@ router.post('/', authenticateToken, async (req: Request, res: Response) => {
     const { operatorId, plateNumber, model, capacity, amenities } = req.body;
 
     console.log('Creating bus with data:', { operatorId, plateNumber, model, capacity, amenities }); // Debug log
+    console.log('Amenities type:', typeof amenities, 'value:', amenities); // Debug amenities specifically
 
     if (!operatorId || !plateNumber || !model || !capacity) {
       return res.status(400).json({ 
@@ -67,13 +68,20 @@ router.post('/', authenticateToken, async (req: Request, res: Response) => {
       return res.status(400).json({ error: 'Bus with this plate number already exists' });
     }
 
+    // Ensure amenities is a string or null, not array
+    const amenitiesString = amenities ? 
+      (typeof amenities === 'string' ? amenities : JSON.stringify(amenities)) : 
+      null;
+
+    console.log('Final amenities for DB:', amenitiesString); // Debug final value
+
     const bus = await prisma.bus.create({
       data: {
         operatorId,
         plateNumber,
         model,
         capacity: parseInt(capacity.toString()), // Ensure integer
-        amenities: amenities || null
+        amenities: amenitiesString // Explicitly ensure string or null
       },
       include: {
         operator: {
