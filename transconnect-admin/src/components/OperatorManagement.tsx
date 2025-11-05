@@ -141,13 +141,23 @@ const OperatorManagement: React.FC = () => {
       
       const method = editingOperator ? 'PUT' : 'POST';
       
+      // Convert firstName + lastName to contactPerson for current backend API
+      const submissionData = {
+        ...operatorFormData,
+        contactPerson: `${operatorFormData.firstName} ${operatorFormData.lastName}`.trim()
+      };
+      
+      // Remove firstName and lastName since backend expects contactPerson
+      delete submissionData.firstName;
+      delete submissionData.lastName;
+      
       const response = await fetch(url, {
         method,
         headers: {
           'Authorization': `Bearer ${token}`,
           'Content-Type': 'application/json'
         },
-        body: JSON.stringify(operatorFormData)
+        body: JSON.stringify(submissionData)
       });
 
       if (response.ok) {
