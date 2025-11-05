@@ -41,6 +41,8 @@ router.post('/', authenticateToken, async (req: Request, res: Response) => {
   try {
     const { operatorId, plateNumber, model, capacity, amenities } = req.body;
 
+    console.log('Creating bus with data:', { operatorId, plateNumber, model, capacity, amenities }); // Debug log
+
     if (!operatorId || !plateNumber || !model || !capacity) {
       return res.status(400).json({ 
         error: 'Operator ID, plate number, model, and capacity are required' 
@@ -56,13 +58,22 @@ router.post('/', authenticateToken, async (req: Request, res: Response) => {
       return res.status(404).json({ error: 'Operator not found' });
     }
 
+    // Check if plate number already exists
+    const existingBus = await prisma.bus.findUnique({
+      where: { plateNumber }
+    });
+
+    if (existingBus) {
+      return res.status(400).json({ error: 'Bus with this plate number already exists' });
+    }
+
     const bus = await prisma.bus.create({
       data: {
         operatorId,
         plateNumber,
         model,
-        capacity: parseInt(capacity),
-        amenities: amenities || []
+        capacity: parseInt(capacity.toString()), // Ensure integer
+        amenities: amenities || null
       },
       include: {
         operator: {
@@ -77,7 +88,7 @@ router.post('/', authenticateToken, async (req: Request, res: Response) => {
     res.status(201).json(bus);
   } catch (error) {
     console.error('Error creating bus:', error);
-    res.status(500).json({ error: 'Failed to create bus' });
+    res.status(500).json({ error: 'Failed to create bus', details: error.message });
   }
 });
 
