@@ -54,6 +54,8 @@ router.post('/', authenticateToken, async (req: Request, res: Response) => {
   try {
     const { companyName, license, firstName, lastName, email, phone, password, approved } = req.body;
 
+    console.log('Creating operator with data:', { companyName, license, firstName, lastName, email, phone, approved }); // Debug log
+
     if (!companyName || !license || !firstName || !lastName || !email || !phone) {
       return res.status(400).json({ 
         error: 'Company name, license, first name, last name, email, and phone are required' 
