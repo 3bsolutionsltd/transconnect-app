@@ -141,15 +141,10 @@ const OperatorManagement: React.FC = () => {
       
       const method = editingOperator ? 'PUT' : 'POST';
       
-      // Convert firstName + lastName to contactPerson for current backend API
+      // Send data directly as expected by backend
       const submissionData = {
-        ...operatorFormData,
-        contactPerson: `${operatorFormData.firstName} ${operatorFormData.lastName}`.trim()
+        ...operatorFormData
       };
-      
-      // Remove firstName and lastName since backend expects contactPerson
-      delete submissionData.firstName;
-      delete submissionData.lastName;
       
       const response = await fetch(url, {
         method,
