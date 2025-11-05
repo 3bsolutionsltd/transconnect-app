@@ -127,7 +127,7 @@ router.get('/:id', async (req: Request, res: Response) => {
   try {
     const { id } = req.params;
     const operator = await prisma.operator.findUnique({
-      where: { id: parseInt(id) },
+      where: { id: id },
       include: {
         user: {
           select: {
@@ -177,7 +177,7 @@ router.put('/:id', authenticateToken, async (req: Request, res: Response) => {
 
     // Get the existing operator with user info
     const existingOperator = await prisma.operator.findUnique({
-      where: { id: parseInt(id) },
+      where: { id: id },
       include: { user: true }
     });
 
@@ -223,7 +223,7 @@ router.put('/:id', authenticateToken, async (req: Request, res: Response) => {
 
     // Update operator information
     const operator = await prisma.operator.update({
-      where: { id: parseInt(id) },
+      where: { id: id },
       data: {
         ...(companyName && { companyName }),
         ...(license && { license }),
@@ -256,7 +256,7 @@ router.delete('/:id', authenticateToken, async (req: Request, res: Response) => 
 
     // Get the operator with user info
     const operator = await prisma.operator.findUnique({
-      where: { id: parseInt(id) },
+      where: { id: id },
       include: { user: true }
     });
 
@@ -266,7 +266,7 @@ router.delete('/:id', authenticateToken, async (req: Request, res: Response) => 
 
     // Delete operator first (due to foreign key constraint)
     await prisma.operator.delete({
-      where: { id: parseInt(id) }
+      where: { id: id }
     });
 
     // Then delete the associated user

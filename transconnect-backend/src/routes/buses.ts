@@ -94,7 +94,7 @@ router.post('/', authenticateToken, async (req: Request, res: Response) => {
     });
 
     res.status(201).json(bus);
-  } catch (error) {
+  } catch (error: any) {
     console.error('Error creating bus:', error);
     res.status(500).json({ error: 'Failed to create bus', details: error.message });
   }
