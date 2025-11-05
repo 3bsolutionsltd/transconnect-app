@@ -196,7 +196,7 @@ async function deployMigrations() {
       try {
         await execAsync('node scripts/seed-production.js');
         console.log('✅ Database seeded successfully');
-      } catch (seedError) {
+      } catch (seedError: any) {
         console.log('⚠️ Database seeding skipped (already seeded or seed failed):', seedError.message);
       }
     } catch (error) {
