@@ -16,7 +16,7 @@ export default function RegisterPage() {
     phone: '',
     password: '',
     confirmPassword: '',
-    role: 'PASSENGER'
+    role: 'PASSENGER' as const // Fixed as PASSENGER for public registration
   });
   const [showPassword, setShowPassword] = useState(false);
   const [showConfirmPassword, setShowConfirmPassword] = useState(false);
@@ -202,23 +202,6 @@ export default function RegisterPage() {
                     {showConfirmPassword ? <EyeOff className="h-5 w-5" /> : <Eye className="h-5 w-5" />}
                   </button>
                 </div>
-              </div>
-
-              <div>
-                <label htmlFor="role" className="block text-sm font-medium text-gray-700 mb-1">
-                  Account Type
-                </label>
-                <select
-                  id="role"
-                  name="role"
-                  value={formData.role}
-                  onChange={(e) => setFormData(prev => ({ ...prev, role: e.target.value }))}
-                  className="form-input"
-                  required
-                >
-                  <option value="PASSENGER">Passenger</option>
-                  <option value="ADMIN">Admin/Operator</option>
-                </select>
               </div>
 
               <Button 
