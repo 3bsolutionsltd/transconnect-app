@@ -114,6 +114,9 @@ router.post('/initiate', [
     let paymentResponse;
 
     try {
+      // Check if demo mode is enabled
+      const demoMode = process.env.PAYMENT_DEMO_MODE === 'true';
+      
       if (method === 'CASH') {
         // For cash payments, just mark as pending for operator confirmation
         paymentResponse = {
@@ -121,8 +124,43 @@ router.post('/initiate', [
           status: 'PENDING' as const,
           checkoutUrl: undefined
         };
+      } else if (demoMode) {
+        // Demo mode: simulate successful payment after 3 seconds
+        paymentResponse = {
+          transactionId: paymentReference,
+          status: 'PENDING' as const,
+          checkoutUrl: undefined
+        };
+        
+        // Auto-complete payment after 5 seconds for demo
+        setTimeout(async () => {
+          try {
+            await prisma.payment.update({
+              where: { id: payment.id },
+              data: {
+                status: 'COMPLETED',
+                metadata: {
+                  ...(payment.metadata as object || {}),
+                  demoModeCompleted: true,
+                  completedAt: new Date().toISOString()
+                }
+              }
+            });
+            
+            // Update booking status
+            await prisma.booking.update({
+              where: { id: payment.bookingId },
+              data: { status: 'CONFIRMED' }
+            });
+            
+            console.log(`Demo payment ${payment.id} auto-completed`);
+          } catch (error) {
+            console.error('Error auto-completing demo payment:', error);
+          }
+        }, 5000);
+        
       } else {
-        // Process online payment
+        // Process online payment with actual provider
         const provider = PaymentGatewayFactory.getProvider(method as PaymentMethod);
         
         const paymentRequest: StandardPaymentRequest = {
