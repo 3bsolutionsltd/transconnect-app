@@ -50,28 +50,46 @@ export default function PaymentPage() {
     setPaymentStatus('processing');
 
     try {
-      // Simulate payment processing
-      await new Promise(resolve => setTimeout(resolve, 3000));
+      // Call actual payment API
+      const paymentRequest = {
+        bookingId: bookingData.id,
+        amount: bookingData.totalAmount,
+        currency: 'UGX',
+        paymentMethod: selectedMethod,
+        phoneNumber: phoneNumber
+      };
+
+      const response = await paymentApi.initiate(paymentRequest);
       
-      // Simulate payment success (90% success rate)
-      const success = Math.random() > 0.1;
-      
-      if (success) {
-        setPaymentStatus('success');
+      if (response.success && response.data) {
+        setPaymentId(response.data.paymentId);
         
-        // Wait a moment to show success, then redirect
-        setTimeout(() => {
-          const successData = encodeURIComponent(JSON.stringify({
-            ...bookingData,
-            paymentStatus: 'COMPLETED',
-            paymentMethod: selectedMethod
-          }));
-          router.push(`/booking-success?booking=${successData}`);
-        }, 2000);
+        // For demo mode, payment should complete immediately
+        if (response.data.status === 'COMPLETED') {
+          setPaymentStatus('success');
+          
+          // Wait a moment to show success, then redirect
+          setTimeout(() => {
+            const successData = encodeURIComponent(JSON.stringify({
+              ...bookingData,
+              paymentStatus: 'COMPLETED',
+              paymentMethod: selectedMethod,
+              paymentId: response.data.paymentId
+            }));
+            router.push(`/booking-success?booking=${successData}`);
+          }, 2000);
+        } else {
+          // Payment is still pending, could implement polling here
+          setErrorMessage('Payment is still processing. Please check back later.');
+          setPaymentStatus('failed');
+        }
       } else {
+        setErrorMessage(response.error || 'Payment failed. Please try again.');
         setPaymentStatus('failed');
       }
-    } catch (error) {
+    } catch (error: any) {
+      console.error('Payment error:', error);
+      setErrorMessage(error.message || 'Payment failed. Please try again.');
       setPaymentStatus('failed');
     } finally {
       setProcessing(false);
@@ -98,7 +116,7 @@ export default function PaymentPage() {
       case 'success':
         return 'Payment successful! Redirecting...';
       case 'failed':
-        return 'Payment failed. Please try again.';
+        return errorMessage || 'Payment failed. Please try again.';
       default:
         return '';
     }
