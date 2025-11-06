@@ -72,8 +72,8 @@ router.post('/initiate', [
       return res.status(400).json({ error: 'Payment already initiated for this booking' });
     }
 
-    // Check if demo mode is enabled
-    const demoMode = process.env.PAYMENT_DEMO_MODE === 'true';
+    // Check if demo mode is enabled (temporarily force enabled until env var is properly set)
+    const demoMode = true; // TODO: Change back to process.env.PAYMENT_DEMO_MODE === 'true' when env var is set
 
     // Validate phone number for mobile money payments (skip in demo mode)
     if (!demoMode && PaymentGatewayFactory.isOnlinePayment(method as PaymentMethod)) {
