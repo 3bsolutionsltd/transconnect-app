@@ -20,6 +20,22 @@ api.interceptors.request.use((config) => {
   return config;
 });
 
+// Handle auth errors globally
+api.interceptors.response.use(
+  (response) => response,
+  (error) => {
+    if (error.response?.status === 401 || error.response?.status === 403) {
+      // Token is invalid or expired
+      if (typeof window !== 'undefined') {
+        localStorage.removeItem('token');
+        localStorage.removeItem('user');
+        // Don't automatically redirect - let components handle it
+      }
+    }
+    return Promise.reject(error);
+  }
+);
+
 // Auth API functions
 export const authApi = {
   async login(email: string, password: string) {

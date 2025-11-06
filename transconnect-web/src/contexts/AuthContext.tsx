@@ -35,16 +35,20 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         
         if (currentUser && token) {
           setUser(currentUser);
+        } else {
+          setUser(null);
         }
       } catch (error) {
         console.error('Error initializing auth:', error);
         authApi.logout();
+        setUser(null);
       } finally {
         setLoading(false);
       }
     };
 
-    initializeAuth();
+    // Add a small delay to ensure localStorage is available
+    setTimeout(initializeAuth, 100);
   }, []);
 
   const login = async (email: string, password: string) => {

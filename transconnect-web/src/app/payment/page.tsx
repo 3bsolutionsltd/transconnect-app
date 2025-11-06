@@ -10,7 +10,7 @@ import { paymentApi } from '@/lib/api';
 export default function PaymentPage() {
   const router = useRouter();
   const searchParams = useSearchParams();
-  const { user } = useAuth();
+  const { user, loading } = useAuth();
   
   const [bookingData, setBookingData] = useState<any>(null);
   const [selectedMethod, setSelectedMethod] = useState('MTN_MOBILE_MONEY');
@@ -21,6 +21,9 @@ export default function PaymentPage() {
   const [errorMessage, setErrorMessage] = useState<string>('');
 
   useEffect(() => {
+    // Don't redirect while still loading auth state
+    if (loading) return;
+    
     // Check if user is authenticated
     if (!user) {
       router.push('/login');
@@ -38,7 +41,7 @@ export default function PaymentPage() {
     } else {
       router.push('/search');
     }
-  }, [searchParams, router, user]);
+  }, [searchParams, router, user, loading]);
 
   const paymentMethods = [
     { id: 'MTN_MOBILE_MONEY', name: 'MTN Mobile Money', icon: Smartphone, color: 'text-yellow-600' },
@@ -142,7 +145,7 @@ export default function PaymentPage() {
     }
   };
 
-  if (!bookingData) {
+  if (loading || !bookingData) {
     return (
       <div className="min-h-screen bg-gray-50 flex items-center justify-center">
         <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600"></div>

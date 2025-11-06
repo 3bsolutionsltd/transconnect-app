@@ -16,15 +16,17 @@ export default function BookingsPage() {
   const [cancellingId, setCancellingId] = useState<string | null>(null);
   const [modifyingId, setModifyingId] = useState<string | null>(null);
   const [newDate, setNewDate] = useState('');
-  const { user, isAuthenticated } = useAuth();
+  const { user, isAuthenticated, loading: authLoading } = useAuth();
 
   useEffect(() => {
+    if (authLoading) return; // Wait for auth to load
+    
     if (isAuthenticated) {
       loadBookings();
     } else {
       setLoading(false);
     }
-  }, [isAuthenticated]);
+  }, [isAuthenticated, authLoading]);
 
   const loadBookings = async () => {
     try {
