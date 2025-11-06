@@ -125,39 +125,34 @@ router.post('/initiate', [
           checkoutUrl: undefined
         };
       } else if (demoMode) {
-        // Demo mode: simulate successful payment after 3 seconds
+        // Demo mode: immediately complete payment for testing
         paymentResponse = {
           transactionId: paymentReference,
-          status: 'PENDING' as const,
+          status: 'SUCCESSFUL' as const,
           checkoutUrl: undefined
         };
         
-        // Auto-complete payment after 5 seconds for demo
-        setTimeout(async () => {
-          try {
-            await prisma.payment.update({
-              where: { id: payment.id },
-              data: {
-                status: 'COMPLETED',
-                metadata: {
-                  ...(payment.metadata as object || {}),
-                  demoModeCompleted: true,
-                  completedAt: new Date().toISOString()
-                }
-              }
-            });
-            
-            // Update booking status
-            await prisma.booking.update({
-              where: { id: payment.bookingId },
-              data: { status: 'CONFIRMED' }
-            });
-            
-            console.log(`Demo payment ${payment.id} auto-completed`);
-          } catch (error) {
-            console.error('Error auto-completing demo payment:', error);
+        // Immediately update payment status for demo mode
+        await prisma.payment.update({
+          where: { id: payment.id },
+          data: {
+            status: 'COMPLETED',
+            transactionId: paymentReference,
+            metadata: {
+              ...(payment.metadata as object || {}),
+              demoModeCompleted: true,
+              completedAt: new Date().toISOString()
+            }
           }
-        }, 5000);
+        });
+        
+        // Update booking status
+        await prisma.booking.update({
+          where: { id: payment.bookingId },
+          data: { status: 'CONFIRMED' }
+        });
+        
+        console.log(`Demo payment ${payment.id} completed immediately`);
         
       } else {
         // Process online payment with actual provider
@@ -187,14 +182,21 @@ router.post('/initiate', [
         });
       }
 
+      // Get the current payment status (in case it was updated in demo mode)
+      const currentPayment = await prisma.payment.findUnique({
+        where: { id: payment.id }
+      });
+
       res.json({
         paymentId: payment.id,
         paymentReference,
-        status: payment.status,
+        status: currentPayment?.status || payment.status,
         provider: PaymentGatewayFactory.getMethodDisplayName(method as PaymentMethod),
         transactionId: paymentResponse.transactionId,
         checkoutUrl: paymentResponse.checkoutUrl,
-        message: paymentResponse.reason || 'Payment initiated successfully'
+        message: demoMode && currentPayment?.status === 'COMPLETED' 
+          ? 'Demo payment completed successfully' 
+          : (paymentResponse.reason || 'Payment initiated successfully')
       });
     } catch (error) {
       // Handle payment provider errors
