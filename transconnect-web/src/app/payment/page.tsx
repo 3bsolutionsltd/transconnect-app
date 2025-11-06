@@ -74,11 +74,11 @@ export default function PaymentPage() {
 
       const response = await paymentApi.initiate(paymentRequest);
       
-      if (response.success && response.data) {
-        setPaymentId(response.data.paymentId);
+      if (response && response.paymentId) {
+        setPaymentId(response.paymentId);
         
         // For demo mode, payment should complete immediately
-        if (response.data.status === 'COMPLETED') {
+        if (response.status === 'COMPLETED') {
           setPaymentStatus('success');
           
           // Wait a moment to show success, then redirect
@@ -87,7 +87,7 @@ export default function PaymentPage() {
               ...bookingData,
               paymentStatus: 'COMPLETED',
               paymentMethod: selectedMethod,
-              paymentId: response.data.paymentId
+              paymentId: response.paymentId
             }));
             router.push(`/booking-success?booking=${successData}`);
           }, 2000);
@@ -97,7 +97,7 @@ export default function PaymentPage() {
           setPaymentStatus('failed');
         }
       } else {
-        setErrorMessage(response.error || 'Payment failed. Please try again.');
+        setErrorMessage('Payment failed. Please try again.');
         setPaymentStatus('failed');
       }
     } catch (error: any) {
