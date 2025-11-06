@@ -99,9 +99,14 @@ export default function QRScannerPage() {
 
       if (qrResult) {
         console.log('QR Code detected!', qrResult.data);
-        // QR code found! Validate it
+        // QR code found! Stop scanning first, then validate
+        if (scanningInterval) {
+          clearInterval(scanningInterval);
+          setScanningInterval(null);
+        }
+        // Validate the QR code
         validateQRCode(qrResult.data);
-        stopCamera(); // Stop camera after successful scan
+        // Don't stop camera here - let validateQRCode handle it after validation
       } else {
         console.log('No QR code found in current frame');
       }
@@ -209,6 +214,28 @@ export default function QRScannerPage() {
   const validateQRCode = async (qrData: string) => {
     try {
       setError('');
+      console.log('Validating QR data:', qrData);
+      
+      // Try to parse the QR data to see what format it is
+      let parsedData;
+      try {
+        parsedData = JSON.parse(qrData);
+        console.log('Parsed QR data:', parsedData);
+      } catch (parseError) {
+        setError('Invalid QR code format - not valid JSON data');
+        stopCamera();
+        return;
+      }
+
+      // Check if this looks like a booking QR (has bookingId and passengerName)
+      if (!parsedData.bookingId || !parsedData.passengerName) {
+        console.log('QR code detected, but not a valid booking ticket');
+        setError(`QR code detected, but this appears to be a route/seat selection QR, not a booking ticket. 
+                  This QR contains: ${Object.keys(parsedData).join(', ')}.
+                  Please scan a QR code from a completed booking confirmation.`);
+        stopCamera();
+        return;
+      }
       
       const response = await api.post('/qr/validate', {
         qrData: qrData,
@@ -217,9 +244,12 @@ export default function QRScannerPage() {
       });
 
       setResult(response.data);
+      stopCamera(); // Stop camera after successful validation
       
     } catch (err: any) {
+      console.error('QR validation error:', err);
       setError(err.response?.data?.error || 'Failed to validate QR code');
+      stopCamera();
     }
   };
 
@@ -477,6 +507,19 @@ export default function QRScannerPage() {
           <p className="text-blue-700 text-xs mt-2">
             Expected result: ❌ Invalid (Booking not found) - this confirms the validation system is working!
           </p>
+          
+          <div className="mt-4 p-3 bg-yellow-50 border border-yellow-200 rounded">
+            <h4 className="font-semibold text-yellow-800 mb-2">📱 How to get real booking QR codes:</h4>
+            <ol className="text-sm text-yellow-700 space-y-1">
+              <li>1. Go to <strong>TransConnect Web Portal</strong></li>
+              <li>2. Make a booking and complete payment</li>
+              <li>3. Copy QR data from booking success page</li>
+              <li>4. Scan that QR data here to validate</li>
+            </ol>
+            <p className="text-xs text-yellow-600 mt-2">
+              Note: Route selection QRs (without passenger name) won't validate - only completed booking QRs work.
+            </p>
+          </div>
         </div>
 
         {/* Instructions */}
