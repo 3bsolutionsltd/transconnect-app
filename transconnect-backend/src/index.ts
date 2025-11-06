@@ -93,6 +93,7 @@ app.get('/health', async (req, res) => {
       message: 'TransConnect Backend API is running',
       timestamp: new Date().toISOString(),
       environment: process.env.NODE_ENV || 'development',
+      demoMode: process.env.PAYMENT_DEMO_MODE === 'true',
     };
 
     // Enhanced health check with database status
@@ -131,7 +132,9 @@ app.get('/api/health', async (req, res) => {
       timestamp: new Date().toISOString(),
       service: 'TransConnect Backend API',
       version: '1.0.1', // Updated for deployment test
-      message: 'Backend is running properly'
+      message: 'Backend is running properly',
+      demoMode: process.env.PAYMENT_DEMO_MODE === 'true',
+      environment: process.env.NODE_ENV || 'development'
     });
   } catch (error: any) {
     res.status(503).json({
