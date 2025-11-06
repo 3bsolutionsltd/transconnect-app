@@ -72,8 +72,11 @@ router.post('/initiate', [
       return res.status(400).json({ error: 'Payment already initiated for this booking' });
     }
 
-    // Validate phone number for mobile money payments
-    if (PaymentGatewayFactory.isOnlinePayment(method as PaymentMethod)) {
+    // Check if demo mode is enabled
+    const demoMode = process.env.PAYMENT_DEMO_MODE === 'true';
+
+    // Validate phone number for mobile money payments (skip in demo mode)
+    if (!demoMode && PaymentGatewayFactory.isOnlinePayment(method as PaymentMethod)) {
       if (!phoneNumber) {
         return res.status(400).json({ error: 'Phone number is required for mobile money payments' });
       }
@@ -114,9 +117,6 @@ router.post('/initiate', [
     let paymentResponse;
 
     try {
-      // Check if demo mode is enabled
-      const demoMode = process.env.PAYMENT_DEMO_MODE === 'true';
-      
       if (method === 'CASH') {
         // For cash payments, just mark as pending for operator confirmation
         paymentResponse = {
