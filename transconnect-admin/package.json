@@ -23,7 +23,9 @@
     "@headlessui/react": "^1.7.17",
     "@heroicons/react": "^2.0.18",
     "qrcode.react": "^3.1.0",
-    "react-qr-scanner": "^1.0.0-alpha.11"
+    "react-qr-scanner": "^1.0.0-alpha.11",
+    "@radix-ui/react-slot": "^1.0.2",
+    "class-variance-authority": "^0.7.0"
   },
   "devDependencies": {
     "@types/react": "^18.2.41",
