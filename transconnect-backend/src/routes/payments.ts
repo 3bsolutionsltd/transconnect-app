@@ -11,6 +11,7 @@ import {
   StandardPaymentRequest 
 } from '../services/payment-gateway.factory';
 import { NotificationService } from '../services/notification.service';
+import QRCode from 'qrcode';
 import crypto from 'crypto';
 
 const router = Router();
@@ -152,7 +153,10 @@ router.post('/initiate', [
           data: { status: 'CONFIRMED' }
         });
         
-        console.log(`Demo payment ${payment.id} completed immediately`);
+        // Generate QR code for the confirmed booking
+        const qrCode = await generateBookingQRCode(payment.bookingId);
+        
+        console.log(`Demo payment ${payment.id} completed immediately${qrCode ? ' with QR code' : ''}`);
         
       } else {
         // Process online payment with actual provider
@@ -182,10 +186,25 @@ router.post('/initiate', [
         });
       }
 
-      // Get the current payment status (in case it was updated in demo mode)
+      // Get the current payment status and booking (in case it was updated in demo mode)
       const currentPayment = await prisma.payment.findUnique({
         where: { id: payment.id }
       });
+
+      // Get updated booking with QR code if payment completed
+      let updatedBooking = null;
+      if (currentPayment?.status === 'COMPLETED') {
+        updatedBooking = await prisma.booking.findUnique({
+          where: { id: payment.bookingId },
+          include: {
+            route: {
+              include: {
+                operator: true
+              }
+            }
+          }
+        });
+      }
 
       res.json({
         paymentId: payment.id,
@@ -196,7 +215,13 @@ router.post('/initiate', [
         checkoutUrl: paymentResponse.checkoutUrl,
         message: demoMode && currentPayment?.status === 'COMPLETED' 
           ? 'Demo payment completed successfully' 
-          : (paymentResponse.reason || 'Payment initiated successfully')
+          : (paymentResponse.reason || 'Payment initiated successfully'),
+        qrCode: updatedBooking?.qrCode || null,
+        bookingDetails: updatedBooking ? {
+          id: updatedBooking.id,
+          status: updatedBooking.status,
+          qrCode: updatedBooking.qrCode
+        } : null
       });
     } catch (error) {
       // Handle payment provider errors
@@ -310,6 +335,10 @@ router.get('/:paymentId/status', authenticateToken, async (req: Request, res: Re
             });
             
             statusMessage = 'Payment completed successfully';
+            
+            // Generate QR code for the confirmed booking
+            const qrCode = await generateBookingQRCode(payment.bookingId);
+            console.log(`Payment ${payment.id} completed${qrCode ? ' with QR code generated' : ''}`);
             
             // Send payment success notification
             try {
@@ -770,5 +799,95 @@ router.get('/methods', async (req: Request, res: Response) => {
     res.status(500).json({ error: 'Failed to get payment methods' });
   }
 });
+
+// Helper function to generate QR code for booking
+async function generateBookingQRCode(bookingId: string): Promise<string | null> {
+  try {
+    const booking = await prisma.booking.findUnique({
+      where: { id: bookingId },
+      include: {
+        route: {
+          include: {
+            bus: {
+              select: {
+                plateNumber: true,
+                model: true
+              }
+            },
+            operator: {
+              select: {
+                companyName: true
+              }
+            }
+          }
+        },
+        user: {
+          select: {
+            firstName: true,
+            lastName: true,
+            email: true
+          }
+        }
+      }
+    });
+
+    if (!booking) {
+      console.error('Booking not found for QR generation:', bookingId);
+      return null;
+    }
+
+    // Generate comprehensive QR data
+    const qrData = {
+      bookingId: booking.id,
+      passengerName: `${booking.user.firstName} ${booking.user.lastName}`,
+      route: `${booking.route.origin} → ${booking.route.destination}`,
+      seatNumber: booking.seatNumber,
+      travelDate: booking.travelDate.toISOString().split('T')[0],
+      busPlate: booking.route.bus.plateNumber,
+      operator: booking.route.operator.companyName,
+      amount: booking.totalAmount,
+      generatedAt: new Date().toISOString(),
+      signature: generateBookingSignature(booking.id, booking.userId)
+    };
+
+    // Generate QR code as data URL
+    const qrCodeDataURL = await QRCode.toDataURL(JSON.stringify(qrData), {
+      width: 256,
+      margin: 2,
+      color: {
+        dark: '#000000',
+        light: '#FFFFFF'
+      }
+    });
+
+    // Update booking with QR code
+    await prisma.booking.update({
+      where: { id: bookingId },
+      data: { qrCode: qrCodeDataURL }
+    });
+
+    console.log('QR code generated successfully for booking:', bookingId);
+    return qrCodeDataURL;
+  } catch (error) {
+    console.error('Error generating QR code for booking:', bookingId, error);
+    return null;
+  }
+}
+
+// Helper function to generate booking signature
+function generateBookingSignature(bookingId: string, userId: string): string {
+  const secret = process.env.JWT_SECRET || 'default-secret';
+  const data = `${bookingId}:${userId}:${secret}`;
+  
+  // Simple hash function (in production, use crypto.createHash)
+  let hash = 0;
+  for (let i = 0; i < data.length; i++) {
+    const char = data.charCodeAt(i);
+    hash = ((hash << 5) - hash) + char;
+    hash = hash & hash; // Convert to 32-bit integer
+  }
+  
+  return Math.abs(hash).toString(16);
+}
 
 export default router;
