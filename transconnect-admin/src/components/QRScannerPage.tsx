@@ -2,6 +2,7 @@ import React, { useState, useRef, useEffect } from 'react';
 import { Camera, CheckCircle, XCircle, RefreshCw, Upload } from 'lucide-react';
 import { useAuth } from '../contexts/AuthContext.tsx';
 import { api } from '../lib/api.ts';
+import jsQR from 'jsqr';
 
 export default function QRScannerPage() {
   const { user } = useAuth();
@@ -10,6 +11,7 @@ export default function QRScannerPage() {
   const [manualCode, setManualCode] = useState('');
   const [scanning, setScanning] = useState(false);
   const [cameraSupported, setCameraSupported] = useState(false);
+  const [scanningInterval, setScanningInterval] = useState<NodeJS.Timeout | null>(null);
   const videoRef = useRef<HTMLVideoElement>(null);
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
@@ -44,6 +46,13 @@ export default function QRScannerPage() {
       if (videoRef.current) {
         videoRef.current.srcObject = stream;
         videoRef.current.play();
+        
+        // Start continuous QR scanning
+        const interval = setInterval(() => {
+          scanForQRCode();
+        }, 1000); // Scan every second
+        
+        setScanningInterval(interval);
       }
     } catch (err: any) {
       setError('Camera access denied. Please allow camera access or use image upload.');
@@ -52,22 +61,14 @@ export default function QRScannerPage() {
     }
   };
 
-  const stopCamera = () => {
-    if (streamRef.current) {
-      streamRef.current.getTracks().forEach(track => track.stop());
-      streamRef.current = null;
-    }
-    setScanning(false);
-  };
-
-  const captureImage = () => {
+  const scanForQRCode = () => {
     if (!videoRef.current || !canvasRef.current) return;
 
     const video = videoRef.current;
     const canvas = canvasRef.current;
     const ctx = canvas.getContext('2d');
 
-    if (!ctx) return;
+    if (!ctx || video.readyState !== video.HAVE_ENOUGH_DATA) return;
 
     // Set canvas size to video size
     canvas.width = video.videoWidth;
@@ -76,9 +77,31 @@ export default function QRScannerPage() {
     // Draw video frame to canvas
     ctx.drawImage(video, 0, 0);
 
-    // Convert to data URL and process
-    const imageData = canvas.toDataURL('image/png');
-    processQRImage(imageData);
+    // Get image data for QR processing
+    const imageData = ctx.getImageData(0, 0, canvas.width, canvas.height);
+
+    // Try to decode QR code
+    const qrResult = jsQR(imageData.data, imageData.width, imageData.height);
+
+    if (qrResult) {
+      // QR code found! Validate it
+      validateQRCode(qrResult.data);
+      stopCamera(); // Stop camera after successful scan
+    }
+  };
+
+  const stopCamera = () => {
+    if (streamRef.current) {
+      streamRef.current.getTracks().forEach(track => track.stop());
+      streamRef.current = null;
+    }
+    
+    if (scanningInterval) {
+      clearInterval(scanningInterval);
+      setScanningInterval(null);
+    }
+    
+    setScanning(false);
   };
 
   const handleFileUpload = (event: React.ChangeEvent<HTMLInputElement>) => {
@@ -97,18 +120,48 @@ export default function QRScannerPage() {
     try {
       setError('');
       
-      // For now, we'll show instructions since we need a QR reading library
-      // In production, you'd use libraries like jsQR or zxing-js
-      setError('QR image processing requires additional setup. Please use manual input for now or check the booking success page for QR data.');
-      
-      // Sample of how it would work with a QR library:
-      // const qrData = await decodeQR(imageData);
-      // if (qrData) {
-      //   validateQRCode(qrData);
-      // }
+      // Create an image element to load the image data
+      const img = new Image();
+      img.onload = () => {
+        // Create a canvas to process the image
+        const canvas = document.createElement('canvas');
+        const ctx = canvas.getContext('2d');
+        
+        if (!ctx) {
+          setError('Canvas not supported');
+          return;
+        }
+
+        // Set canvas size to image size
+        canvas.width = img.width;
+        canvas.height = img.height;
+
+        // Draw image to canvas
+        ctx.drawImage(img, 0, 0);
+
+        // Get image data for QR processing
+        const imageData = ctx.getImageData(0, 0, canvas.width, canvas.height);
+
+        // Try to decode QR code
+        const qrResult = jsQR(imageData.data, imageData.width, imageData.height);
+
+        if (qrResult) {
+          // QR code found! Validate it
+          validateQRCode(qrResult.data);
+          stopCamera(); // Stop camera after successful scan
+        } else {
+          setError('No QR code found in image. Please try again with a clearer image.');
+        }
+      };
+
+      img.onerror = () => {
+        setError('Failed to load image. Please try a different image.');
+      };
+
+      img.src = imageData;
       
     } catch (err: any) {
-      setError('Failed to process QR code image');
+      setError('Failed to process QR code image: ' + err.message);
     }
   };
 
@@ -195,8 +248,9 @@ export default function QRScannerPage() {
                   <div className="absolute inset-0 flex items-center justify-center">
                     <div className="border-2 border-white border-dashed w-64 h-64 rounded-lg flex items-center justify-center">
                       <div className="text-white text-center">
-                        <div className="animate-pulse">📱</div>
-                        <p className="text-sm mt-2">Align QR code here</p>
+                        <div className="animate-pulse text-2xl">📱</div>
+                        <p className="text-sm mt-2">Scanning for QR codes...</p>
+                        <p className="text-xs mt-1">Point at QR code</p>
                       </div>
                     </div>
                   </div>
@@ -204,10 +258,10 @@ export default function QRScannerPage() {
                 
                 <div className="flex justify-center space-x-4">
                   <button 
-                    onClick={captureImage}
+                    onClick={scanForQRCode}
                     className="bg-green-600 text-white px-4 py-2 rounded-lg hover:bg-green-700 transition-colors"
                   >
-                    📸 Capture & Scan
+                    📸 Manual Capture
                   </button>
                   <button 
                     onClick={stopCamera}
@@ -216,6 +270,9 @@ export default function QRScannerPage() {
                     Stop Camera
                   </button>
                 </div>
+                <p className="text-center text-white text-sm mt-2">
+                  🔄 Auto-scanning active - QR codes will be detected automatically
+                </p>
               </div>
             )}
           </div>
