@@ -3,7 +3,7 @@ import React, { useEffect, useState } from 'react';
 import Link from 'next/link';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
-import { Calendar, MapPin, Clock, QrCode, Download, User, ArrowRight, X, Edit, RefreshCw } from 'lucide-react';
+import { Calendar, MapPin, Clock, QrCode, Download, User, ArrowRight, X, Edit, RefreshCw, CreditCard } from 'lucide-react';
 import { useAuth } from '@/contexts/AuthContext';
 import { getMyBookings, cancelBooking, modifyBookingDate } from '@/lib/api';
 import Header from '@/components/Header';
@@ -122,7 +122,10 @@ export default function BookingsPage() {
     const now = new Date();
     const hoursUntilTravel = (travelDate.getTime() - now.getTime()) / (1000 * 60 * 60);
     
-    return booking.status === 'CONFIRMED' && hoursUntilTravel > 24;
+    // Allow cancellation of confirmed bookings 24 hours before travel
+    // Allow cancellation of pending bookings anytime before travel
+    return (booking.status === 'CONFIRMED' && hoursUntilTravel > 24) || 
+           (booking.status === 'PENDING' && hoursUntilTravel > 2);
   };
 
   const canModifyBooking = (booking: any) => {
@@ -131,6 +134,20 @@ export default function BookingsPage() {
     const hoursUntilTravel = (travelDate.getTime() - now.getTime()) / (1000 * 60 * 60);
     
     return (booking.status === 'CONFIRMED' || booking.status === 'PENDING') && hoursUntilTravel > 48;
+  };
+
+  const handlePayNow = (booking: any) => {
+    // Navigate to payment page with booking data
+    const bookingData = encodeURIComponent(JSON.stringify(booking));
+    window.location.href = `/payment?booking=${bookingData}`;
+  };
+
+  const canPayBooking = (booking: any) => {
+    const travelDate = new Date(booking.travelDate);
+    const now = new Date();
+    const hoursUntilTravel = (travelDate.getTime() - now.getTime()) / (1000 * 60 * 60);
+    
+    return booking.status === 'PENDING' && hoursUntilTravel > 2; // Can pay up to 2 hours before travel
   };
 
   if (!isAuthenticated) {
@@ -236,7 +253,9 @@ export default function BookingsPage() {
         ) : (
           <div className="space-y-4">
             {bookings.map((booking) => (
-              <Card key={booking.id} className="hover:shadow-md transition-shadow">
+              <Card key={booking.id} className={`hover:shadow-md transition-shadow ${
+                booking.status === 'PENDING' ? 'border-yellow-300 bg-yellow-50' : ''
+              }`}>
                 <CardContent className="p-6">
                   <div className="flex justify-between items-start mb-4">
                     <div className="flex-1">
@@ -285,8 +304,25 @@ export default function BookingsPage() {
                   </div>
                   
                   {/* Booking Management Actions */}
-                  {(canCancelBooking(booking) || canModifyBooking(booking)) && (
+                  {(canPayBooking(booking) || canCancelBooking(booking) || canModifyBooking(booking)) && (
                     <div className="border-t pt-4 mt-4">
+                      {/* Pay Now Button for Pending Bookings */}
+                      {canPayBooking(booking) && (
+                        <div className="mb-4">
+                          <Button
+                            onClick={() => handlePayNow(booking)}
+                            className="bg-green-600 hover:bg-green-700 text-white"
+                            size="sm"
+                          >
+                            <CreditCard className="h-4 w-4 mr-1" />
+                            Pay Now - UGX {booking.totalAmount?.toLocaleString()}
+                          </Button>
+                          <p className="text-xs text-gray-500 mt-1">
+                            • Complete payment to confirm your booking
+                          </p>
+                        </div>
+                      )}
+                      
                       <div className="flex flex-wrap gap-3">
                         {canModifyBooking(booking) && (
                           <div className="flex items-center space-x-2">
@@ -327,7 +363,8 @@ export default function BookingsPage() {
                       </div>
                       
                       <div className="mt-2 text-xs text-gray-500">
-                        {canCancelBooking(booking) && '• Free cancellation up to 24 hours before travel'}
+                        {canCancelBooking(booking) && booking.status === 'CONFIRMED' && '• Free cancellation up to 24 hours before travel'}
+                        {canCancelBooking(booking) && booking.status === 'PENDING' && '• Cancel unpaid booking anytime before travel'}
                         {canModifyBooking(booking) && ' • Date changes allowed up to 48 hours before travel'}
                       </div>
                     </div>
