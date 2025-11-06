@@ -62,31 +62,52 @@ export default function QRScannerPage() {
   };
 
   const scanForQRCode = () => {
-    if (!videoRef.current || !canvasRef.current) return;
+    if (!videoRef.current || !canvasRef.current) {
+      console.log('Video or canvas ref missing');
+      return;
+    }
 
     const video = videoRef.current;
     const canvas = canvasRef.current;
     const ctx = canvas.getContext('2d');
 
-    if (!ctx || video.readyState !== video.HAVE_ENOUGH_DATA) return;
+    if (!ctx) {
+      console.log('Canvas context not available');
+      return;
+    }
 
-    // Set canvas size to video size
-    canvas.width = video.videoWidth;
-    canvas.height = video.videoHeight;
+    if (video.readyState !== video.HAVE_ENOUGH_DATA) {
+      console.log('Video not ready, readyState:', video.readyState);
+      return;
+    }
 
-    // Draw video frame to canvas
-    ctx.drawImage(video, 0, 0);
+    try {
+      // Set canvas size to video size
+      canvas.width = video.videoWidth;
+      canvas.height = video.videoHeight;
 
-    // Get image data for QR processing
-    const imageData = ctx.getImageData(0, 0, canvas.width, canvas.height);
+      // Draw video frame to canvas
+      ctx.drawImage(video, 0, 0);
 
-    // Try to decode QR code
-    const qrResult = jsQR(imageData.data, imageData.width, imageData.height);
+      // Get image data for QR processing
+      const imageData = ctx.getImageData(0, 0, canvas.width, canvas.height);
 
-    if (qrResult) {
-      // QR code found! Validate it
-      validateQRCode(qrResult.data);
-      stopCamera(); // Stop camera after successful scan
+      console.log('Scanning for QR code...', canvas.width, 'x', canvas.height);
+
+      // Try to decode QR code
+      const qrResult = jsQR(imageData.data, imageData.width, imageData.height);
+
+      if (qrResult) {
+        console.log('QR Code detected!', qrResult.data);
+        // QR code found! Validate it
+        validateQRCode(qrResult.data);
+        stopCamera(); // Stop camera after successful scan
+      } else {
+        console.log('No QR code found in current frame');
+      }
+    } catch (error) {
+      console.error('Error scanning for QR code:', error);
+      setError('Error scanning QR code: ' + (error as Error).message);
     }
   };
 
@@ -106,12 +127,22 @@ export default function QRScannerPage() {
 
   const handleFileUpload = (event: React.ChangeEvent<HTMLInputElement>) => {
     const file = event.target.files?.[0];
-    if (!file) return;
+    if (!file) {
+      console.log('No file selected');
+      return;
+    }
+
+    console.log('File selected:', file.name, file.type);
+    setError('Processing image...');
 
     const reader = new FileReader();
     reader.onload = (e) => {
       const imageData = e.target?.result as string;
+      console.log('Image loaded, processing QR...');
       processQRImage(imageData);
+    };
+    reader.onerror = () => {
+      setError('Failed to read image file');
     };
     reader.readAsDataURL(file);
   };
@@ -119,10 +150,13 @@ export default function QRScannerPage() {
   const processQRImage = async (imageData: string) => {
     try {
       setError('');
+      console.log('Processing QR image...');
       
       // Create an image element to load the image data
       const img = new Image();
       img.onload = () => {
+        console.log('Image loaded:', img.width, 'x', img.height);
+        
         // Create a canvas to process the image
         const canvas = document.createElement('canvas');
         const ctx = canvas.getContext('2d');
@@ -140,27 +174,34 @@ export default function QRScannerPage() {
         ctx.drawImage(img, 0, 0);
 
         // Get image data for QR processing
-        const imageData = ctx.getImageData(0, 0, canvas.width, canvas.height);
+        const imgData = ctx.getImageData(0, 0, canvas.width, canvas.height);
+
+        console.log('Scanning image for QR codes...');
 
         // Try to decode QR code
-        const qrResult = jsQR(imageData.data, imageData.width, imageData.height);
+        const qrResult = jsQR(imgData.data, imgData.width, imgData.height);
 
         if (qrResult) {
+          console.log('QR Code found in image!', qrResult.data);
           // QR code found! Validate it
           validateQRCode(qrResult.data);
           stopCamera(); // Stop camera after successful scan
         } else {
+          console.log('No QR code found in uploaded image');
           setError('No QR code found in image. Please try again with a clearer image.');
         }
       };
 
       img.onerror = () => {
+        console.error('Failed to load image');
         setError('Failed to load image. Please try a different image.');
       };
 
+      console.log('Setting image source...');
       img.src = imageData;
       
     } catch (err: any) {
+      console.error('Error processing QR image:', err);
       setError('Failed to process QR code image: ' + err.message);
     }
   };
