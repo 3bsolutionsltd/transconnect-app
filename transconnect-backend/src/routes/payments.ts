@@ -2,7 +2,7 @@ import { Router, Request, Response } from 'express';
 import { prisma } from '../index';
 import { authenticateToken } from '../middleware/auth';
 import { body, validationResult } from 'express-validator';
-import { PaymentMethod, PaymentStatus } from '@prisma/client';
+import { PaymentMethod, PaymentStatus, Booking } from '@prisma/client';
 import { 
   PaymentGatewayFactory, 
   PaymentError, 
@@ -192,7 +192,11 @@ router.post('/initiate', [
       });
 
       // Get updated booking with QR code if payment completed
-      let updatedBooking = null;
+      let updatedBooking: (Booking & {
+        route: {
+          operator: any;
+        } & any;
+      }) | null = null;
       if (currentPayment?.status === 'COMPLETED') {
         updatedBooking = await prisma.booking.findUnique({
           where: { id: payment.bookingId },
