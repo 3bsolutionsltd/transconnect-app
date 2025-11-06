@@ -21,6 +21,12 @@ export default function PaymentPage() {
   const [errorMessage, setErrorMessage] = useState<string>('');
 
   useEffect(() => {
+    // Check if user is authenticated
+    if (!user) {
+      router.push('/login');
+      return;
+    }
+
     const booking = searchParams.get('booking');
     if (booking) {
       try {
@@ -32,7 +38,7 @@ export default function PaymentPage() {
     } else {
       router.push('/search');
     }
-  }, [searchParams, router]);
+  }, [searchParams, router, user]);
 
   const paymentMethods = [
     { id: 'MTN_MOBILE_MONEY', name: 'MTN Mobile Money', icon: Smartphone, color: 'text-yellow-600' },
@@ -41,6 +47,12 @@ export default function PaymentPage() {
   ];
 
   const handlePayment = async () => {
+    if (!user) {
+      setErrorMessage('Please log in to complete payment');
+      setPaymentStatus('failed');
+      return;
+    }
+
     if (!phoneNumber && selectedMethod !== 'FLUTTERWAVE') {
       alert('Please enter your phone number');
       return;
@@ -87,7 +99,17 @@ export default function PaymentPage() {
       }
     } catch (error: any) {
       console.error('Payment error:', error);
-      setErrorMessage(error.message || 'Payment failed. Please try again.');
+      
+      // Handle specific error types
+      if (error.response?.status === 401) {
+        setErrorMessage('Please log in to complete payment');
+        setTimeout(() => router.push('/login'), 2000);
+      } else if (error.response?.status === 403) {
+        setErrorMessage('Authentication failed. Please log in again.');
+        setTimeout(() => router.push('/login'), 2000);
+      } else {
+        setErrorMessage(error.response?.data?.error || error.message || 'Payment failed. Please try again.');
+      }
       setPaymentStatus('failed');
     } finally {
       setProcessing(false);
