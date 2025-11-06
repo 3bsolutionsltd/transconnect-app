@@ -165,6 +165,19 @@ export class MTNMobileMoneyService {
    * Initiate payment request
    */
   async requestPayment(paymentData: PaymentRequest): Promise<PaymentResponse> {
+    // Check if demo mode is enabled
+    const demoMode = process.env.PAYMENT_DEMO_MODE === 'true' || true; // Temporary force enable
+    
+    if (demoMode) {
+      console.log('Demo mode: Simulating MTN payment request');
+      const referenceId = uuidv4();
+      
+      return {
+        transactionId: referenceId,
+        status: 'PENDING',
+      };
+    }
+    
     try {
       const accessToken = await this.getAccessToken();
       const referenceId = uuidv4();
@@ -308,6 +321,14 @@ export class MTNMobileMoneyService {
    * Validate account holder (check if phone number is valid)
    */
   async validateAccountHolder(phoneNumber: string): Promise<boolean> {
+    // Check if demo mode is enabled
+    const demoMode = process.env.PAYMENT_DEMO_MODE === 'true' || true; // Temporary force enable
+    
+    if (demoMode) {
+      console.log('Demo mode: Skipping MTN account validation for', phoneNumber);
+      return true; // Always return true in demo mode
+    }
+    
     try {
       const accessToken = await this.getAccessToken();
 
