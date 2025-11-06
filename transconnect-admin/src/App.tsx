@@ -23,7 +23,7 @@ import LoginPage from './components/LoginPage.tsx';
 import RouteManagement from './components/RouteManagement.tsx';
 import UserManagement from './components/UserManagement.tsx';
 import OperatorManagement from './components/OperatorManagement.tsx';
-import QRScannerPage from './app/qr-scanner/page.tsx';
+import QRScannerPage from './components/QRScannerPage.tsx';
 
 // Dashboard Component
 const Dashboard = () => {
