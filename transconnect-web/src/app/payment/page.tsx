@@ -53,9 +53,7 @@ export default function PaymentPage() {
       // Call actual payment API
       const paymentRequest = {
         bookingId: bookingData.id,
-        amount: bookingData.totalAmount,
-        currency: 'UGX',
-        paymentMethod: selectedMethod,
+        method: selectedMethod,
         phoneNumber: phoneNumber
       };
 
