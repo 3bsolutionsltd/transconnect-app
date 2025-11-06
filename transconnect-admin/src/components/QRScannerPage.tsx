@@ -1,5 +1,5 @@
-import React, { useState } from 'react';
-import { Camera, CheckCircle, XCircle, RefreshCw } from 'lucide-react';
+import React, { useState, useRef, useEffect } from 'react';
+import { Camera, CheckCircle, XCircle, RefreshCw, Upload } from 'lucide-react';
 import { useAuth } from '../contexts/AuthContext.tsx';
 import { api } from '../lib/api.ts';
 
@@ -8,6 +8,109 @@ export default function QRScannerPage() {
   const [result, setResult] = useState<any>(null);
   const [error, setError] = useState<string>('');
   const [manualCode, setManualCode] = useState('');
+  const [scanning, setScanning] = useState(false);
+  const [cameraSupported, setCameraSupported] = useState(false);
+  const videoRef = useRef<HTMLVideoElement>(null);
+  const canvasRef = useRef<HTMLCanvasElement>(null);
+  const fileInputRef = useRef<HTMLInputElement>(null);
+  const streamRef = useRef<MediaStream | null>(null);
+
+  useEffect(() => {
+    // Check if camera is supported
+    if (navigator.mediaDevices && navigator.mediaDevices.getUserMedia) {
+      setCameraSupported(true);
+    }
+    
+    return () => {
+      stopCamera();
+    };
+  }, []);
+
+  const startCamera = async () => {
+    try {
+      setScanning(true);
+      setError('');
+      
+      const stream = await navigator.mediaDevices.getUserMedia({
+        video: { 
+          facingMode: 'environment', // Use back camera
+          width: { ideal: 1280 },
+          height: { ideal: 720 }
+        }
+      });
+      
+      streamRef.current = stream;
+      
+      if (videoRef.current) {
+        videoRef.current.srcObject = stream;
+        videoRef.current.play();
+      }
+    } catch (err: any) {
+      setError('Camera access denied. Please allow camera access or use image upload.');
+      setScanning(false);
+      console.error('Camera error:', err);
+    }
+  };
+
+  const stopCamera = () => {
+    if (streamRef.current) {
+      streamRef.current.getTracks().forEach(track => track.stop());
+      streamRef.current = null;
+    }
+    setScanning(false);
+  };
+
+  const captureImage = () => {
+    if (!videoRef.current || !canvasRef.current) return;
+
+    const video = videoRef.current;
+    const canvas = canvasRef.current;
+    const ctx = canvas.getContext('2d');
+
+    if (!ctx) return;
+
+    // Set canvas size to video size
+    canvas.width = video.videoWidth;
+    canvas.height = video.videoHeight;
+
+    // Draw video frame to canvas
+    ctx.drawImage(video, 0, 0);
+
+    // Convert to data URL and process
+    const imageData = canvas.toDataURL('image/png');
+    processQRImage(imageData);
+  };
+
+  const handleFileUpload = (event: React.ChangeEvent<HTMLInputElement>) => {
+    const file = event.target.files?.[0];
+    if (!file) return;
+
+    const reader = new FileReader();
+    reader.onload = (e) => {
+      const imageData = e.target?.result as string;
+      processQRImage(imageData);
+    };
+    reader.readAsDataURL(file);
+  };
+
+  const processQRImage = async (imageData: string) => {
+    try {
+      setError('');
+      
+      // For now, we'll show instructions since we need a QR reading library
+      // In production, you'd use libraries like jsQR or zxing-js
+      setError('QR image processing requires additional setup. Please use manual input for now or check the booking success page for QR data.');
+      
+      // Sample of how it would work with a QR library:
+      // const qrData = await decodeQR(imageData);
+      // if (qrData) {
+      //   validateQRCode(qrData);
+      // }
+      
+    } catch (err: any) {
+      setError('Failed to process QR code image');
+    }
+  };
 
   const validateQRCode = async (qrData: string) => {
     try {
@@ -47,12 +150,113 @@ export default function QRScannerPage() {
           <p className="text-gray-600">Validate passenger tickets</p>
         </div>
 
-        {/* Manual Input */}
+        {/* Camera Scanner */}
         <div className="bg-white rounded-lg shadow border mb-6">
           <div className="p-6 border-b border-gray-200">
             <h2 className="text-lg font-semibold text-gray-900 flex items-center">
               <Camera className="h-5 w-5 mr-2" />
-              QR Code Validation
+              Camera Scanner
+            </h2>
+          </div>
+          <div className="p-6">
+            {!scanning ? (
+              <div className="text-center space-y-4">
+                {cameraSupported ? (
+                  <button 
+                    onClick={startCamera}
+                    className="bg-blue-600 text-white px-6 py-3 rounded-lg hover:bg-blue-700 transition-colors"
+                  >
+                    <Camera className="h-5 w-5 mr-2 inline" />
+                    Start Camera Scanning
+                  </button>
+                ) : (
+                  <div className="text-gray-500">
+                    <Camera className="h-12 w-12 mx-auto mb-2 text-gray-300" />
+                    <p>Camera not supported on this device</p>
+                  </div>
+                )}
+                <p className="text-sm text-gray-600">
+                  Point camera at passenger's QR code
+                </p>
+              </div>
+            ) : (
+              <div className="space-y-4">
+                <div className="relative bg-black rounded-lg overflow-hidden">
+                  <video
+                    ref={videoRef}
+                    className="w-full max-w-md mx-auto rounded-lg"
+                    autoPlay
+                    playsInline
+                    muted
+                  />
+                  <canvas ref={canvasRef} className="hidden" />
+                  
+                  {/* Scanning overlay */}
+                  <div className="absolute inset-0 flex items-center justify-center">
+                    <div className="border-2 border-white border-dashed w-64 h-64 rounded-lg flex items-center justify-center">
+                      <div className="text-white text-center">
+                        <div className="animate-pulse">📱</div>
+                        <p className="text-sm mt-2">Align QR code here</p>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+                
+                <div className="flex justify-center space-x-4">
+                  <button 
+                    onClick={captureImage}
+                    className="bg-green-600 text-white px-4 py-2 rounded-lg hover:bg-green-700 transition-colors"
+                  >
+                    📸 Capture & Scan
+                  </button>
+                  <button 
+                    onClick={stopCamera}
+                    className="bg-gray-600 text-white px-4 py-2 rounded-lg hover:bg-gray-700 transition-colors"
+                  >
+                    Stop Camera
+                  </button>
+                </div>
+              </div>
+            )}
+          </div>
+        </div>
+
+        {/* Image Upload Scanner */}
+        <div className="bg-white rounded-lg shadow border mb-6">
+          <div className="p-6 border-b border-gray-200">
+            <h2 className="text-lg font-semibold text-gray-900 flex items-center">
+              <Upload className="h-5 w-5 mr-2" />
+              Upload QR Code Image
+            </h2>
+          </div>
+          <div className="p-6">
+            <div className="text-center">
+              <input
+                type="file"
+                ref={fileInputRef}
+                onChange={handleFileUpload}
+                accept="image/*"
+                className="hidden"
+              />
+              <button
+                onClick={() => fileInputRef.current?.click()}
+                className="bg-purple-600 text-white px-6 py-3 rounded-lg hover:bg-purple-700 transition-colors"
+              >
+                <Upload className="h-5 w-5 mr-2 inline" />
+                Choose QR Code Image
+              </button>
+              <p className="text-sm text-gray-600 mt-2">
+                Upload a screenshot or photo of the QR code
+              </p>
+            </div>
+          </div>
+        </div>
+
+        {/* Manual Input Scanner */}
+        <div className="bg-white rounded-lg shadow border mb-6">
+          <div className="p-6 border-b border-gray-200">
+            <h2 className="text-lg font-semibold text-gray-900">
+              Manual QR Code Input
             </h2>
           </div>
           <div className="p-6">
