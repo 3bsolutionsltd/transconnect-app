@@ -7,6 +7,7 @@ const router = Router();
 router.get('/', async (req: Request, res: Response) => {
   try {
     const { origin, destination, travelDate } = req.query;
+    console.log('Routes API called with params:', { origin, destination, travelDate });
 
     // Build where clause for filtering
     let whereClause: any = {
@@ -86,6 +87,14 @@ router.get('/', async (req: Request, res: Response) => {
         bookings: undefined // Remove bookings from response
       };
     });
+
+    console.log('Routes found:', routesWithAvailability.length);
+    console.log('Sample route:', routesWithAvailability[0] ? {
+      id: routesWithAvailability[0].id,
+      origin: routesWithAvailability[0].origin,
+      destination: routesWithAvailability[0].destination,
+      active: routesWithAvailability[0].active
+    } : 'None');
 
     res.json(routesWithAvailability);
   } catch (error) {
