@@ -12,6 +12,7 @@ export default function RoutePage({ params }: { params: { id: string } }) {
   const [route, setRoute] = useState<any>(null);
   const [bookedSeats, setBookedSeats] = useState<string[]>([]);
   const [selectedSeats, setSelectedSeats] = useState<string[]>([]);
+  const [travelDate, setTravelDate] = useState(new Date().toISOString().split('T')[0]);
   const [loading, setLoading] = useState(false);
   const router = useRouter();
 
@@ -19,11 +20,20 @@ export default function RoutePage({ params }: { params: { id: string } }) {
     async function load() {
       setLoading(true);
       try {
-        const data = await fetchRouteById(id);
+        // Pass travel date to get accurate seat availability
+        const data = await fetchRouteById(id, { travelDate });
         setRoute(data);
+        
+        // Update booked seats based on the travel date
         if (data.availability && Array.isArray(data.availability.bookedSeatNumbers)) {
           setBookedSeats(data.availability.bookedSeatNumbers.map((n: any) => n.toString()));
+        } else {
+          // No bookings for this date
+          setBookedSeats([]);
         }
+        
+        // Clear selected seats when date changes to avoid conflicts
+        setSelectedSeats([]);
       } catch (err) {
         console.error(err);
       } finally {
@@ -31,7 +41,7 @@ export default function RoutePage({ params }: { params: { id: string } }) {
       }
     }
     load();
-  }, [id]);
+  }, [id, travelDate]);
 
   if (loading) return (
     <div className="min-h-screen bg-gray-50 flex items-center justify-center">
@@ -185,9 +195,38 @@ export default function RoutePage({ params }: { params: { id: string } }) {
           )}
         </div>
 
+        {/* Travel Date Selection */}
+        <div className="card mb-6">
+          <h2 className="text-xl font-semibold text-gray-900 mb-4">Select Travel Date</h2>
+          <div className="max-w-md">
+            <label className="block text-sm font-medium text-gray-700 mb-2">
+              When do you want to travel?
+            </label>
+            <input
+              type="date"
+              value={travelDate}
+              onChange={(e) => setTravelDate(e.target.value)}
+              min={new Date().toISOString().split('T')[0]}
+              className="form-input w-full"
+            />
+            <div className="text-sm text-gray-500 mt-2">
+              Seat availability will update based on your selected date
+            </div>
+          </div>
+        </div>
+
         {/* Seat Selection */}
         <div className="card mb-6">
-          <h2 className="text-xl font-semibold text-gray-900 mb-4">Select Your Seat</h2>
+          <div className="flex items-center justify-between mb-4">
+            <h2 className="text-xl font-semibold text-gray-900">Select Your Seats</h2>
+            {loading && (
+              <div className="flex items-center space-x-2 text-blue-600">
+                <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-blue-600"></div>
+                <span className="text-sm">Updating availability...</span>
+              </div>
+            )}
+          </div>
+          
           <SeatMap 
             capacity={route.bus.capacity} 
             bookedSeats={bookedSeats} 
@@ -204,6 +243,7 @@ export default function RoutePage({ params }: { params: { id: string } }) {
             routeId={route.id} 
             price={route.price} 
             selectedSeats={selectedSeats}
+            defaultTravelDate={travelDate}
             onSuccess={(b) => router.push('/profile')} 
           />
         </div>

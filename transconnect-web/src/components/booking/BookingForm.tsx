@@ -9,11 +9,12 @@ type Props = {
   routeId: string;
   price: number;
   selectedSeats?: string[];
+  defaultTravelDate?: string;
   onSuccess?: (booking: any) => void;
 };
 
-export default function BookingForm({ routeId, price, selectedSeats = [], onSuccess }: Props) {
-  const [travelDate, setTravelDate] = useState('');
+export default function BookingForm({ routeId, price, selectedSeats = [], defaultTravelDate, onSuccess }: Props) {
+  const [travelDate, setTravelDate] = useState(defaultTravelDate || '');
   const [passengerDetails, setPassengerDetails] = useState<Array<{name: string, phone: string}>>([]);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -30,6 +31,13 @@ export default function BookingForm({ routeId, price, selectedSeats = [], onSucc
       })));
     }
   }, [selectedSeats, user]);
+
+  // Update travel date when default changes
+  React.useEffect(() => {
+    if (defaultTravelDate && !travelDate) {
+      setTravelDate(defaultTravelDate);
+    }
+  }, [defaultTravelDate, travelDate]);
 
   const calculateTotal = () => {
     const baseTotal = selectedSeats.length * price;
