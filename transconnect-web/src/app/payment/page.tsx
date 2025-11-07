@@ -87,7 +87,8 @@ export default function PaymentPage() {
               ...bookingData,
               paymentStatus: 'COMPLETED',
               paymentMethod: selectedMethod,
-              paymentId: response.paymentId
+              paymentId: response.paymentId,
+              qrCode: response.qrCode // Include QR code from payment response
             }));
             router.push(`/booking-success?booking=${successData}`);
           }, 2000);

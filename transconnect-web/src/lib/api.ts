@@ -94,8 +94,16 @@ export const authApi = {
 };
 
 export async function fetchRoutes(params?: Record<string, any>) {
-  const res = await api.get('/routes', { params });
-  return res.data;
+  console.log('Fetching routes with params:', params);
+  console.log('API Base URL:', api.defaults.baseURL);
+  try {
+    const res = await api.get('/routes', { params });
+    console.log('Routes API response:', res.data?.length || 0, 'routes found');
+    return res.data;
+  } catch (error) {
+    console.error('Error fetching routes:', error);
+    throw error;
+  }
 }
 
 export async function fetchRouteById(id: string, params?: Record<string, any>) {
