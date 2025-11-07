@@ -29,6 +29,9 @@ router.get('/my-bookings', authenticateToken, async (req: Request, res: Response
               select: {
                 companyName: true
               }
+            },
+            stops: {
+              orderBy: { order: 'asc' }
             }
           }
         },
@@ -57,8 +60,9 @@ router.get('/my-bookings', authenticateToken, async (req: Request, res: Response
 router.post('/', [
   authenticateToken,
   body('routeId').notEmpty().withMessage('Route ID is required'),
-  body('seatNumber').notEmpty().withMessage('Seat number is required'),
-  body('travelDate').isISO8601().withMessage('Valid travel date is required')
+  body('seatNumbers').isArray({ min: 1 }).withMessage('At least one seat number is required'),
+  body('travelDate').isISO8601().withMessage('Valid travel date is required'),
+  body('passengers').isArray({ min: 1 }).withMessage('Passenger details are required')
 ], async (req: Request, res: Response) => {
   try {
     const errors = validationResult(req);
@@ -66,8 +70,22 @@ router.post('/', [
       return res.status(400).json({ errors: errors.array() });
     }
 
-    const { routeId, seatNumber, travelDate } = req.body;
+    const { 
+      routeId, 
+      seatNumbers, 
+      travelDate, 
+      passengers,
+      boardingStop,
+      alightingStop 
+    } = req.body;
     const userId = (req as any).user.userId;
+
+    // Validate seat count matches passenger count
+    if (seatNumbers.length !== passengers.length) {
+      return res.status(400).json({ 
+        error: 'Number of seats must match number of passengers' 
+      });
+    }
 
     // Check if route exists and is active
     const route = await prisma.route.findUnique({
@@ -75,6 +93,9 @@ router.post('/', [
       include: {
         bus: true,
         operator: true,
+        stops: {
+          orderBy: { order: 'asc' }
+        },
         bookings: {
           where: {
             travelDate: new Date(travelDate),
@@ -88,48 +109,95 @@ router.post('/', [
       return res.status(404).json({ error: 'Route not found or inactive' });
     }
 
-    // Check if seat is available for the specific travel date
-    const existingBooking = await prisma.booking.findFirst({
-      where: {
-        routeId,
-        seatNumber: seatNumber,
-        travelDate: new Date(travelDate),
-        status: { in: ['PENDING', 'CONFIRMED'] }
+    // Validate stops and calculate pricing
+    let finalPrice = route.price;
+    let boarding: any = null;
+    let alighting: any = null;
+
+    if (boardingStop && alightingStop && route.stops.length > 0) {
+      boarding = route.stops.find(stop => stop.stopName === boardingStop);
+      alighting = route.stops.find(stop => stop.stopName === alightingStop);
+
+      if (!boarding || !alighting) {
+        return res.status(400).json({ error: 'Invalid boarding or alighting stop' });
       }
-    });
 
-    if (existingBooking) {
-      return res.status(400).json({ error: 'Seat is already booked for this date' });
+      if (boarding.order >= alighting.order) {
+        return res.status(400).json({ error: 'Boarding stop must be before alighting stop' });
+      }
+
+      // Calculate price based on stops
+      finalPrice = alighting.priceFromOrigin - boarding.priceFromOrigin;
     }
 
-    // Validate seat number against bus capacity
-    const seatNum = parseInt(seatNumber);
-    if (isNaN(seatNum) || seatNum < 1 || seatNum > route.bus.capacity) {
-      return res.status(400).json({ error: 'Invalid seat number for this bus' });
+    // Check seat availability
+    for (const seatNumber of seatNumbers) {
+      const existingBooking = await prisma.booking.findFirst({
+        where: {
+          routeId,
+          seatNumber: seatNumber,
+          travelDate: new Date(travelDate),
+          status: { in: ['PENDING', 'CONFIRMED'] }
+        }
+      });
+
+      if (existingBooking) {
+        return res.status(400).json({ 
+          error: `Seat ${seatNumber} is already booked for this date` 
+        });
+      }
+
+      // Validate seat number against bus capacity
+      const seatNum = parseInt(seatNumber);
+      if (isNaN(seatNum) || seatNum < 1 || seatNum > route.bus.capacity) {
+        return res.status(400).json({ 
+          error: `Invalid seat number ${seatNumber} for this bus` 
+        });
+      }
     }
 
-    // Generate QR code data
-    const qrData = {
-      routeId: routeId,
-      seatNumber: seatNumber,
-      travelDate: travelDate,
-      route: `${route.origin} → ${route.destination}`,
-      busPlate: route.bus.plateNumber,
-      timestamp: Date.now()
-    };
+    // Create bookings for each passenger
+    const bookings: any[] = [];
+    
+    for (let i = 0; i < passengers.length; i++) {
+      const passenger = passengers[i];
+      const seatNumber = seatNumbers[i];
 
-    const qrCode = await QRCode.toDataURL(JSON.stringify(qrData));
-
-    // Create booking
-    const booking = await prisma.booking.create({
-      data: {
-        userId,
-        routeId,
+      // Generate QR code data
+      const qrData = {
+        routeId: routeId,
         seatNumber: seatNumber,
-        travelDate: new Date(travelDate),
-        qrCode,
-        totalAmount: route.price,
-        status: 'PENDING'
+        travelDate: travelDate,
+        route: boardingStop && alightingStop 
+          ? `${boardingStop} → ${alightingStop}` 
+          : `${route.origin} → ${route.destination}`,
+        busPlate: route.bus.plateNumber,
+        passengerName: `${passenger.firstName} ${passenger.lastName}`,
+        timestamp: Date.now()
+      };
+
+      const qrCode = await QRCode.toDataURL(JSON.stringify(qrData));
+
+      // Create booking with only existing fields for now
+      const booking = await prisma.booking.create({
+        data: {
+          userId,
+          routeId,
+          seatNumber: seatNumber,
+          travelDate: new Date(travelDate),
+          qrCode,
+          totalAmount: finalPrice,
+          status: 'PENDING'
+        }
+      });
+
+      bookings.push(booking);
+    }
+
+    // Fetch complete booking data with relations
+    const completeBookings = await prisma.booking.findMany({
+      where: {
+        id: { in: bookings.map(b => b.id) }
       },
       include: {
         route: {
@@ -142,25 +210,38 @@ router.post('/', [
       }
     });
 
-    // Send booking confirmation notification
+    // Send booking confirmation notification for the primary passenger
     try {
+      const primaryBooking = completeBookings[0];
       await notificationService.sendBookingConfirmation({
-        userId: booking.userId,
-        bookingId: booking.id,
-        passengerName: `${booking.user.firstName} ${booking.user.lastName}`,
-        route: `${booking.route.origin} to ${booking.route.destination}`,
-        date: booking.travelDate.toLocaleDateString(),
-        time: booking.route.departureTime,
-        seatNumber: booking.seatNumber,
-        amount: booking.totalAmount,
-        qrCode: booking.id,
+        userId: primaryBooking.userId,
+        bookingId: primaryBooking.id,
+        passengerName: `${primaryBooking.user.firstName} ${primaryBooking.user.lastName}`,
+        route: boardingStop && alightingStop 
+          ? `${boardingStop} to ${alightingStop}` 
+          : `${primaryBooking.route.origin} to ${primaryBooking.route.destination}`,
+        date: primaryBooking.travelDate.toLocaleDateString(),
+        time: primaryBooking.route.departureTime,
+        seatNumber: seatNumbers.join(', '),
+        amount: finalPrice * seatNumbers.length,
+        qrCode: primaryBooking.id,
       });
     } catch (notificationError) {
       console.error('Error sending booking confirmation notification:', notificationError);
       // Don't fail the booking if notification fails
     }
 
-    res.status(201).json(booking);
+    res.status(201).json({
+      bookings: completeBookings,
+      summary: {
+        totalSeats: seatNumbers.length,
+        pricePerSeat: finalPrice,
+        totalAmount: finalPrice * seatNumbers.length,
+        route: boardingStop && alightingStop 
+          ? `${boardingStop} → ${alightingStop}` 
+          : `${route.origin} → ${route.destination}`
+      }
+    });
   } catch (error) {
     console.error('Error creating booking:', error);
     res.status(500).json({ error: 'Failed to create booking' });
@@ -284,7 +365,10 @@ router.get('/:id', authenticateToken, async (req: Request, res: Response) => {
         route: {
           include: {
             bus: true,
-            operator: true
+            operator: true,
+            stops: {
+              orderBy: { order: 'asc' }
+            }
           }
         },
         payment: true,

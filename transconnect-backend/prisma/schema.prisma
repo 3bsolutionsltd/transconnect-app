@@ -116,8 +116,27 @@ model Route {
   operator Operator  @relation(fields: [operatorId], references: [id], onDelete: Cascade)
   bus      Bus       @relation(fields: [busId], references: [id], onDelete: Cascade)
   bookings Booking[]
+  stops    RouteStop[]
 
   @@map("routes")
+}
+
+model RouteStop {
+  id            String   @id @default(cuid())
+  routeId       String
+  stopName      String   // Name of the town/stop
+  distanceFromOrigin Float // Distance in km from route origin
+  priceFromOrigin    Float // Price in UGX from route origin  
+  order         Int      // Order of stop along the route (1, 2, 3...)
+  estimatedTime String   // Estimated arrival time "HH:MM"
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+
+  // Relations
+  route Route @relation(fields: [routeId], references: [id], onDelete: Cascade)
+  
+  @@unique([routeId, order])
+  @@map("route_stops")
 }
 
 model Booking {
@@ -129,6 +148,9 @@ model Booking {
   status       BookingStatus @default(PENDING)
   qrCode       String
   totalAmount  Float
+  boardingStop String?       // Origin or intermediate stop name
+  alightingStop String?      // Destination or intermediate stop name  
+  actualPrice  Float?        // Price based on distance between stops
   createdAt    DateTime      @default(now())
   updatedAt    DateTime      @updatedAt
 

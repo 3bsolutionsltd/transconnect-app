@@ -47,6 +47,9 @@ router.get('/', async (req: Request, res: Response) => {
             amenities: true
           }
         },
+        stops: {
+          orderBy: { order: 'asc' }
+        },
         bookings: travelDate ? {
           where: {
             travelDate: new Date(travelDate as string),
@@ -127,6 +130,9 @@ router.get('/:id', async (req: Request, res: Response) => {
             capacity: true,
             amenities: true
           }
+        },
+        stops: {
+          orderBy: { order: 'asc' }
         },
         bookings: travelDate ? {
           where: {
@@ -212,6 +218,9 @@ router.get('/search/:origin/:destination', async (req: Request, res: Response) =
             capacity: true,
             amenities: true
           }
+        },
+        stops: {
+          orderBy: { order: 'asc' }
         },
         bookings: travelDate ? {
           where: {
@@ -475,6 +484,203 @@ router.delete('/:id', async (req: Request, res: Response) => {
   } catch (error) {
     console.error('Error deleting route:', error);
     res.status(500).json({ error: 'Failed to delete route' });
+  }
+});
+
+// ==================== ROUTE STOPS MANAGEMENT ====================
+
+// Get stops for a specific route
+router.get('/:id/stops', async (req: Request, res: Response) => {
+  try {
+    const { id } = req.params;
+
+    const route = await prisma.route.findUnique({
+      where: { id },
+      include: {
+        stops: {
+          orderBy: { order: 'asc' }
+        }
+      }
+    });
+
+    if (!route) {
+      return res.status(404).json({ error: 'Route not found' });
+    }
+
+    res.json(route.stops);
+  } catch (error) {
+    console.error('Error fetching route stops:', error);
+    res.status(500).json({ error: 'Failed to fetch route stops' });
+  }
+});
+
+// Add stops to a route (Admin/Operator only)
+router.post('/:id/stops', async (req: Request, res: Response) => {
+  try {
+    const { id } = req.params;
+    const { stops } = req.body;
+
+    // Validate request
+    if (!stops || !Array.isArray(stops)) {
+      return res.status(400).json({ error: 'Stops array is required' });
+    }
+
+    // Check if route exists
+    const route = await prisma.route.findUnique({
+      where: { id }
+    });
+
+    if (!route) {
+      return res.status(404).json({ error: 'Route not found' });
+    }
+
+    // Delete existing stops for the route
+    await prisma.routeStop.deleteMany({
+      where: { routeId: id }
+    });
+
+    // Create new stops
+    const createdStops = await prisma.$transaction(
+      stops.map((stop: any, index: number) => 
+        prisma.routeStop.create({
+          data: {
+            routeId: id,
+            stopName: stop.stopName,
+            distanceFromOrigin: parseFloat(stop.distanceFromOrigin),
+            priceFromOrigin: parseFloat(stop.priceFromOrigin),
+            order: index + 1,
+            estimatedTime: stop.estimatedTime
+          }
+        })
+      )
+    );
+
+    res.status(201).json(createdStops);
+  } catch (error) {
+    console.error('Error adding route stops:', error);
+    res.status(500).json({ error: 'Failed to add route stops' });
+  }
+});
+
+// Calculate price between two stops
+router.get('/:id/stops/calculate-price', async (req: Request, res: Response) => {
+  try {
+    const { id } = req.params;
+    const { boardingStop, alightingStop } = req.query;
+
+    if (!boardingStop || !alightingStop) {
+      return res.status(400).json({ 
+        error: 'boardingStop and alightingStop parameters are required' 
+      });
+    }
+
+    const route = await prisma.route.findUnique({
+      where: { id },
+      include: {
+        stops: {
+          orderBy: { order: 'asc' }
+        }
+      }
+    });
+
+    if (!route) {
+      return res.status(404).json({ error: 'Route not found' });
+    }
+
+    const boarding = route.stops.find(stop => stop.stopName === boardingStop);
+    const alighting = route.stops.find(stop => stop.stopName === alightingStop);
+
+    if (!boarding || !alighting) {
+      return res.status(400).json({ error: 'Invalid boarding or alighting stop' });
+    }
+
+    if (boarding.order >= alighting.order) {
+      return res.status(400).json({ error: 'Boarding stop must be before alighting stop' });
+    }
+
+    const distance = alighting.distanceFromOrigin - boarding.distanceFromOrigin;
+    const price = alighting.priceFromOrigin - boarding.priceFromOrigin;
+
+    res.json({
+      boardingStop: boarding,
+      alightingStop: alighting,
+      distance,
+      price,
+      route: {
+        id: route.id,
+        origin: route.origin,
+        destination: route.destination
+      }
+    });
+  } catch (error) {
+    console.error('Error calculating stop price:', error);
+    res.status(500).json({ error: 'Failed to calculate stop price' });
+  }
+});
+
+// Get all available boarding stops (for passenger selection)
+router.get('/:id/boarding-stops', async (req: Request, res: Response) => {
+  try {
+    const { id } = req.params;
+
+    const route = await prisma.route.findUnique({
+      where: { id },
+      include: {
+        stops: {
+          orderBy: { order: 'asc' }
+        }
+      }
+    });
+
+    if (!route) {
+      return res.status(404).json({ error: 'Route not found' });
+    }
+
+    // Return all stops except the last one (can't board at final destination)
+    const boardingStops = route.stops.slice(0, -1);
+
+    res.json(boardingStops);
+  } catch (error) {
+    console.error('Error fetching boarding stops:', error);
+    res.status(500).json({ error: 'Failed to fetch boarding stops' });
+  }
+});
+
+// Get available alighting stops for a given boarding stop
+router.get('/:id/alighting-stops/:boardingStop', async (req: Request, res: Response) => {
+  try {
+    const { id, boardingStop } = req.params;
+
+    const route = await prisma.route.findUnique({
+      where: { id },
+      include: {
+        stops: {
+          orderBy: { order: 'asc' }
+        }
+      }
+    });
+
+    if (!route) {
+      return res.status(404).json({ error: 'Route not found' });
+    }
+
+    const boardingStopData = route.stops.find(stop => 
+      stop.stopName === decodeURIComponent(boardingStop)
+    );
+
+    if (!boardingStopData) {
+      return res.status(400).json({ error: 'Invalid boarding stop' });
+    }
+
+    // Return all stops after the boarding stop
+    const alightingStops = route.stops.filter(stop => 
+      stop.order > boardingStopData.order
+    );
+
+    res.json(alightingStops);
+  } catch (error) {
+    console.error('Error fetching alighting stops:', error);
+    res.status(500).json({ error: 'Failed to fetch alighting stops' });
   }
 });
 
