@@ -128,14 +128,43 @@ export default function SearchPage() {
               <div key={route.id} className="card hover:shadow-md transition-shadow">
                 <div className="flex flex-col sm:flex-row sm:justify-between sm:items-start space-y-4 sm:space-y-0">
                   <div className="flex-1">
-                    <div className="text-lg sm:text-xl font-semibold text-gray-900 mb-3 sm:mb-2">
-                      {route.origin} → {route.destination}
-                      {route.via && (
-                        <span className="text-sm font-normal text-blue-600 ml-2">
-                          (via {route.via})
-                        </span>
+                    <div className="flex items-center justify-between mb-3">
+                      <div className="text-lg sm:text-xl font-semibold text-gray-900">
+                        {route.origin} → {route.destination}
+                        {route.via && (
+                          <span className="text-sm font-normal text-blue-600 ml-2">
+                            (via {route.via})
+                          </span>
+                        )}
+                      </div>
+                      {route.operator && (
+                        <div className="flex items-center space-x-2 bg-blue-50 px-3 py-1 rounded-full">
+                          <div className="w-2 h-2 bg-blue-500 rounded-full"></div>
+                          <span className="text-sm font-medium text-blue-700">
+                            {route.operator.companyName}
+                          </span>
+                        </div>
                       )}
                     </div>
+                    
+                    {/* Bus Information */}
+                    {route.bus && (
+                      <div className="flex flex-wrap items-center gap-4 text-sm text-gray-600 mb-3 p-2 bg-gray-50 rounded-lg">
+                        <div className="flex items-center space-x-1">
+                          <span className="font-medium">🚌 Bus:</span>
+                          <span>{route.bus.plateNumber}</span>
+                        </div>
+                        <div className="flex items-center space-x-1">
+                          <span className="font-medium">Model:</span>
+                          <span>{route.bus.model}</span>
+                        </div>
+                        <div className="flex items-center space-x-1">
+                          <span className="font-medium">Capacity:</span>
+                          <span>{route.bus.capacity} seats</span>
+                        </div>
+                      </div>
+                    )}
+                    
                     <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3 sm:gap-4 text-sm text-gray-600 mb-4">
                       <div>
                         <span className="font-medium">Price:</span> UGX {route.price?.toLocaleString()}

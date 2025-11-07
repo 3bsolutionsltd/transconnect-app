@@ -11,7 +11,7 @@ export default function RoutePage({ params }: { params: { id: string } }) {
   const { id } = params;
   const [route, setRoute] = useState<any>(null);
   const [bookedSeats, setBookedSeats] = useState<string[]>([]);
-  const [selectedSeat, setSelectedSeat] = useState<string | null>(null);
+  const [selectedSeats, setSelectedSeats] = useState<string[]>([]);
   const [loading, setLoading] = useState(false);
   const router = useRouter();
 
@@ -113,7 +113,28 @@ export default function RoutePage({ params }: { params: { id: string } }) {
             </div>
           </div>
           
-          <div className="grid grid-cols-2 md:grid-cols-4 gap-6">
+          {/* Operator Information Banner */}
+          {route.operator && (
+            <div className="mb-6 p-4 bg-blue-50 border border-blue-200 rounded-lg">
+              <div className="flex items-center justify-between">
+                <div className="flex items-center space-x-3">
+                  <div className="w-12 h-12 bg-blue-600 rounded-full flex items-center justify-center text-white font-bold">
+                    {route.operator.companyName.charAt(0)}
+                  </div>
+                  <div>
+                    <div className="font-semibold text-blue-900">{route.operator.companyName}</div>
+                    <div className="text-sm text-blue-700">Licensed Bus Operator</div>
+                  </div>
+                </div>
+                <div className="flex items-center space-x-2 bg-green-100 px-3 py-1 rounded-full">
+                  <div className="w-2 h-2 bg-green-500 rounded-full"></div>
+                  <span className="text-sm font-medium text-green-700">Verified</span>
+                </div>
+              </div>
+            </div>
+          )}
+          
+          <div className="grid grid-cols-2 md:grid-cols-5 gap-6">
             <div className="flex items-center space-x-3">
               <Clock className="h-5 w-5 text-gray-400" />
               <div>
@@ -138,7 +159,14 @@ export default function RoutePage({ params }: { params: { id: string } }) {
             <div className="flex items-center space-x-3">
               <MapPin className="h-5 w-5 text-gray-400" />
               <div>
-                <div className="text-xs text-gray-500 uppercase">Bus</div>
+                <div className="text-xs text-gray-500 uppercase">Bus Model</div>
+                <div className="font-medium">{route.bus?.model}</div>
+              </div>
+            </div>
+            <div className="flex items-center space-x-3">
+              <MapPin className="h-5 w-5 text-gray-400" />
+              <div>
+                <div className="text-xs text-gray-500 uppercase">Plate Number</div>
                 <div className="font-medium">{route.bus?.plateNumber}</div>
               </div>
             </div>
@@ -163,16 +191,10 @@ export default function RoutePage({ params }: { params: { id: string } }) {
           <SeatMap 
             capacity={route.bus.capacity} 
             bookedSeats={bookedSeats} 
-            selectedSeat={selectedSeat} 
-            onSelect={(s) => setSelectedSeat(s)} 
+            selectedSeats={selectedSeats} 
+            maxSeats={4}
+            onSelect={(seats) => setSelectedSeats(seats)} 
           />
-          {selectedSeat && (
-            <div className="mt-4 p-3 bg-blue-50 border border-blue-200 rounded-lg">
-              <div className="text-sm text-blue-800">
-                <strong>Selected Seat:</strong> {selectedSeat}
-              </div>
-            </div>
-          )}
         </div>
 
         {/* Booking Form */}
@@ -181,7 +203,7 @@ export default function RoutePage({ params }: { params: { id: string } }) {
           <BookingForm 
             routeId={route.id} 
             price={route.price} 
-            selectedSeat={selectedSeat}
+            selectedSeats={selectedSeats}
             onSuccess={(b) => router.push('/profile')} 
           />
         </div>

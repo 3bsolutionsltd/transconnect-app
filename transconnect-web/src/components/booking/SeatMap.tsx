@@ -13,11 +13,12 @@ interface Seat {
 type Props = {
   capacity: number;
   bookedSeats?: string[];
-  selectedSeat?: string | null;
-  onSelect: (seat: string) => void;
+  selectedSeats?: string[];
+  maxSeats?: number;
+  onSelect: (seats: string[]) => void;
 };
 
-export default function SeatMap({ capacity, bookedSeats = [], selectedSeat, onSelect }: Props) {
+export default function SeatMap({ capacity, bookedSeats = [], selectedSeats = [], maxSeats = 4, onSelect }: Props) {
   // Generate seats with types
   const generateSeats = (): Seat[] => {
     const seats: Seat[] = [];
@@ -57,8 +58,29 @@ export default function SeatMap({ capacity, bookedSeats = [], selectedSeat, onSe
   const seats = generateSeats();
   const rows = Math.ceil(capacity / 4);
 
+  const handleSeatClick = (seatNumber: string) => {
+    if (bookedSeats.includes(seatNumber)) return;
+    
+    let newSelectedSeats: string[];
+    
+    if (selectedSeats.includes(seatNumber)) {
+      // Deselect seat
+      newSelectedSeats = selectedSeats.filter(s => s !== seatNumber);
+    } else {
+      // Select seat (up to maxSeats)
+      if (selectedSeats.length >= maxSeats) {
+        // Replace oldest selection with new one
+        newSelectedSeats = [...selectedSeats.slice(1), seatNumber];
+      } else {
+        newSelectedSeats = [...selectedSeats, seatNumber];
+      }
+    }
+    
+    onSelect(newSelectedSeats);
+  };
+
   const getSeatStyles = (seat: Seat) => {
-    const isSelected = selectedSeat === seat.number;
+    const isSelected = selectedSeats.includes(seat.number);
     
     if (seat.isBooked) {
       return 'bg-red-100 text-red-800 cursor-not-allowed border-2 border-red-200';
@@ -106,7 +128,7 @@ export default function SeatMap({ capacity, bookedSeats = [], selectedSeat, onSe
                 <div key={seat.number} className="relative">
                   <button
                     disabled={seat.isBooked}
-                    onClick={() => onSelect(seat.number)}
+                    onClick={() => handleSeatClick(seat.number)}
                     className={`
                       relative h-14 w-14 rounded-lg font-medium text-xs transition-all duration-200 shadow-sm
                       ${getSeatStyles(seat)}
@@ -117,9 +139,9 @@ export default function SeatMap({ capacity, bookedSeats = [], selectedSeat, onSe
                       <span className="font-bold">{seat.number}</span>
                     </div>
                     
-                    {selectedSeat === seat.number && (
-                      <span className="absolute -top-1 -right-1 w-4 h-4 bg-yellow-400 rounded-full flex items-center justify-center">
-                        ✓
+                    {selectedSeats.includes(seat.number) && (
+                      <span className="absolute -top-1 -right-1 w-4 h-4 bg-yellow-400 rounded-full flex items-center justify-center text-xs">
+                        {selectedSeats.indexOf(seat.number) + 1}
                       </span>
                     )}
                     
@@ -187,22 +209,45 @@ export default function SeatMap({ capacity, bookedSeats = [], selectedSeat, onSe
         </div>
         
         <div className="mt-3 pt-3 border-t border-gray-200">
-          <div className="flex items-center justify-between text-xs text-gray-600">
+          <div className="flex items-center justify-between text-xs text-gray-600 mb-2">
             <span>💺 Total Seats: {capacity}</span>
             <span>🚫 Booked: {bookedSeats.length}</span>
             <span>✅ Available: {capacity - bookedSeats.length}</span>
           </div>
+          <div className="flex items-center justify-between text-xs">
+            <span className="text-blue-600 font-medium">👥 Selected: {selectedSeats.length}/{maxSeats}</span>
+            {selectedSeats.length >= maxSeats && (
+              <span className="text-amber-600">Max seats reached</span>
+            )}
+          </div>
         </div>
       </div>
       
-      {selectedSeat && (
-        <div className="bg-blue-50 border border-blue-200 rounded-lg p-4 text-center">
-          <div className="text-sm text-blue-800">
-            <strong>Selected:</strong> Seat {selectedSeat} 
-            {seats.find(s => s.number === selectedSeat)?.type === 'premium' && (
-              <span className="text-purple-600 ml-1">(Premium +UGX 15,000)</span>
-            )}
+      {selectedSeats.length > 0 && (
+        <div className="bg-blue-50 border border-blue-200 rounded-lg p-4">
+          <div className="text-center text-sm text-blue-800 mb-3">
+            <strong>Selected Seats ({selectedSeats.length}):</strong>
           </div>
+          <div className="flex flex-wrap justify-center gap-2">
+            {selectedSeats.map((seatNumber, index) => {
+              const seat = seats.find(s => s.number === seatNumber);
+              const isPremium = seat?.type === 'premium';
+              return (
+                <div key={seatNumber} className="flex items-center space-x-2 bg-white px-3 py-2 rounded-lg border border-blue-200">
+                  <span className="text-blue-600 font-medium">#{index + 1}</span>
+                  <span className="font-medium">Seat {seatNumber}</span>
+                  {isPremium && (
+                    <span className="text-purple-600 text-xs">(Premium +15k)</span>
+                  )}
+                </div>
+              );
+            })}
+          </div>
+          {selectedSeats.some(seatNumber => seats.find(s => s.number === seatNumber)?.type === 'premium') && (
+            <div className="text-center text-xs text-purple-600 mt-2">
+              Premium seats include extra fees
+            </div>
+          )}
         </div>
       )}
     </div>
