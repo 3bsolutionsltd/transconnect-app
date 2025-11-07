@@ -12,11 +12,18 @@ export default function SearchPage() {
   const [date, setDate] = useState('');
   const [routes, setRoutes] = useState<any[]>([]);
   const [loading, setLoading] = useState(false);
+  const [error, setError] = useState<string>('');
   const router = useRouter();
+
+  // Load all routes when component mounts
+  React.useEffect(() => {
+    handleSearch();
+  }, []);
 
   async function handleSearch(e?: React.FormEvent) {
     if (e) e.preventDefault();
     setLoading(true);
+    setError('');
     try {
       const params: any = {};
       if (origin) params.origin = origin;
@@ -24,9 +31,16 @@ export default function SearchPage() {
       if (date) params.travelDate = date;
 
       const result = await fetchRoutes(params);
-      setRoutes(result);
-    } catch (err) {
-      console.error(err);
+      setRoutes(result || []);
+      
+      if (!result || result.length === 0) {
+        setError(origin || destination 
+          ? 'No routes match your search criteria. Try different locations or dates.'
+          : 'No routes available at the moment. Please try again later.');
+      }
+    } catch (err: any) {
+      console.error('Search error:', err);
+      setError('Unable to load routes. Please check your internet connection and try again.');
       setRoutes([]);
     } finally {
       setLoading(false);
@@ -88,10 +102,26 @@ export default function SearchPage() {
           </div>
         ) : (
           <div className="space-y-4">
-            {routes.length === 0 && (
+            {routes.length === 0 && !loading && (
               <div className="card text-center py-8 sm:py-12">
                 <div className="text-gray-500 mb-2 text-base sm:text-lg">No routes found</div>
-                <div className="text-sm text-gray-400">Try searching for "Kampala" to "Jinja" or clear filters to see all routes</div>
+                <div className="text-sm text-gray-400">
+                  {origin || destination 
+                    ? 'Try different search terms or clear filters to see all available routes'
+                    : 'Loading available routes... If this continues, please refresh the page'
+                  }
+                </div>
+                <button 
+                  onClick={() => {
+                    setOrigin('');
+                    setDestination('');
+                    setDate('');
+                    handleSearch();
+                  }}
+                  className="mt-4 text-blue-600 hover:text-blue-800 underline"
+                >
+                  Show all routes
+                </button>
               </div>
             )}
             {routes.map((route: any) => (
