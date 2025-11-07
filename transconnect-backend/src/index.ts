@@ -214,6 +214,7 @@ deployMigrations().then(() => {
   server.listen(PORT, HOST, () => {
     console.log(`🚀 TransConnect Backend server running on ${HOST}:${PORT}`);
     console.log(`📊 Health check: http://${HOST}:${PORT}/health`);
+    console.log('🛤️ Route stops system ready');
   });
 });
 
