@@ -1,0 +1,165 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Test QR Code for TransConnect</title>
+    <script src="https://cdn.jsdelivr.net/npm/qrcode@1.5.3/build/qrcode.min.js"></script>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            max-width: 800px;
+            margin: 0 auto;
+            padding: 20px;
+            background: #f5f5f5;
+        }
+        .container {
+            background: white;
+            padding: 30px;
+            border-radius: 10px;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+        }
+        .qr-container {
+            text-align: center;
+            margin: 20px 0;
+        }
+        .ticket-info {
+            background: #e3f2fd;
+            padding: 20px;
+            border-radius: 8px;
+            margin: 20px 0;
+        }
+        .qr-data {
+            background: #f5f5f5;
+            padding: 15px;
+            border-radius: 5px;
+            font-family: monospace;
+            font-size: 12px;
+            margin: 20px 0;
+            word-break: break-all;
+        }
+        .button {
+            background: #2196F3;
+            color: white;
+            padding: 10px 20px;
+            border: none;
+            border-radius: 5px;
+            cursor: pointer;
+            margin: 10px 5px;
+        }
+        .button:hover {
+            background: #1976D2;
+        }
+        .instructions {
+            background: #fff3cd;
+            border: 1px solid #ffeaa7;
+            padding: 15px;
+            border-radius: 5px;
+            margin: 20px 0;
+        }
+        #qrcode {
+            margin: 20px auto;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>🎫 TransConnect Test QR Code</h1>
+        
+        <div class="instructions">
+            <h3>📱 How to Test QR Scanning:</h3>
+            <ol>
+                <li><strong>Open Admin Dashboard:</strong> <a href="https://transconnect-admin.vercel.app" target="_blank">transconnect-admin.vercel.app</a></li>
+                <li><strong>Login</strong> with admin credentials</li>
+                <li><strong>Go to "QR Scanner"</strong> in the sidebar</li>
+                <li><strong>Use camera</strong> to scan the QR code below OR</li>
+                <li><strong>Copy the QR data</strong> below and paste in manual input</li>
+            </ol>
+        </div>
+
+        <div class="ticket-info">
+            <h3>🎫 Ticket Information</h3>
+            <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 10px;">
+                <div><strong>👤 Passenger:</strong> John Doe</div>
+                <div><strong>🚌 Route:</strong> Kampala → Jinja</div>
+                <div><strong>💺 Seat:</strong> A12</div>
+                <div><strong>📅 Date:</strong> November 7, 2025</div>
+                <div><strong>🚐 Bus:</strong> UAH-001A</div>
+                <div><strong>🏢 Operator:</strong> Swift Safaris</div>
+            </div>
+        </div>
+
+        <div class="qr-container">
+            <h3>📱 QR Code to Scan</h3>
+            <div id="qrcode"></div>
+            <button class="button" onclick="generateQR()">🔄 Generate New QR</button>
+            <button class="button" onclick="copyQRData()">📋 Copy QR Data</button>
+        </div>
+
+        <div class="qr-data">
+            <h4>🔍 QR Code Data (for manual input):</h4>
+            <div id="qrData">Click "Generate New QR" to see data</div>
+        </div>
+
+        <div class="instructions">
+            <h3>✅ Expected Scan Results:</h3>
+            <p><strong>Status:</strong> ❌ INVALID (Booking not found)</p>
+            <p><strong>Reason:</strong> This is a demo QR code - not a real booking</p>
+            <p><strong>Purpose:</strong> Test the scanning interface and validation system</p>
+        </div>
+    </div>
+
+    <script>
+        function generateQR() {
+            const qrData = {
+                bookingId: `demo_${Date.now()}`,
+                passengerName: 'John Doe',
+                route: 'Kampala → Jinja',
+                seatNumber: 'A12',
+                travelDate: '2025-11-07T08:00:00.000Z',
+                busPlate: 'UAH-001A',
+                operator: 'Swift Safaris',
+                timestamp: new Date().toISOString(),
+                signature: `demo_signature_${Date.now()}`
+            };
+
+            const qrDataString = JSON.stringify(qrData);
+            
+            // Clear previous QR code
+            document.getElementById('qrcode').innerHTML = '';
+            
+            // Generate new QR code
+            QRCode.toCanvas(document.getElementById('qrcode'), qrDataString, {
+                width: 256,
+                margin: 2,
+                color: {
+                    dark: '#000000',
+                    light: '#FFFFFF'
+                }
+            }, function (error) {
+                if (error) console.error(error);
+                console.log('QR code generated successfully!');
+            });
+
+            // Display QR data
+            document.getElementById('qrData').textContent = qrDataString;
+        }
+
+        function copyQRData() {
+            const qrDataText = document.getElementById('qrData').textContent;
+            if (qrDataText && qrDataText !== 'Click "Generate New QR" to see data') {
+                navigator.clipboard.writeText(qrDataText).then(function() {
+                    alert('✅ QR data copied to clipboard! Paste it in the admin dashboard manual input.');
+                });
+            } else {
+                alert('Please generate a QR code first!');
+            }
+        }
+
+        // Generate QR code on page load
+        window.onload = function() {
+            generateQR();
+        };
+    </script>
+</body>
+</html>

@@ -1,7 +1,7 @@
 import React, { useState, useRef, useEffect } from 'react';
 import { Camera, CheckCircle, XCircle, RefreshCw, Upload } from 'lucide-react';
-import { useAuth } from '../contexts/AuthContext.tsx';
-import { api } from '../lib/api.ts';
+import { useAuth } from '../contexts/AuthContext';
+import { api } from '../lib/api';
 import jsQR from 'jsqr';
 
 export default function QRScannerPage() {
@@ -19,9 +19,9 @@ export default function QRScannerPage() {
 
   useEffect(() => {
     // Check if camera is supported
-    if (navigator.mediaDevices && navigator.mediaDevices.getUserMedia) {
-      setCameraSupported(true);
-    }
+    setCameraSupported(
+      !!(navigator.mediaDevices && typeof navigator.mediaDevices.getUserMedia === 'function')
+    );
     
     return () => {
       stopCamera();

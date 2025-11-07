@@ -18,12 +18,12 @@ import {
   Building2,
   QrCode
 } from 'lucide-react';
-import { AuthProvider, useAuth } from './contexts/AuthContext.tsx';
-import LoginPage from './components/LoginPage.tsx';
-import RouteManagement from './components/RouteManagement.tsx';
-import UserManagement from './components/UserManagement.tsx';
-import OperatorManagement from './components/OperatorManagement.tsx';
-import QRScannerPage from './components/QRScannerPage.tsx';
+import { AuthProvider, useAuth } from './contexts/AuthContext';
+import LoginPage from './components/LoginPage';
+import RouteManagement from './components/RouteManagement';
+import UserManagement from './components/UserManagement';
+import OperatorManagement from './components/OperatorManagement';
+import QRScannerPage from './components/QRScannerPage';
 
 // Dashboard Component
 const Dashboard = () => {

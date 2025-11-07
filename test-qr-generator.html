@@ -1,0 +1,160 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>QR Code Generator for Testing</title>
+    <script src="https://cdn.jsdelivr.net/npm/qrcode@1.5.3/build/qrcode.min.js"></script>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            max-width: 800px;
+            margin: 0 auto;
+            padding: 20px;
+            background-color: #f5f5f5;
+        }
+        .container {
+            background: white;
+            padding: 30px;
+            border-radius: 10px;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+        }
+        h1 {
+            color: #333;
+            text-align: center;
+        }
+        .qr-section {
+            text-align: center;
+            margin: 30px 0;
+        }
+        #qrcode {
+            margin: 20px 0;
+        }
+        .test-data {
+            background: #f8f9fa;
+            padding: 15px;
+            border-radius: 5px;
+            margin: 20px 0;
+            font-family: monospace;
+            font-size: 12px;
+            word-break: break-all;
+        }
+        button {
+            background: #007bff;
+            color: white;
+            border: none;
+            padding: 10px 20px;
+            border-radius: 5px;
+            cursor: pointer;
+            margin: 10px;
+        }
+        button:hover {
+            background: #0056b3;
+        }
+        .instructions {
+            background: #e7f3ff;
+            padding: 15px;
+            border-radius: 5px;
+            margin: 20px 0;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>🎫 QR Code Generator for TransConnect Testing</h1>
+        
+        <div class="instructions">
+            <h3>📱 How to Test QR Scanner:</h3>
+            <ol>
+                <li>Click "Generate QR Code" below</li>
+                <li>Open TransConnect Admin Dashboard</li>
+                <li>Go to QR Scanner</li>
+                <li>Point camera at the QR code on this screen</li>
+                <li>Or save the QR image and upload it</li>
+            </ol>
+        </div>
+
+        <div class="qr-section">
+            <button onclick="generateTestQR()">🎯 Generate Test QR Code</button>
+            <button onclick="generateValidQR()">✅ Generate Valid Booking QR</button>
+            <div id="qrcode"></div>
+            <div id="qr-data" class="test-data"></div>
+        </div>
+
+        <div class="instructions">
+            <h3>🧪 Test Scenarios:</h3>
+            <p><strong>Test QR:</strong> Will show "Invalid (Booking not found)" - confirms validation works</p>
+            <p><strong>Valid Booking QR:</strong> Contains real booking data structure</p>
+        </div>
+    </div>
+
+    <script>
+        function generateTestQR() {
+            const testData = {
+                "bookingId": "demo_12345",
+                "passengerName": "John Doe",
+                "route": "Kampala → Jinja",
+                "seatNumber": "A12",
+                "travelDate": "2025-11-07T08:00:00.000Z",
+                "busPlate": "UAH-001A",
+                "operator": "Swift Safaris",
+                "timestamp": "2025-11-06T12:00:00.000Z",
+                "signature": "demo_signature"
+            };
+
+            const qrData = JSON.stringify(testData);
+            generateQR(qrData, "Test QR Code - Should show 'Booking not found'");
+        }
+
+        function generateValidQR() {
+            const validData = {
+                "bookingId": "bk_" + Date.now() + "_test",
+                "passengerName": "Jane Smith",
+                "route": "Kampala → Entebbe",
+                "seatNumber": "B5",
+                "travelDate": "2025-11-07T10:00:00.000Z",
+                "busPlate": "UAH-002B",
+                "operator": "Express Lines",
+                "timestamp": new Date().toISOString(),
+                "signature": "valid_test_signature_" + Date.now()
+            };
+
+            const qrData = JSON.stringify(validData);
+            generateQR(qrData, "Valid Booking QR Code");
+        }
+
+        function generateQR(data, title) {
+            // Clear previous QR code
+            document.getElementById('qrcode').innerHTML = '';
+            
+            // Generate new QR code
+            QRCode.toCanvas(document.getElementById('qrcode'), data, {
+                width: 300,
+                height: 300,
+                margin: 2,
+                color: {
+                    dark: '#000000',
+                    light: '#FFFFFF'
+                }
+            }, function (error) {
+                if (error) {
+                    console.error('QR Code generation failed:', error);
+                    document.getElementById('qrcode').innerHTML = '<p style="color: red;">Failed to generate QR code</p>';
+                } else {
+                    console.log('QR Code generated successfully');
+                    document.getElementById('qr-data').innerHTML = `
+                        <h4>${title}</h4>
+                        <strong>QR Data:</strong><br>
+                        ${data}
+                    `;
+                }
+            });
+        }
+
+        // Generate a test QR code on page load
+        window.onload = function() {
+            generateTestQR();
+        };
+    </script>
+</body>
+</html>
