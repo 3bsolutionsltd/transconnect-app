@@ -81,8 +81,8 @@ router.get('/:id', authenticateToken, async (req: Request, res: Response) => {
             createdAt: true,
             route: {
               select: {
-                from: true,
-                to: true
+                origin: true,
+                destination: true
               }
             }
           },
