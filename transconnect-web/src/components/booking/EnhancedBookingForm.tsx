@@ -58,6 +58,7 @@ const EnhancedBookingForm: React.FC<EnhancedBookingFormProps> = ({
   const [loading, setLoading] = useState<boolean>(false);
   const [useStops, setUseStops] = useState<boolean>(false);
   const [availableSeats, setAvailableSeats] = useState<string[]>([]);
+  const [bookedSeats, setBookedSeats] = useState<string[]>([]);
 
   // Initialize passengers array when seats are selected
   useEffect(() => {
@@ -84,6 +85,7 @@ const EnhancedBookingForm: React.FC<EnhancedBookingFormProps> = ({
           `${process.env.NEXT_PUBLIC_API_URL}/api/bookings/route/${route.id}/seats?travelDate=${travelDate}`
         );
         setAvailableSeats(response.data.availableSeats);
+        setBookedSeats(response.data.bookedSeats || []);
       } catch (error) {
         console.error('Error fetching seat availability:', error);
       }
@@ -245,9 +247,9 @@ const EnhancedBookingForm: React.FC<EnhancedBookingFormProps> = ({
             </h3>
             <SeatMap
               capacity={route.bus.capacity}
+              bookedSeats={bookedSeats}
               selectedSeats={selectedSeats}
-              availableSeats={availableSeats}
-              onSeatSelect={setSelectedSeats}
+              onSelect={setSelectedSeats}
               maxSeats={4}
             />
             <div className="mt-4 text-sm text-gray-600">
