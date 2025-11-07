@@ -4,6 +4,7 @@ import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { createBooking } from '../../lib/api';
 import { useAuth } from '@/contexts/AuthContext';
+import StopSelector from './StopSelector';
 
 type Props = {
   routeId: string;
@@ -18,6 +19,12 @@ export default function BookingForm({ routeId, price, selectedSeats = [], defaul
   const [passengerDetails, setPassengerDetails] = useState<Array<{name: string, phone: string}>>([]);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  
+  // Route stops state
+  const [boardingStop, setBoardingStop] = useState<string>('');
+  const [alightingStop, setAlightingStop] = useState<string>('');
+  const [dynamicPrice, setDynamicPrice] = useState<number>(price);
+  const [showStopSelector, setShowStopSelector] = useState<boolean>(false);
   
   const { user, isAuthenticated } = useAuth();
   const router = useRouter();
@@ -40,10 +47,14 @@ export default function BookingForm({ routeId, price, selectedSeats = [], defaul
   }, [defaultTravelDate, travelDate]);
 
   const calculateTotal = () => {
-    const baseTotal = selectedSeats.length * price;
-    // Add premium seat fees (assuming 15000 extra for premium seats)
-    // This would need to be calculated based on actual seat types
-    return baseTotal;
+    const effectivePrice = dynamicPrice > 0 ? dynamicPrice : price;
+    return selectedSeats.length * effectivePrice;
+  };
+
+  const handleStopsSelected = (boarding: string, alighting: string, calculatedPrice: number) => {
+    setBoardingStop(boarding);
+    setAlightingStop(alighting);
+    setDynamicPrice(calculatedPrice);
   };
 
   async function submitBooking(e: React.FormEvent) {
@@ -70,24 +81,30 @@ export default function BookingForm({ routeId, price, selectedSeats = [], defaul
 
     setLoading(true);
     try {
-      // Create multiple bookings (one for each seat)
-      const bookingPromises = selectedSeats.map((seatNumber, index) => {
-        const payload = {
-          routeId,
-          seatNumber,
-          travelDate,
-          passengerName: passengerDetails[index].name,
-          passengerPhone: passengerDetails[index].phone
-        };
-        return createBooking(localStorage.getItem('token'), payload);
-      });
+      // Create booking payload with stops support
+      const passengers = selectedSeats.map((seatNumber, index) => ({
+        firstName: passengerDetails[index].name.split(' ')[0] || passengerDetails[index].name,
+        lastName: passengerDetails[index].name.split(' ').slice(1).join(' ') || '',
+        phone: passengerDetails[index].phone || user?.phone || ''
+      }));
 
-      const results = await Promise.all(bookingPromises);
+      const payload = {
+        routeId,
+        seatNumbers: selectedSeats,
+        travelDate,
+        passengers,
+        ...(boardingStop && alightingStop && {
+          boardingStop,
+          alightingStop
+        })
+      };
+
+      const result = await createBooking(localStorage.getItem('token'), payload);
       
-      if (onSuccess) onSuccess(results);
+      if (onSuccess) onSuccess(result);
       
-      // Redirect to payment page with multiple booking data
-      const bookingData = encodeURIComponent(JSON.stringify(results));
+      // Redirect to payment page with booking data
+      const bookingData = encodeURIComponent(JSON.stringify(result));
       router.push(`/payment?bookings=${bookingData}`);
     } catch (err: any) {
       setError(err?.response?.data?.error || err.message || 'Booking failed. Please try again.');
@@ -136,6 +153,46 @@ export default function BookingForm({ routeId, price, selectedSeats = [], defaul
             min={new Date().toISOString().split('T')[0]}
             required
           />
+        </div>
+
+        {/* Route Stops Selection */}
+        <div>
+          <div className="flex items-center justify-between mb-4">
+            <label className="block text-sm font-medium text-gray-700">
+              Journey Points (Optional)
+            </label>
+            <button
+              type="button"
+              onClick={() => setShowStopSelector(!showStopSelector)}
+              className="text-sm text-blue-600 hover:text-blue-800 font-medium"
+            >
+              {showStopSelector ? 'Hide Options' : 'Customize Journey'}
+            </button>
+          </div>
+          
+          {showStopSelector && (
+            <StopSelector
+              routeId={routeId}
+              onStopsSelected={handleStopsSelected}
+            />
+          )}
+          
+          {boardingStop && alightingStop && (
+            <div className="mt-4 bg-green-50 border border-green-200 rounded-lg p-4">
+              <h4 className="font-medium text-green-800 mb-2">✅ Custom Journey Selected</h4>
+              <div className="text-sm text-green-700 space-y-1">
+                <p><span className="font-medium">From:</span> {boardingStop}</p>
+                <p><span className="font-medium">To:</span> {alightingStop}</p>
+                <p><span className="font-medium">Price per seat:</span> UGX {dynamicPrice.toLocaleString()} 
+                  {dynamicPrice !== price && (
+                    <span className="text-green-600 ml-2">
+                      (Save UGX {(price - dynamicPrice).toLocaleString()})
+                    </span>
+                  )}
+                </p>
+              </div>
+            </div>
+          )}
         </div>
 
         {/* Selected Seats Summary */}
@@ -225,7 +282,14 @@ export default function BookingForm({ routeId, price, selectedSeats = [], defaul
                   <span className="text-gray-600">
                     Seat {seat} - {passengerDetails[index]?.name || 'Passenger ' + (index + 1)}
                   </span>
-                  <span className="font-medium">UGX {price?.toLocaleString()}</span>
+                  <span className="font-medium">
+                    UGX {(dynamicPrice > 0 ? dynamicPrice : price).toLocaleString()}
+                    {dynamicPrice > 0 && dynamicPrice !== price && (
+                      <span className="text-green-600 text-xs ml-1">
+                        (was UGX {price.toLocaleString()})
+                      </span>
+                    )}
+                  </span>
                 </div>
               ))}
               <div className="border-t border-gray-300 pt-2 mt-2">
