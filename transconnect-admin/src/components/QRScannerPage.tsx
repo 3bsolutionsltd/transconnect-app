@@ -222,17 +222,30 @@ export default function QRScannerPage() {
         parsedData = JSON.parse(qrData);
         console.log('Parsed QR data:', parsedData);
       } catch (parseError) {
-        setError('Invalid QR code format - not valid JSON data');
-        stopCamera();
-        return;
+        // If it's not JSON, treat it as plain text QR (could be a booking ID)
+        console.log('QR data is not JSON, treating as plain text');
+        parsedData = { rawData: qrData };
       }
 
       // Check if this looks like a booking QR (has bookingId and passengerName)
-      if (!parsedData.bookingId || !parsedData.passengerName) {
-        console.log('QR code detected, but not a valid booking ticket');
-        setError(`QR code detected, but this appears to be a route/seat selection QR, not a booking ticket. 
-                  This QR contains: ${Object.keys(parsedData).join(', ')}.
-                  Please scan a QR code from a completed booking confirmation.`);
+      // OR if it's a route QR that we can try to convert/validate
+      if (parsedData.bookingId && parsedData.passengerName) {
+        // This is a proper booking QR - validate it
+        console.log('Valid booking QR detected, validating...');
+      } else if (parsedData.routeId || parsedData.seatNumber) {
+        // This is a route selection QR - provide helpful guidance
+        setError(`This appears to be a route selection QR code. 
+                  To validate a passenger ticket, you need the QR code from a completed booking.
+                  Ask the passenger to show their booking confirmation QR code.`);
+        stopCamera();
+        return;
+      } else if (parsedData.rawData) {
+        // Plain text QR - might be a booking reference
+        console.log('Plain text QR detected, attempting validation...');
+      } else {
+        // Unknown format
+        setError(`QR code format not recognized. 
+                  Please scan a valid booking confirmation QR code from TransConnect.`);
         stopCamera();
         return;
       }
@@ -248,7 +261,15 @@ export default function QRScannerPage() {
       
     } catch (err: any) {
       console.error('QR validation error:', err);
-      setError(err.response?.data?.error || 'Failed to validate QR code');
+      
+      // Provide more user-friendly error messages
+      if (err.response?.status === 400) {
+        setError('This QR code is not a valid TransConnect booking ticket. Please ask the passenger for their booking confirmation QR code.');
+      } else if (err.response?.status === 404) {
+        setError('Booking not found. This ticket may be expired or invalid.');
+      } else {
+        setError('Unable to validate ticket. Please check your internet connection and try again.');
+      }
       stopCamera();
     }
   };
@@ -270,8 +291,8 @@ export default function QRScannerPage() {
     <div className="min-h-screen bg-gray-50 p-6">
       <div className="max-w-2xl mx-auto">
         <div className="mb-6">
-          <h1 className="text-3xl font-bold text-gray-900 mb-2">QR Ticket Scanner</h1>
-          <p className="text-gray-600">Validate passenger tickets</p>
+          <h1 className="text-3xl font-bold text-gray-900 mb-2">🎫 Ticket Validator</h1>
+          <p className="text-gray-600">Scan passenger QR codes to validate tickets and view booking details</p>
         </div>
 
         {/* Camera Scanner */}
@@ -317,11 +338,11 @@ export default function QRScannerPage() {
                   
                   {/* Scanning overlay */}
                   <div className="absolute inset-0 flex items-center justify-center">
-                    <div className="border-2 border-white border-dashed w-64 h-64 rounded-lg flex items-center justify-center">
+                    <div className="border-2 border-green-400 border-dashed w-64 h-64 rounded-lg flex items-center justify-center animate-pulse">
                       <div className="text-white text-center">
-                        <div className="animate-pulse text-2xl">📱</div>
-                        <p className="text-sm mt-2">Scanning for QR codes...</p>
-                        <p className="text-xs mt-1">Point at QR code</p>
+                        <div className="text-4xl mb-2">📱</div>
+                        <p className="text-sm font-semibold">Point camera at QR code</p>
+                        <p className="text-xs mt-1 opacity-80">Auto-scanning active...</p>
                       </div>
                     </div>
                   </div>
@@ -525,13 +546,30 @@ export default function QRScannerPage() {
         {/* Instructions */}
         <div className="bg-white rounded-lg shadow border mt-6">
           <div className="p-6 border-b border-gray-200">
-            <h2 className="text-sm font-semibold text-gray-900">Instructions</h2>
+            <h2 className="text-sm font-semibold text-gray-900">📋 How to Validate Tickets</h2>
           </div>
-          <div className="p-6 text-sm text-gray-600 space-y-2">
-            <div>• Paste QR code data in the text area above</div>
-            <div>• Valid tickets will show passenger and journey details</div>
-            <div>• Already scanned tickets will be marked but details are still shown</div>
-            <div>• Contact support if you encounter invalid tickets</div>
+          <div className="p-6 text-sm text-gray-600 space-y-3">
+            <div className="flex items-start space-x-2">
+              <span className="text-blue-600">1️⃣</span>
+              <span>Ask passenger to show their <strong>booking confirmation QR code</strong></span>
+            </div>
+            <div className="flex items-start space-x-2">
+              <span className="text-blue-600">2️⃣</span>
+              <span>Click "Start Camera Scanning" and point at the QR code</span>
+            </div>
+            <div className="flex items-start space-x-2">
+              <span className="text-blue-600">3️⃣</span>
+              <span>Valid tickets will show green checkmark with passenger details</span>
+            </div>
+            <div className="flex items-start space-x-2">
+              <span className="text-blue-600">4️⃣</span>
+              <span>Invalid or already scanned tickets will be clearly marked</span>
+            </div>
+            <div className="mt-4 p-3 bg-blue-50 rounded border border-blue-200">
+              <p className="text-blue-800 text-xs">
+                <strong>Note:</strong> Only scan QR codes from completed bookings. Route selection QRs are not valid tickets.
+              </p>
+            </div>
           </div>
         </div>
       </div>

@@ -15,6 +15,7 @@ import {
   MoreVertical,
   Download
 } from 'lucide-react';
+import { api } from '../lib/api';
 
 interface User {
   id: string;
@@ -39,61 +40,19 @@ const UserManagement: React.FC = () => {
   const [showUserModal, setShowUserModal] = useState(false);
   const [selectedUser, setSelectedUser] = useState<User | null>(null);
 
-  const API_BASE_URL = process.env.REACT_APP_API_URL || 'https://transconnect-app-44ie.onrender.com/api';
-
   useEffect(() => {
     fetchUsers();
   }, []);
 
   const fetchUsers = async () => {
     try {
-      const token = localStorage.getItem('admin_token');
-      const response = await fetch(`${API_BASE_URL}/users`, {
-        headers: {
-          'Authorization': `Bearer ${token}`,
-          'Content-Type': 'application/json'
-        }
-      });
-
-      if (response.ok) {
-        const data = await response.json();
-        // Mock additional data for demo
-        const enhancedUsers = data.map((user: User) => ({
-          ...user,
-          lastLogin: new Date(Date.now() - Math.random() * 7 * 24 * 60 * 60 * 1000).toISOString(),
-          bookingsCount: Math.floor(Math.random() * 20)
-        }));
-        setUsers(enhancedUsers);
-      }
+      setLoading(true);
+      const response = await api.get('/users');
+      setUsers(response.data);
     } catch (error) {
       console.error('Error fetching users:', error);
-      // Mock data for demo if API fails
-      setUsers([
-        {
-          id: '1',
-          email: 'admin@transconnect.ug',
-          firstName: 'Admin',
-          lastName: 'User',
-          phone: '+256700000000',
-          role: 'ADMIN',
-          verified: true,
-          createdAt: new Date().toISOString(),
-          lastLogin: new Date().toISOString(),
-          bookingsCount: 0
-        },
-        {
-          id: '2',
-          email: 'john@example.com',
-          firstName: 'John',
-          lastName: 'Doe',
-          phone: '+256701234567',
-          role: 'PASSENGER',
-          verified: true,
-          createdAt: new Date(Date.now() - 2 * 24 * 60 * 60 * 1000).toISOString(),
-          lastLogin: new Date(Date.now() - 1 * 60 * 60 * 1000).toISOString(),
-          bookingsCount: 5
-        }
-      ]);
+      // Show error message to user
+      alert('Failed to load users. Please check your connection and try again.');
     } finally {
       setLoading(false);
     }
@@ -101,40 +60,30 @@ const UserManagement: React.FC = () => {
 
   const handleUserAction = async (userId: string, action: 'verify' | 'unverify' | 'delete') => {
     try {
-      const token = localStorage.getItem('admin_token');
-      
       if (action === 'delete') {
         if (!window.confirm('Are you sure you want to delete this user?')) return;
         
-        const response = await fetch(`${API_BASE_URL}/users/${userId}`, {
-          method: 'DELETE',
-          headers: {
-            'Authorization': `Bearer ${token}`,
-          }
-        });
-
-        if (response.ok) {
-          setUsers(users.filter(u => u.id !== userId));
-        }
+        await api.delete(`/users/${userId}`);
+        setUsers(users.filter(u => u.id !== userId));
+        alert('User deleted successfully');
       } else {
         const verified = action === 'verify';
-        const response = await fetch(`${API_BASE_URL}/users/${userId}`, {
-          method: 'PUT',
-          headers: {
-            'Authorization': `Bearer ${token}`,
-            'Content-Type': 'application/json'
-          },
-          body: JSON.stringify({ verified })
+        const user = users.find(u => u.id === userId);
+        if (!user) return;
+
+        await api.put(`/users/${userId}`, {
+          ...user,
+          verified
         });
 
-        if (response.ok) {
-          setUsers(users.map(u => 
-            u.id === userId ? { ...u, verified } : u
-          ));
-        }
+        setUsers(users.map(u => 
+          u.id === userId ? { ...u, verified } : u
+        ));
+        alert(`User ${verified ? 'verified' : 'unverified'} successfully`);
       }
     } catch (error) {
-      console.error('Error performing user action:', error);
+      console.error('Error updating user:', error);
+      alert('Failed to update user. Please try again.');
     }
   };
 
