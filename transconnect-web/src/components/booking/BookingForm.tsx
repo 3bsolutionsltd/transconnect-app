@@ -114,7 +114,7 @@ export default function BookingForm({ routeId, price, selectedSeats = [], defaul
       
       // Redirect to payment page with booking data
       const bookingData = encodeURIComponent(JSON.stringify(result));
-      router.push(`/payment?bookings=${bookingData}`);
+      router.push(`/payment?booking=${bookingData}`);
     } catch (err: any) {
       setError(err?.response?.data?.error || err.message || 'Booking failed. Please try again.');
     } finally {
