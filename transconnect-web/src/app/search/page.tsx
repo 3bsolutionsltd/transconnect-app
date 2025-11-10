@@ -170,7 +170,7 @@ export default function SearchPage() {
                         <span className="font-medium">Price:</span> UGX {route.price?.toLocaleString()}
                       </div>
                       <div>
-                        <span className="font-medium">Duration:</span> {route.duration} mins
+                        <span className="font-medium">Duration:</span> {Math.floor(route.duration / 60)}h {route.duration % 60}m
                       </div>
                       <div>
                         <span className="font-medium">Departure:</span> {route.departureTime}
