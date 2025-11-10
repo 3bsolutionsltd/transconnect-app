@@ -8,6 +8,7 @@ import {
   Phone, 
   Calendar,
   Shield,
+  Eye,
   Trash2,
   Download
 } from 'lucide-react';
