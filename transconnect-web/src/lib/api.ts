@@ -128,7 +128,7 @@ export async function getMyBookings(token: string | null) {
 export async function cancelBooking(bookingId: string, token: string | null) {
   const headers: any = {};
   if (token) headers.Authorization = `Bearer ${token}`;
-  const res = await api.patch(`/bookings/${bookingId}/cancel`, {}, { headers });
+  const res = await api.put(`/bookings/${bookingId}/cancel`, {}, { headers });
   return res.data;
 }
 

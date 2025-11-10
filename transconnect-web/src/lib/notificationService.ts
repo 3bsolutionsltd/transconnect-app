@@ -4,6 +4,7 @@
  */
 
 import { useNotifications, NotificationTemplates } from '@/contexts/NotificationContext';
+import { EmailUtils } from './emailService';
 
 export interface NotificationService {
   // Booking related notifications
@@ -43,6 +44,19 @@ export const useNotificationService = (): NotificationService => {
     // Booking notifications
     onBookingCreated: (bookingId: string, routeDetails: string) => {
       addNotification(NotificationTemplates.bookingCreated(bookingId, routeDetails));
+      
+      // Send email notification for critical action
+      if (typeof window !== 'undefined') {
+        const user = JSON.parse(localStorage.getItem('user') || '{}');
+        if (user.email) {
+          EmailUtils.sendCriticalActionEmail('booking-created', {
+            userEmail: user.email,
+            userName: `${user.firstName} ${user.lastName}`,
+            bookingId,
+            routeDetails,
+          });
+        }
+      }
     },
 
     onBookingCancelled: (bookingId: string, routeDetails: string) => {
@@ -52,6 +66,19 @@ export const useNotificationService = (): NotificationService => {
         message: `Your booking ${bookingId} for ${routeDetails} has been cancelled successfully.`,
         persistent: true,
       });
+      
+      // Send email notification for critical action
+      if (typeof window !== 'undefined') {
+        const user = JSON.parse(localStorage.getItem('user') || '{}');
+        if (user.email) {
+          EmailUtils.sendCriticalActionEmail('booking-cancelled', {
+            userEmail: user.email,
+            userName: `${user.firstName} ${user.lastName}`,
+            bookingId,
+            routeDetails,
+          });
+        }
+      }
     },
 
     onSeatChanged: (oldSeat: string, newSeat: string) => {
@@ -61,10 +88,39 @@ export const useNotificationService = (): NotificationService => {
     // Payment notifications
     onPaymentSuccess: (amount: number, method: string) => {
       addNotification(NotificationTemplates.paymentConfirmed(amount, method));
+      
+      // Send email notification for critical action
+      if (typeof window !== 'undefined') {
+        const user = JSON.parse(localStorage.getItem('user') || '{}');
+        if (user.email) {
+          EmailUtils.sendCriticalActionEmail('payment-success', {
+            userEmail: user.email,
+            userName: `${user.firstName} ${user.lastName}`,
+            bookingId: 'current-booking',
+            routeDetails: 'Payment confirmed',
+            amount,
+            paymentMethod: method,
+          });
+        }
+      }
     },
 
     onPaymentFailed: (reason: string) => {
       addNotification(NotificationTemplates.paymentFailed(reason));
+      
+      // Send email notification for critical action
+      if (typeof window !== 'undefined') {
+        const user = JSON.parse(localStorage.getItem('user') || '{}');
+        if (user.email) {
+          EmailUtils.sendCriticalActionEmail('payment-failed', {
+            userEmail: user.email,
+            userName: `${user.firstName} ${user.lastName}`,
+            bookingId: 'current-booking',
+            routeDetails: 'Payment failed',
+            reason,
+          });
+        }
+      }
     },
 
     onRefundProcessed: (amount: number, bookingId: string) => {

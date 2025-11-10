@@ -6,7 +6,9 @@ import { Button } from '@/components/ui/button';
 import { Calendar, MapPin, Clock, QrCode, Download, User, ArrowRight, X, Edit, RefreshCw, CreditCard } from 'lucide-react';
 import { useAuth } from '@/contexts/AuthContext';
 import { getMyBookings, cancelBooking, modifyBookingDate } from '@/lib/api';
+import { useNotificationService } from '@/lib/notificationService';
 import Header from '@/components/Header';
+import ConfirmationDialog from '@/components/ui/ConfirmationDialog';
 import toast from 'react-hot-toast';
 
 export default function BookingsPage() {
@@ -16,7 +18,15 @@ export default function BookingsPage() {
   const [cancellingId, setCancellingId] = useState<string | null>(null);
   const [modifyingId, setModifyingId] = useState<string | null>(null);
   const [newDate, setNewDate] = useState('');
+  const [confirmDialog, setConfirmDialog] = useState<{
+    isOpen: boolean;
+    title: string;
+    message: string;
+    onConfirm: () => void;
+    type?: 'warning' | 'danger' | 'info';
+  } | null>(null);
   const { user, isAuthenticated, loading: authLoading } = useAuth();
+  const notificationService = useNotificationService();
 
   useEffect(() => {
     if (authLoading) return; // Wait for auth to load
@@ -61,62 +71,94 @@ export default function BookingsPage() {
   };
 
   const handleCancelBooking = async (bookingId: string) => {
-    if (!confirm('Are you sure you want to cancel this booking? This action cannot be undone.')) {
-      return;
-    }
+    const booking = bookings.find(b => b.id === bookingId);
+    if (!booking) return;
 
-    setCancellingId(bookingId);
-    try {
-      const token = localStorage.getItem('token');
-      await cancelBooking(bookingId, token);
-      
-      // Update the booking status locally
-      setBookings(prev => prev.map(booking => 
-        booking.id === bookingId 
-          ? { ...booking, status: 'CANCELLED' }
-          : booking
-      ));
-      
-      toast.success('Booking cancelled successfully');
-    } catch (err: any) {
-      console.error('Error cancelling booking:', err);
-      toast.error(err.response?.data?.message || 'Failed to cancel booking');
-    } finally {
-      setCancellingId(null);
-    }
+    const routeDetails = `${booking.route?.origin} → ${booking.route?.destination}`;
+    
+    setConfirmDialog({
+      isOpen: true,
+      title: 'Cancel Booking',
+      message: `Are you sure you want to cancel your booking for ${routeDetails} on ${new Date(booking.travelDate).toLocaleDateString()}? This action cannot be undone and may be subject to cancellation fees.`,
+      type: 'danger',
+      onConfirm: async () => {
+        setCancellingId(bookingId);
+        try {
+          const token = localStorage.getItem('token');
+          await cancelBooking(bookingId, token);
+          
+          // Update the booking status locally
+          setBookings(prev => prev.map(booking => 
+            booking.id === bookingId 
+              ? { ...booking, status: 'CANCELLED' }
+              : booking
+          ));
+          
+          // Show success notification
+          notificationService.onBookingCancelled(bookingId, routeDetails);
+          notificationService.showSuccess(
+            'Booking Cancelled Successfully', 
+            `Your booking for ${routeDetails} has been cancelled. A confirmation email has been sent.`
+          );
+          
+          setConfirmDialog(null);
+        } catch (err: any) {
+          console.error('Error cancelling booking:', err);
+          const errorMessage = err.response?.data?.error || err.response?.data?.message || 'Failed to cancel booking';
+          notificationService.showError('Cancellation Failed', errorMessage);
+        } finally {
+          setCancellingId(null);
+        }
+      }
+    });
   };
 
   const handleModifyDate = async (bookingId: string) => {
     if (!newDate) {
-      toast.error('Please select a new travel date');
+      notificationService.showWarning('Date Required', 'Please select a new travel date');
       return;
     }
 
-    if (!confirm('Are you sure you want to modify the travel date? Additional charges may apply.')) {
-      return;
-    }
+    const booking = bookings.find(b => b.id === bookingId);
+    if (!booking) return;
 
-    setModifyingId(bookingId);
-    try {
-      const token = localStorage.getItem('token');
-      const updatedBooking = await modifyBookingDate(bookingId, newDate, token);
-      
-      // Update the booking locally
-      setBookings(prev => prev.map(booking => 
-        booking.id === bookingId 
-          ? { ...booking, travelDate: newDate, status: 'PENDING' }
-          : booking
-      ));
-      
-      setNewDate('');
-      setModifyingId(null);
-      toast.success('Travel date updated successfully');
-    } catch (err: any) {
-      console.error('Error modifying booking:', err);
-      toast.error(err.response?.data?.message || 'Failed to modify booking date');
-    } finally {
-      setModifyingId(null);
-    }
+    const routeDetails = `${booking.route?.origin} → ${booking.route?.destination}`;
+    
+    setConfirmDialog({
+      isOpen: true,
+      title: 'Modify Travel Date',
+      message: `Are you sure you want to change your travel date for ${routeDetails} to ${new Date(newDate).toLocaleDateString()}? Additional charges may apply and you'll need to confirm payment.`,
+      type: 'warning',
+      onConfirm: async () => {
+        setModifyingId(bookingId);
+        try {
+          const token = localStorage.getItem('token');
+          const updatedBooking = await modifyBookingDate(bookingId, newDate, token);
+          
+          // Update the booking locally
+          setBookings(prev => prev.map(booking => 
+            booking.id === bookingId 
+              ? { ...booking, travelDate: newDate, status: 'PENDING' }
+              : booking
+          ));
+          
+          // Show success notification
+          notificationService.showSuccess(
+            'Travel Date Updated', 
+            `Your travel date for ${routeDetails} has been changed to ${new Date(newDate).toLocaleDateString()}. Please complete payment to confirm.`
+          );
+          
+          setNewDate('');
+          setConfirmDialog(null);
+        } catch (err: any) {
+          console.error('Error modifying booking:', err);
+          const errorMessage = err.response?.data?.error || err.response?.data?.message || 'Failed to modify booking date';
+          notificationService.showError('Modification Failed', errorMessage);
+        } finally {
+          setModifyingId(null);
+        }
+      }
+    });
   };
 
   const canCancelBooking = (booking: any) => {
@@ -381,6 +423,20 @@ export default function BookingsPage() {
           </div>
         )}
       </div>
+
+      {/* Confirmation Dialog */}
+      {confirmDialog && (
+        <ConfirmationDialog
+          isOpen={confirmDialog.isOpen}
+          onClose={() => setConfirmDialog(null)}
+          onConfirm={confirmDialog.onConfirm}
+          title={confirmDialog.title}
+          message={confirmDialog.message}
+          type={confirmDialog.type}
+          confirmText={confirmDialog.type === 'danger' ? 'Cancel Booking' : 'Confirm'}
+          loading={cancellingId !== null || modifyingId !== null}
+        />
+      )}
     </div>
   );
 }

@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import axios from 'axios';
+import { useNotificationService } from '@/lib/notificationService';
 import SeatMap from './SeatMap';
 import StopSelector from './StopSelector';
 
@@ -110,26 +111,28 @@ const EnhancedBookingForm: React.FC<EnhancedBookingFormProps> = ({
   };
 
   const validateForm = (): boolean => {
+    const notificationService = useNotificationService();
+    
     if (selectedSeats.length === 0) {
-      alert('Please select at least one seat');
+      notificationService.showWarning('Seat Selection Required', 'Please select at least one seat to continue with your booking');
       return false;
     }
 
     if (useStops && (!boardingStop || !alightingStop)) {
-      alert('Please select both boarding and alighting stops');
+      notificationService.showWarning('Stop Selection Required', 'Please select both boarding and alighting stops for your journey');
       return false;
     }
 
     for (let i = 0; i < passengers.length; i++) {
       const passenger = passengers[i];
       if (!passenger.firstName || !passenger.lastName || !passenger.phone) {
-        alert(`Please fill in all details for passenger ${i + 1}`);
+        notificationService.showWarning('Passenger Details Required', `Please fill in all details for passenger ${i + 1}`);
         return false;
       }
       
       // Basic phone validation
       if (!/^\+?[\d\s\-\(\)]+$/.test(passenger.phone)) {
-        alert(`Please enter a valid phone number for passenger ${i + 1}`);
+        notificationService.showWarning('Invalid Phone Number', `Please enter a valid phone number for passenger ${i + 1}`);
         return false;
       }
     }
@@ -168,7 +171,8 @@ const EnhancedBookingForm: React.FC<EnhancedBookingFormProps> = ({
       onBookingComplete(response.data);
     } catch (error: any) {
       console.error('Booking error:', error);
-      alert(error.response?.data?.error || 'Failed to create booking');
+      const notificationService = useNotificationService();
+      notificationService.showError('Booking Failed', error.response?.data?.error || 'Failed to create booking. Please try again.');
     } finally {
       setLoading(false);
     }

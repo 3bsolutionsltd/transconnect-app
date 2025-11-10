@@ -59,7 +59,7 @@ export default function PaymentPage() {
     }
 
     if (!phoneNumber && selectedMethod !== 'FLUTTERWAVE') {
-      alert('Please enter your phone number');
+      notificationService.showWarning('Phone Number Required', 'Please enter your phone number to proceed with payment');
       return;
     }
 
