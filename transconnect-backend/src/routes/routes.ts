@@ -622,6 +622,7 @@ router.get('/:id/stops/calculate-price', async (req: Request, res: Response) => 
 router.get('/:id/boarding-stops', async (req: Request, res: Response) => {
   try {
     const { id } = req.params;
+    console.log(`[DEBUG] Fetching boarding stops for route: ${id}`);
 
     const route = await prisma.route.findUnique({
       where: { id },
@@ -632,12 +633,20 @@ router.get('/:id/boarding-stops', async (req: Request, res: Response) => {
       }
     });
 
+    console.log(`[DEBUG] Route found:`, !!route);
+    console.log(`[DEBUG] Route stops count:`, route?.stops?.length || 0);
+    
+    if (route?.stops) {
+      console.log(`[DEBUG] Route stops:`, route.stops.map(s => s.stopName));
+    }
+
     if (!route) {
       return res.status(404).json({ error: 'Route not found' });
     }
 
     // Return all stops except the last one (can't board at final destination)
     const boardingStops = route.stops.slice(0, -1);
+    console.log(`[DEBUG] Boarding stops count:`, boardingStops.length);
 
     res.json(boardingStops);
   } catch (error) {

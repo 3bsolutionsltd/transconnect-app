@@ -24,7 +24,6 @@ export default function BookingForm({ routeId, price, selectedSeats = [], defaul
   const [boardingStop, setBoardingStop] = useState<string>('');
   const [alightingStop, setAlightingStop] = useState<string>('');
   const [dynamicPrice, setDynamicPrice] = useState<number>(price);
-  const [showStopSelector, setShowStopSelector] = useState<boolean>(false);
   
   const { user, isAuthenticated } = useAuth();
   const router = useRouter();
@@ -155,31 +154,20 @@ export default function BookingForm({ routeId, price, selectedSeats = [], defaul
           />
         </div>
 
-        {/* Route Stops Selection */}
+        {/* Route Stops Selection - Always Visible */}
         <div>
-          <div className="flex items-center justify-between mb-4">
-            <label className="block text-sm font-medium text-gray-700">
-              Journey Points (Optional)
-            </label>
-            <button
-              type="button"
-              onClick={() => setShowStopSelector(!showStopSelector)}
-              className="text-sm text-blue-600 hover:text-blue-800 font-medium"
-            >
-              {showStopSelector ? 'Hide Options' : 'Customize Journey'}
-            </button>
-          </div>
+          <label className="block text-sm font-medium text-gray-700 mb-4">
+            Select Boarding and Destination Points
+          </label>
           
-          {showStopSelector && (
-            <StopSelector
-              routeId={routeId}
-              onStopsSelected={handleStopsSelected}
-            />
-          )}
+          <StopSelector
+            routeId={routeId}
+            onStopsSelected={handleStopsSelected}
+          />
           
           {boardingStop && alightingStop && (
             <div className="mt-4 bg-green-50 border border-green-200 rounded-lg p-4">
-              <h4 className="font-medium text-green-800 mb-2">✅ Custom Journey Selected</h4>
+              <h4 className="font-medium text-green-800 mb-2">✅ Journey Selected</h4>
               <div className="text-sm text-green-700 space-y-1">
                 <p><span className="font-medium">From:</span> {boardingStop}</p>
                 <p><span className="font-medium">To:</span> {alightingStop}</p>
