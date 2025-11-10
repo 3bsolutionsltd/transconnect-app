@@ -1,4 +1,4 @@
-import React, { useState, useRef, useEffect } from 'react';
+import React, { useState, useRef, useEffect, useCallback } from 'react';
 import { Camera, CheckCircle, XCircle, RefreshCw, Upload } from 'lucide-react';
 import { useAuth } from '../contexts/AuthContext';
 import { api } from '../lib/api';
@@ -17,6 +17,20 @@ export default function QRScannerPage() {
   const fileInputRef = useRef<HTMLInputElement>(null);
   const streamRef = useRef<MediaStream | null>(null);
 
+  const stopCamera = useCallback(() => {
+    if (streamRef.current) {
+      streamRef.current.getTracks().forEach(track => track.stop());
+      streamRef.current = null;
+    }
+    
+    if (scanningInterval) {
+      clearInterval(scanningInterval);
+      setScanningInterval(null);
+    }
+    
+    setScanning(false);
+  }, [scanningInterval]);
+
   useEffect(() => {
     // Check if camera is supported
     setCameraSupported(
@@ -26,7 +40,7 @@ export default function QRScannerPage() {
     return () => {
       stopCamera();
     };
-  }, []);
+  }, [stopCamera]);
 
   const startCamera = async () => {
     try {
@@ -116,19 +130,7 @@ export default function QRScannerPage() {
     }
   };
 
-  const stopCamera = () => {
-    if (streamRef.current) {
-      streamRef.current.getTracks().forEach(track => track.stop());
-      streamRef.current = null;
-    }
-    
-    if (scanningInterval) {
-      clearInterval(scanningInterval);
-      setScanningInterval(null);
-    }
-    
-    setScanning(false);
-  };
+
 
   const handleFileUpload = (event: React.ChangeEvent<HTMLInputElement>) => {
     const file = event.target.files?.[0];

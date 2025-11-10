@@ -2,17 +2,13 @@ import React, { useState, useEffect } from 'react';
 import { 
   Users, 
   Search, 
-  Filter, 
   UserCheck, 
   UserX, 
   Mail, 
   Phone, 
   Calendar,
   Shield,
-  Eye,
-  Edit3,
   Trash2,
-  MoreVertical,
   Download
 } from 'lucide-react';
 import { api } from '../lib/api';

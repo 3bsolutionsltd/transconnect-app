@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import { 
   Plus, 
   Edit3, 
@@ -6,9 +6,6 @@ import {
   MapPin, 
   Clock, 
   DollarSign, 
-  Bus, 
-  Users,
-  Eye,
   ToggleLeft,
   ToggleRight,
   Search
@@ -59,13 +56,7 @@ const RouteManagement: React.FC = () => {
 
   const API_BASE_URL = process.env.REACT_APP_API_URL || 'https://transconnect-app-44ie.onrender.com/api';
 
-  useEffect(() => {
-    fetchRoutes();
-    fetchOperators();
-    fetchBuses();
-  }, []);
-
-  const fetchRoutes = async () => {
+  const fetchRoutes = useCallback(async () => {
     try {
       const token = localStorage.getItem('admin_token');
       const response = await fetch(`${API_BASE_URL}/routes`, {
@@ -84,9 +75,9 @@ const RouteManagement: React.FC = () => {
     } finally {
       setLoading(false);
     }
-  };
+  }, [API_BASE_URL]);
 
-  const fetchOperators = async () => {
+  const fetchOperators = useCallback(async () => {
     try {
       const token = localStorage.getItem('admin_token');
       const response = await fetch(`${API_BASE_URL}/operators`, {
@@ -103,9 +94,9 @@ const RouteManagement: React.FC = () => {
     } catch (error) {
       console.error('Error fetching operators:', error);
     }
-  };
+  }, [API_BASE_URL]);
 
-  const fetchBuses = async () => {
+  const fetchBuses = useCallback(async () => {
     try {
       const token = localStorage.getItem('admin_token');
       const response = await fetch(`${API_BASE_URL}/buses`, {
@@ -122,7 +113,13 @@ const RouteManagement: React.FC = () => {
     } catch (error) {
       console.error('Error fetching buses:', error);
     }
-  };
+  }, [API_BASE_URL]);
+
+  useEffect(() => {
+    fetchRoutes();
+    fetchOperators();
+    fetchBuses();
+  }, [fetchRoutes, fetchOperators, fetchBuses]);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
