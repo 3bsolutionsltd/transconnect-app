@@ -3,6 +3,8 @@
 import { QueryClient, QueryClientProvider } from 'react-query'
 import { useState } from 'react'
 import { AuthProvider } from '@/contexts/AuthContext'
+import { NotificationProvider } from '@/contexts/NotificationContext'
+import NotificationToast from '@/components/notifications/NotificationToast'
 
 export function Providers({ children }: { children: React.ReactNode }) {
   const [queryClient] = useState(() => new QueryClient({
@@ -17,7 +19,10 @@ export function Providers({ children }: { children: React.ReactNode }) {
   return (
     <QueryClientProvider client={queryClient}>
       <AuthProvider>
-        {children}
+        <NotificationProvider>
+          {children}
+          <NotificationToast />
+        </NotificationProvider>
       </AuthProvider>
     </QueryClientProvider>
   )

@@ -5,12 +5,14 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { CreditCard, Smartphone, CheckCircle, Clock, AlertCircle } from 'lucide-react';
 import { useAuth } from '@/contexts/AuthContext';
+import { useNotificationService } from '@/lib/notificationService';
 import { paymentApi } from '@/lib/api';
 
 export default function PaymentPage() {
   const router = useRouter();
   const searchParams = useSearchParams();
   const { user, loading } = useAuth();
+  const notificationService = useNotificationService();
   
   const [bookingData, setBookingData] = useState<any>(null);
   const [selectedMethod, setSelectedMethod] = useState('MTN_MOBILE_MONEY');
@@ -81,6 +83,10 @@ export default function PaymentPage() {
         if (response.status === 'COMPLETED') {
           setPaymentStatus('success');
           
+          // Show payment success notification
+          const paymentMethodName = paymentMethods.find(m => m.id === selectedMethod)?.name || selectedMethod;
+          notificationService.onPaymentSuccess(bookingData.totalAmount, paymentMethodName);
+          
           // Wait a moment to show success, then redirect
           setTimeout(() => {
             const successData = encodeURIComponent(JSON.stringify({
@@ -94,26 +100,37 @@ export default function PaymentPage() {
           }, 2000);
         } else {
           // Payment is still pending, could implement polling here
-          setErrorMessage('Payment is still processing. Please check back later.');
+          const errorMsg = 'Payment is still processing. Please check back later.';
+          setErrorMessage(errorMsg);
           setPaymentStatus('failed');
+          notificationService.onPaymentFailed(errorMsg);
         }
       } else {
-        setErrorMessage('Payment failed. Please try again.');
+        const errorMsg = 'Payment failed. Please try again.';
+        setErrorMessage(errorMsg);
         setPaymentStatus('failed');
+        notificationService.onPaymentFailed(errorMsg);
       }
     } catch (error: any) {
       console.error('Payment error:', error);
       
       // Handle specific error types
+      let errorMsg = '';
       if (error.response?.status === 401) {
-        setErrorMessage('Please log in to complete payment');
+        errorMsg = 'Please log in to complete payment';
+        setErrorMessage(errorMsg);
         setTimeout(() => router.push('/login'), 2000);
       } else if (error.response?.status === 403) {
-        setErrorMessage('Authentication failed. Please log in again.');
+        errorMsg = 'Authentication failed. Please log in again.';
+        setErrorMessage(errorMsg);
         setTimeout(() => router.push('/login'), 2000);
       } else {
-        setErrorMessage(error.response?.data?.error || error.message || 'Payment failed. Please try again.');
+        errorMsg = error.response?.data?.error || error.message || 'Payment failed. Please try again.';
+        setErrorMessage(errorMsg);
       }
+      
+      // Show payment failed notification
+      notificationService.onPaymentFailed(errorMsg);
       setPaymentStatus('failed');
     } finally {
       setProcessing(false);

@@ -14,6 +14,7 @@ import {
   X
 } from 'lucide-react';
 import { useState } from 'react';
+import NotificationCenter from '@/components/notifications/NotificationCenter';
 
 export default function Header() {
   const { user, isAuthenticated, logout } = useAuth();
@@ -60,6 +61,7 @@ export default function Header() {
           <div className="hidden md:flex items-center space-x-4">
             {isAuthenticated ? (
               <div className="flex items-center space-x-4">
+                <NotificationCenter />
                 <div className="flex items-center space-x-2">
                   <User className="h-5 w-5 text-gray-600" />
                   <span className="text-gray-700 font-medium">
@@ -154,14 +156,17 @@ export default function Header() {
               <div className="border-t pt-3 mt-3">
                 {isAuthenticated ? (
                   <div className="space-y-1">
-                    <div className="px-3 py-3 text-gray-700 font-medium border-b border-gray-100">
-                      <User className="inline h-4 w-4 mr-2" />
-                      {user?.firstName} {user?.lastName}
-                      {isAdmin && (
-                        <span className="ml-2 px-2 py-1 bg-blue-100 text-blue-800 text-xs font-medium rounded-full">
-                          {user?.role}
-                        </span>
-                      )}
+                    <div className="px-3 py-3 flex items-center justify-between text-gray-700 font-medium border-b border-gray-100">
+                      <div>
+                        <User className="inline h-4 w-4 mr-2" />
+                        {user?.firstName} {user?.lastName}
+                        {isAdmin && (
+                          <span className="ml-2 px-2 py-1 bg-blue-100 text-blue-800 text-xs font-medium rounded-full">
+                            {user?.role}
+                          </span>
+                        )}
+                      </div>
+                      <NotificationCenter />
                     </div>
                     <button 
                       onClick={() => {

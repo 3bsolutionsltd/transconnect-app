@@ -4,6 +4,7 @@ import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { createBooking } from '../../lib/api';
 import { useAuth } from '@/contexts/AuthContext';
+import { useNotificationService } from '@/lib/notificationService';
 import StopSelector from './StopSelector';
 
 type Props = {
@@ -26,6 +27,7 @@ export default function BookingForm({ routeId, price, selectedSeats = [], defaul
   const [dynamicPrice, setDynamicPrice] = useState<number>(price);
   
   const { user, isAuthenticated } = useAuth();
+  const notificationService = useNotificationService();
   const router = useRouter();
 
   // Initialize passenger details when seats change
@@ -99,6 +101,14 @@ export default function BookingForm({ routeId, price, selectedSeats = [], defaul
       };
 
       const result = await createBooking(localStorage.getItem('token'), payload);
+      
+      // Show success notifications
+      const routeDetails = boardingStop && alightingStop 
+        ? `${boardingStop} → ${alightingStop}` 
+        : `${selectedSeats.length} seat${selectedSeats.length > 1 ? 's' : ''} booked`;
+      
+      notificationService.onBookingCreated(result.id, routeDetails);
+      notificationService.onQrTicketReady(result.id);
       
       if (onSuccess) onSuccess(result);
       
