@@ -128,7 +128,7 @@ export default function BookingForm({ routeId, price, selectedSeats = [], defaul
           travelDate: travelDate,
           seatNumber: selectedSeats.join(', '),
           passengers: passengers.map((p, i) => ({
-            name: p.name,
+            name: `${p.firstName} ${p.lastName}`.trim(),
             seatNumber: selectedSeats[i]
           })),
           pricePerSeat: effectivePrice,
