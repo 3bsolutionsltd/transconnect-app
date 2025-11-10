@@ -2,7 +2,8 @@
 import React, { useState } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
-import DurationInput, { formatDuration, formatDurationShort } from '@/components/ui/DurationInput';
+import DurationInput from '@/components/ui/DurationInput';
+import { formatDuration, formatDurationShort } from '@/lib/durationUtils';
 import { Clock, Plus, Edit } from 'lucide-react';
 
 export default function RouteFormDemo() {
