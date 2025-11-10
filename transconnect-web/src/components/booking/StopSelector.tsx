@@ -225,7 +225,9 @@ const StopSelector: React.FC<StopSelectorProps> = ({ routeId, onStopsSelected })
         const alightingStop = allStops.find(s => s.stopName === selectedAlighting);
         
         if (boardingStop && alightingStop) {
-          const price = alightingStop.priceFromOrigin - boardingStop.priceFromOrigin;
+          // Calculate price difference between stops
+          const price = Math.max(0, alightingStop.priceFromOrigin - boardingStop.priceFromOrigin);
+          console.log(`Price calculation: ${alightingStop.stopName} (${alightingStop.priceFromOrigin}) - ${boardingStop.stopName} (${boardingStop.priceFromOrigin}) = ${price}`);
           setCalculatedPrice(price);
           onStopsSelected(selectedBoarding, selectedAlighting, price);
         }

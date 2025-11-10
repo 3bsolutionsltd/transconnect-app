@@ -107,13 +107,35 @@ export default function BookingForm({ routeId, price, selectedSeats = [], defaul
         ? `${boardingStop} → ${alightingStop}` 
         : `${selectedSeats.length} seat${selectedSeats.length > 1 ? 's' : ''} booked`;
       
-      notificationService.onBookingCreated(result.id, routeDetails);
-      notificationService.onQrTicketReady(result.id);
+      // Handle API response - it returns an object with bookings array and summary
+      const primaryBooking = result.bookings ? result.bookings[0] : result;
+      const bookingId = primaryBooking?.id || 'Unknown';
+      
+      notificationService.onBookingCreated(bookingId, routeDetails);
+      notificationService.onQrTicketReady(bookingId);
       
       if (onSuccess) onSuccess(result);
       
-      // Redirect to payment page with booking data
-      const bookingData = encodeURIComponent(JSON.stringify(result));
+        // Use the summary data for payment page (includes totalAmount and route info)
+        const effectivePrice = dynamicPrice > 0 ? dynamicPrice : price;
+        const bookingForPayment = {
+          id: bookingId,
+          totalAmount: result.summary?.totalAmount || (selectedSeats.length * effectivePrice),
+          route: {
+            origin: boardingStop || 'Origin',
+            destination: alightingStop || 'Destination'
+          },
+          travelDate: travelDate,
+          seatNumber: selectedSeats.join(', '),
+          passengers: passengers.map((p, i) => ({
+            name: p.name,
+            seatNumber: selectedSeats[i]
+          })),
+          pricePerSeat: effectivePrice,
+          boardingStop: boardingStop,
+          alightingStop: alightingStop
+        };      // Redirect to payment page with booking data
+      const bookingData = encodeURIComponent(JSON.stringify(bookingForPayment));
       router.push(`/payment?booking=${bookingData}`);
     } catch (err: any) {
       setError(err?.response?.data?.error || err.message || 'Booking failed. Please try again.');
@@ -284,7 +306,7 @@ export default function BookingForm({ routeId, price, selectedSeats = [], defaul
                     UGX {(dynamicPrice > 0 ? dynamicPrice : price).toLocaleString()}
                     {dynamicPrice > 0 && dynamicPrice !== price && (
                       <span className="text-green-600 text-xs ml-1">
-                        (was UGX {price.toLocaleString()})
+                        (Full route: UGX {price.toLocaleString()})
                       </span>
                     )}
                   </span>
