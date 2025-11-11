@@ -200,6 +200,58 @@ router.post('/test', [
 });
 
 /**
+ * @route POST /api/notifications/email
+ * @desc Send email notification
+ * @access Private
+ */
+router.post('/email', [
+  authenticateToken,
+  body('template').notEmpty().withMessage('Email template is required'),
+  body('data').isObject().withMessage('Email data is required'),
+], async (req, res) => {
+  try {
+    const errors = validationResult(req);
+    if (!errors.isEmpty()) {
+      return res.status(400).json({ errors: errors.array() });
+    }
+
+    const { template, data } = req.body;
+    const userId = req.user.userId;
+
+    // Send notification using the NotificationService which handles email
+    const result = await notificationService.sendNotification({
+      userId,
+      type: 'BOOKING_UPDATE',
+      channels: ['EMAIL'],
+      title: data.subject,
+      body: `Email notification: ${template}`,
+      data: {
+        template,
+        ...data,
+      },
+    });
+
+    if (result.success) {
+      res.json({
+        success: true,
+        message: 'Email notification sent successfully'
+      });
+    } else {
+      res.status(500).json({
+        success: false,
+        error: 'Failed to send email notification'
+      });
+    }
+  } catch (error: any) {
+    console.error('Error sending email notification:', error);
+    res.status(500).json({ 
+      success: false,
+      error: 'Internal server error' 
+    });
+  }
+});
+
+/**
  * @route GET /api/notifications/unread-count
  * @desc Get count of unread notifications
  * @access Private

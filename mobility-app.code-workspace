@@ -7,5 +7,7 @@
 			"path": "../Documents/Green Rokon/MobilityApp/TransConnect_MVP1_Docs"
 		}
 	],
-	"settings": {}
+	"settings": {
+		"powershell.cwd": "mobility-app"
+	}
 }
