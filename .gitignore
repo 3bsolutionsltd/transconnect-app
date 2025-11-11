@@ -2,8 +2,10 @@
 # TransConnect MVP1 - Root .gitignore
 # ===============================================
 
-# Environment Variables
+# Environment Variables & Sensitive Data
 .env
+.env.*
+!.env.example
 .env.local
 .env.development.local
 .env.test.local
@@ -15,6 +17,27 @@ transconnect-backend/.env.production
 transconnect-backend/firebase-service-account.json
 transconnect-mobile/android/app/google-services.json
 transconnect-mobile/ios/Runner/GoogleService-Info.plist
+
+# Security & Credentials
+**/secrets/
+**/credentials/
+**/*-key.json
+**/*-credentials.json
+**/*-secret.txt
+**/*.pem
+**/*.p12
+**/*.pfx
+**/private-keys/
+**/certificates/
+api-keys.txt
+tokens.txt
+passwords.txt
+
+# Development & Testing Files with Credentials
+test-email.js
+test-sms.js
+test-api-credentials.js
+**/temp-test-*
 
 # IDE and Editor Files
 .vscode/
