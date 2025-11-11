@@ -221,7 +221,7 @@ router.post('/email', [
     // Send notification using the NotificationService which handles email
     const result = await notificationService.sendNotification({
       userId,
-      type: 'BOOKING_UPDATE',
+      type: 'GENERAL',
       channels: ['EMAIL'],
       title: data.subject,
       body: `Email notification: ${template}`,

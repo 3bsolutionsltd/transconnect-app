@@ -5,6 +5,9 @@
  * Helps manage secure credentials and token rotation
  */
 
+// Security Manager - Development Tool Only
+// This file is not used in production deployment
+
 const crypto = require('crypto');
 const fs = require('fs');
 const path = require('path');
