@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import { Routes, Route, Link, useLocation } from 'react-router-dom';
 import { 
   BarChart3, 
@@ -8,7 +8,6 @@ import {
   Menu, 
   X,
   Home,
-  CreditCard,
   MapPin,
   Bell,
   LogOut,
@@ -43,11 +42,7 @@ const Dashboard = () => {
 
   const API_BASE_URL = process.env.REACT_APP_API_URL || 'https://transconnect-app-44ie.onrender.com/api';
 
-  useEffect(() => {
-    loadDashboardData();
-  }, []);
-
-  const loadDashboardData = async () => {
+  const loadDashboardData = useCallback(async () => {
     try {
       const token = localStorage.getItem('admin_token');
       
@@ -131,7 +126,11 @@ const Dashboard = () => {
     } finally {
       setLoading(false);
     }
-  };
+  }, [API_BASE_URL]);
+
+  useEffect(() => {
+    loadDashboardData();
+  }, [loadDashboardData]);
 
   const getStatusColor = (status: string) => {
     switch (status.toLowerCase()) {
@@ -424,68 +423,7 @@ const Dashboard = () => {
   );
 };
 
-// Bus Routes Component
-const BusRoutes = () => (
-  <div className="space-y-6">
-    <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between">
-      <h1 className="text-2xl sm:text-3xl font-bold text-gray-900 mb-4 sm:mb-0">Bus Routes</h1>
-      <button className="bg-blue-600 text-white px-4 py-2 rounded-lg hover:bg-blue-700 transition-colors w-full sm:w-auto">
-        Add New Route
-      </button>
-    </div>
-    
-    <div className="bg-white rounded-lg shadow border overflow-hidden">
-      <div className="overflow-x-auto">
-        <table className="w-full">
-          <thead className="bg-gray-50">
-            <tr>
-              <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                Route
-              </th>
-              <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider hidden sm:table-cell">
-                Distance
-              </th>
-              <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                Price
-              </th>
-              <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider hidden md:table-cell">
-                Status
-              </th>
-            </tr>
-          </thead>
-          <tbody className="bg-white divide-y divide-gray-200">
-            {[
-              { route: 'Kampala → Jinja', distance: '87 km', price: 'UGX 15,000', status: 'Active' },
-              { route: 'Kampala → Entebbe', distance: '42 km', price: 'UGX 8,000', status: 'Active' },
-              { route: 'Jinja → Mbale', distance: '125 km', price: 'UGX 20,000', status: 'Inactive' },
-            ].map((route, index) => (
-              <tr key={index} className="hover:bg-gray-50">
-                <td className="px-4 py-4 whitespace-nowrap">
-                  <div className="font-medium text-gray-900">{route.route}</div>
-                </td>
-                <td className="px-4 py-4 whitespace-nowrap text-sm text-gray-600 hidden sm:table-cell">
-                  {route.distance}
-                </td>
-                <td className="px-4 py-4 whitespace-nowrap text-sm text-gray-900">
-                  {route.price}
-                </td>
-                <td className="px-4 py-4 whitespace-nowrap hidden md:table-cell">
-                  <span className={`inline-flex px-2 py-1 text-xs font-semibold rounded-full ${
-                    route.status === 'Active' 
-                      ? 'bg-green-100 text-green-800' 
-                      : 'bg-red-100 text-red-800'
-                  }`}>
-                    {route.status}
-                  </span>
-                </td>
-              </tr>
-            ))}
-          </tbody>
-        </table>
-      </div>
-    </div>
-  </div>
-);
+
 
 // Analytics Component
 const Analytics = () => (
