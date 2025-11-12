@@ -252,6 +252,62 @@ router.post('/email', [
 });
 
 /**
+ * @route POST /api/notifications/sms
+ * @desc Send SMS notification
+ * @access Private
+ */
+router.post('/sms', [
+  authenticateToken,
+  body('phoneNumber').isMobilePhone().withMessage('Valid phone number is required'),
+  body('type').isIn(['booking_confirmation', 'payment_success', 'payment_failed', 'trip_reminder', 'general']).withMessage('Valid SMS type required'),
+  body('data').optional().isObject().withMessage('SMS data must be an object'),
+], async (req, res) => {
+  try {
+    const errors = validationResult(req);
+    if (!errors.isEmpty()) {
+      return res.status(400).json({ errors: errors.array() });
+    }
+
+    const { phoneNumber, type, data } = req.body;
+    const userId = req.user.userId;
+
+    // Send SMS notification using the NotificationService
+    const result = await notificationService.sendNotification({
+      userId,
+      type: type === 'booking_confirmation' ? 'BOOKING_CONFIRMATION' : 
+            type === 'payment_success' ? 'PAYMENT_SUCCESS' :
+            type === 'payment_failed' ? 'PAYMENT_FAILED' :
+            type === 'trip_reminder' ? 'TRIP_REMINDER' : 'GENERAL',
+      channels: ['SMS'],
+      title: `TransConnect ${type.replace('_', ' ')} notification`,
+      body: `SMS notification for ${type}`,
+      recipient: phoneNumber,
+      data: data || {},
+    });
+
+    if (result.success) {
+      res.json({
+        success: true,
+        message: 'SMS notification sent successfully',
+        results: result.results
+      });
+    } else {
+      res.status(500).json({
+        success: false,
+        error: 'Failed to send SMS notification',
+        results: result.results
+      });
+    }
+  } catch (error: any) {
+    console.error('Error sending SMS notification:', error);
+    res.status(500).json({ 
+      success: false,
+      error: 'Internal server error' 
+    });
+  }
+});
+
+/**
  * @route GET /api/notifications/unread-count
  * @desc Get count of unread notifications
  * @access Private

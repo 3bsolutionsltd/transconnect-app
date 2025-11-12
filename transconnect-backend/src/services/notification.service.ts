@@ -1,6 +1,7 @@
 import { PrismaClient, NotificationType, NotificationChannel, NotificationStatus } from '@prisma/client';
 import { FirebaseService } from './firebase.service';
 import { EmailService } from './email.service';
+import { SMSService } from './sms.service';
 
 const prisma = new PrismaClient();
 
@@ -26,10 +27,12 @@ export class NotificationService {
   private static instance: NotificationService;
   private firebaseService: FirebaseService;
   private emailService: EmailService;
+  private smsService: SMSService;
 
   private constructor() {
     this.firebaseService = FirebaseService.getInstance();
     this.emailService = EmailService.getInstance();
+    this.smsService = SMSService.getInstance();
   }
 
   public static getInstance(): NotificationService {
@@ -165,7 +168,7 @@ export class NotificationService {
     await this.sendNotification({
       userId: bookingData.userId,
       type: 'BOOKING_CONFIRMATION',
-      channels: ['EMAIL', 'PUSH', 'IN_APP'],
+      channels: ['EMAIL', 'SMS', 'PUSH', 'IN_APP'],
       title: 'Booking Confirmed!',
       body: `Your ticket for ${bookingData.route} on ${bookingData.date} has been confirmed. Seat ${bookingData.seatNumber}.`,
       subject: `Booking Confirmed - ${bookingData.bookingId}`,
@@ -195,7 +198,7 @@ export class NotificationService {
     await this.sendNotification({
       userId: paymentData.userId,
       type: 'PAYMENT_SUCCESS',
-      channels: ['EMAIL', 'PUSH', 'IN_APP'],
+      channels: ['EMAIL', 'SMS', 'PUSH', 'IN_APP'],
       title: 'Payment Successful!',
       body: `Your payment of UGX ${paymentData.amount.toLocaleString()} via ${paymentData.method} was successful.`,
       subject: `Payment Confirmed - ${paymentData.transactionId}`,
@@ -221,7 +224,7 @@ export class NotificationService {
     await this.sendNotification({
       userId: paymentData.userId,
       type: 'PAYMENT_FAILED',
-      channels: ['EMAIL', 'PUSH', 'IN_APP'],
+      channels: ['EMAIL', 'SMS', 'PUSH', 'IN_APP'],
       title: 'Payment Failed',
       body: `Your payment of UGX ${paymentData.amount.toLocaleString()} could not be processed. ${paymentData.reason}`,
       subject: 'Payment Failed - Action Required',
@@ -341,20 +344,74 @@ export class NotificationService {
   }
 
   /**
-   * Send SMS notification (placeholder - implement with SMS provider)
+   * Send SMS notification using Twilio SMS service
    */
   private async sendSMSNotification(
     phoneNumber: string,
     data: NotificationData
   ): Promise<{ success: boolean; messageId?: string; error?: string }> {
-    // Placeholder for SMS implementation
-    // You can integrate with Twilio, Africa's Talking, or other SMS providers
-    console.log(`SMS to ${phoneNumber}: ${data.title} - ${data.body}`);
-    
-    return {
-      success: true,
-      messageId: `sms_${Date.now()}`,
-    };
+    try {
+      // Use specific SMS templates based on notification type
+      switch (data.type) {
+        case 'BOOKING_CONFIRMATION':
+          if (data.data) {
+            return await this.smsService.sendBookingConfirmation(phoneNumber, data.data);
+          }
+          break;
+        
+        case 'PAYMENT_SUCCESS':
+          if (data.data) {
+            return await this.smsService.sendPaymentSuccess(phoneNumber, data.data);
+          }
+          break;
+        
+        case 'PAYMENT_FAILED':
+          if (data.data) {
+            return await this.smsService.sendPaymentFailed(phoneNumber, data.data);
+          }
+          break;
+        
+        case 'TRIP_REMINDER':
+          if (data.data) {
+            return await this.smsService.sendTripReminder(phoneNumber, data.data);
+          }
+          break;
+        
+        case 'BUS_DELAYED':
+          if (data.data) {
+            return await this.smsService.sendBusDelay(phoneNumber, data.data);
+          }
+          break;
+        
+        case 'BUS_CANCELLED':
+          if (data.data) {
+            return await this.smsService.sendBusCancellation(phoneNumber, data.data);
+          }
+          break;
+        
+        default:
+          // For general notifications, use the basic SMS method
+          const message = `${data.title}\n\n${data.body}`;
+          return await this.smsService.sendSMS({
+            phoneNumber,
+            message
+          });
+      }
+      
+      // Fallback for cases where specific data is missing
+      const message = `TransConnect: ${data.title}\n\n${data.body}`;
+      return await this.smsService.sendSMS({
+        phoneNumber,
+        message
+      });
+      
+    } catch (error: any) {
+      console.error('SMS notification failed:', error);
+      return {
+        success: false,
+        error: error.message || 'Failed to send SMS notification'
+      };
+    }
   }
 
   /**

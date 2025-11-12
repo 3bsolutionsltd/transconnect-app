@@ -67,7 +67,7 @@
     "qrcode": "^1.5.4",
     "redis": "^4.7.1",
     "socket.io": "^4.7.4",
-    "twilio": "^4.19.0",
+    "twilio": "^4.23.0",
     "uuid": "^13.0.0"
   },
   "devDependencies": {
