@@ -1,0 +1,11 @@
+{
+  "name": "TransConnect Backend",
+  "build": {
+    "builder": "nixpacks",
+    "nixpacksConfigPath": "nixpacks.toml"
+  },
+  "deploy": {
+    "numReplicas": 1,
+    "restartPolicyType": "always"
+  }
+}
