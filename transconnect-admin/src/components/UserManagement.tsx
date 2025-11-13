@@ -10,7 +10,11 @@ import {
   Shield,
   Eye,
   Trash2,
-  Download
+  Download,
+  UserPlus,
+  Building,
+  Settings,
+  Plus
 } from 'lucide-react';
 import { api } from '../lib/api';
 
@@ -27,19 +31,60 @@ interface User {
   bookingsCount?: number;
 }
 
+interface OperatorUser {
+  id: string;
+  userId: string;
+  firstName: string;
+  lastName: string;
+  email: string;
+  phone: string;
+  verified: boolean;
+  operatorRole: 'MANAGER' | 'DRIVER' | 'CONDUCTOR' | 'TICKETER' | 'MAINTENANCE';
+  active: boolean;
+  createdAt: string;
+  operator?: {
+    id: string;
+    companyName: string;
+    approved: boolean;
+  };
+}
+
+interface Operator {
+  id: string;
+  companyName: string;
+  approved: boolean;
+}
+
 const UserManagement: React.FC = () => {
+  const [activeTab, setActiveTab] = useState<'users' | 'operator-users'>('users');
   const [users, setUsers] = useState<User[]>([]);
+  const [operatorUsers, setOperatorUsers] = useState<OperatorUser[]>([]);
+  const [operators, setOperators] = useState<Operator[]>([]);
   const [loading, setLoading] = useState(true);
   const [searchTerm, setSearchTerm] = useState('');
   const [roleFilter, setRoleFilter] = useState<string>('ALL');
   const [statusFilter, setStatusFilter] = useState<string>('ALL');
+  const [operatorFilter, setOperatorFilter] = useState<string>('ALL');
   const [selectedUsers, setSelectedUsers] = useState<string[]>([]);
   const [showUserModal, setShowUserModal] = useState(false);
+  const [showCreateOperatorUserModal, setShowCreateOperatorUserModal] = useState(false);
   const [selectedUser, setSelectedUser] = useState<User | null>(null);
+  const [selectedOperatorUser, setSelectedOperatorUser] = useState<OperatorUser | null>(null);
+  const [createOperatorUserForm, setCreateOperatorUserForm] = useState({
+    operatorId: '',
+    firstName: '',
+    lastName: '',
+    email: '',
+    phone: '',
+    password: '',
+    role: 'TICKETER' as 'MANAGER' | 'DRIVER' | 'CONDUCTOR' | 'TICKETER' | 'MAINTENANCE'
+  });
 
   useEffect(() => {
-    console.log('UserManagement: Component mounted, fetching users...');
+    console.log('UserManagement: Component mounted, fetching data...');
     fetchUsers();
+    fetchOperatorUsers();
+    fetchOperators();
   }, []);
 
   const fetchUsers = async () => {
@@ -110,6 +155,28 @@ const UserManagement: React.FC = () => {
     }
   };
 
+  const fetchOperatorUsers = async () => {
+    try {
+      const response = await api.get('/admin/operator-users/all');
+      const operatorUsersData = Array.isArray(response) ? response : (response.users || response.data || []);
+      setOperatorUsers(operatorUsersData);
+    } catch (error: any) {
+      console.error('Error fetching operator users:', error);
+      setOperatorUsers([]);
+    }
+  };
+
+  const fetchOperators = async () => {
+    try {
+      const response = await api.get('/operators');
+      const operatorsData = Array.isArray(response) ? response : (response.data || []);
+      setOperators(operatorsData);
+    } catch (error: any) {
+      console.error('Error fetching operators:', error);
+      setOperators([]);
+    }
+  };
+
   const handleUserAction = async (userId: string, action: 'verify' | 'unverify' | 'delete') => {
     try {
       if (action === 'delete') {
@@ -153,6 +220,66 @@ const UserManagement: React.FC = () => {
     setSelectedUsers([]);
   };
 
+  const handleCreateOperatorUser = async () => {
+    try {
+      if (!createOperatorUserForm.operatorId || !createOperatorUserForm.firstName || 
+          !createOperatorUserForm.lastName || !createOperatorUserForm.email || 
+          !createOperatorUserForm.phone || !createOperatorUserForm.password) {
+        alert('Please fill in all required fields');
+        return;
+      }
+
+      await api.post('/admin/operator-users/create', createOperatorUserForm);
+      alert('Operator user created successfully');
+      
+      // Reset form and close modal
+      setCreateOperatorUserForm({
+        operatorId: '',
+        firstName: '',
+        lastName: '',
+        email: '',
+        phone: '',
+        password: '',
+        role: 'TICKETER'
+      });
+      setShowCreateOperatorUserModal(false);
+      
+      // Refresh data
+      fetchOperatorUsers();
+    } catch (error: any) {
+      console.error('Error creating operator user:', error);
+      alert(`Failed to create operator user: ${error.message || 'Unknown error'}`);
+    }
+  };
+
+  const handleOperatorUserAction = async (userId: string, action: 'activate' | 'deactivate' | 'delete') => {
+    try {
+      if (action === 'delete') {
+        if (!window.confirm('Are you sure you want to delete this operator user?')) return;
+        
+        await api.delete(`/admin/operator-users/${userId}`);
+        setOperatorUsers(operatorUsers.filter(u => u.userId !== userId));
+        alert('Operator user deleted successfully');
+      } else {
+        const active = action === 'activate';
+        const operatorUser = operatorUsers.find(u => u.userId === userId);
+        if (!operatorUser) return;
+
+        await api.put(`/admin/operator-users/${userId}`, {
+          active
+        });
+
+        setOperatorUsers(operatorUsers.map(u => 
+          u.userId === userId ? { ...u, active } : u
+        ));
+        alert(`Operator user ${active ? 'activated' : 'deactivated'} successfully`);
+      }
+    } catch (error: any) {
+      console.error('Error updating operator user:', error);
+      alert(`Failed to update operator user: ${error.message || 'Unknown error'}`);
+    }
+  };
+
   const exportUsers = () => {
     const csvContent = [
       ['Name', 'Email', 'Phone', 'Role', 'Verified', 'Bookings', 'Created At'],
@@ -176,8 +303,9 @@ const UserManagement: React.FC = () => {
     window.URL.revokeObjectURL(url);
   };
 
-  // Ensure users is always an array before filtering
+  // Ensure arrays are always arrays before filtering
   const safeUsers = Array.isArray(users) ? users : [];
+  const safeOperatorUsers = Array.isArray(operatorUsers) ? operatorUsers : [];
   
   const filteredUsers = safeUsers.filter(user => {
     const matchesSearch = 
@@ -195,6 +323,24 @@ const UserManagement: React.FC = () => {
     return matchesSearch && matchesRole && matchesStatus;
   });
 
+  const filteredOperatorUsers = safeOperatorUsers.filter(user => {
+    const matchesSearch = 
+      (user.firstName || '').toLowerCase().includes(searchTerm.toLowerCase()) ||
+      (user.lastName || '').toLowerCase().includes(searchTerm.toLowerCase()) ||
+      (user.email || '').toLowerCase().includes(searchTerm.toLowerCase()) ||
+      (user.phone || '').includes(searchTerm);
+    
+    const matchesRole = roleFilter === 'ALL' || user.operatorRole === roleFilter;
+    const matchesStatus = 
+      statusFilter === 'ALL' || 
+      (statusFilter === 'ACTIVE' && user.active) ||
+      (statusFilter === 'INACTIVE' && !user.active);
+
+    const matchesOperator = operatorFilter === 'ALL' || user.operator?.id === operatorFilter;
+
+    return matchesSearch && matchesRole && matchesStatus && matchesOperator;
+  });
+
   const userStats = {
     total: safeUsers.length,
     admins: safeUsers.filter(u => u.role === 'ADMIN').length,
@@ -202,6 +348,17 @@ const UserManagement: React.FC = () => {
     passengers: safeUsers.filter(u => u.role === 'PASSENGER').length,
     verified: safeUsers.filter(u => u.verified).length,
     unverified: safeUsers.filter(u => !u.verified).length
+  };
+
+  const operatorUserStats = {
+    total: safeOperatorUsers.length,
+    managers: safeOperatorUsers.filter(u => u.operatorRole === 'MANAGER').length,
+    drivers: safeOperatorUsers.filter(u => u.operatorRole === 'DRIVER').length,
+    conductors: safeOperatorUsers.filter(u => u.operatorRole === 'CONDUCTOR').length,
+    ticketers: safeOperatorUsers.filter(u => u.operatorRole === 'TICKETER').length,
+    maintenance: safeOperatorUsers.filter(u => u.operatorRole === 'MAINTENANCE').length,
+    active: safeOperatorUsers.filter(u => u.active).length,
+    inactive: safeOperatorUsers.filter(u => !u.active).length
   };
 
   const formatDate = (dateString: string) => {
@@ -227,6 +384,17 @@ const UserManagement: React.FC = () => {
       case 'ADMIN': return 'bg-red-100 text-red-800';
       case 'OPERATOR': return 'bg-blue-100 text-blue-800';
       case 'PASSENGER': return 'bg-green-100 text-green-800';
+      default: return 'bg-gray-100 text-gray-800';
+    }
+  };
+
+  const getOperatorRoleBadgeColor = (role: string) => {
+    switch (role) {
+      case 'MANAGER': return 'bg-purple-100 text-purple-800';
+      case 'DRIVER': return 'bg-blue-100 text-blue-800';
+      case 'CONDUCTOR': return 'bg-green-100 text-green-800';
+      case 'TICKETER': return 'bg-orange-100 text-orange-800';
+      case 'MAINTENANCE': return 'bg-yellow-100 text-yellow-800';
       default: return 'bg-gray-100 text-gray-800';
     }
   };
@@ -272,9 +440,18 @@ const UserManagement: React.FC = () => {
       <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
         <div>
           <h1 className="text-2xl sm:text-3xl font-bold text-gray-900">User Management</h1>
-          <p className="text-gray-600">Manage platform users and permissions</p>
+          <p className="text-gray-600">Manage platform users and operator staff</p>
         </div>
         <div className="flex items-center space-x-3">
+          {activeTab === 'operator-users' && (
+            <button
+              onClick={() => setShowCreateOperatorUserModal(true)}
+              className="bg-blue-600 text-white px-4 py-2 rounded-lg hover:bg-blue-700 transition-colors flex items-center space-x-2"
+            >
+              <UserPlus className="h-4 w-4" />
+              <span>Add Operator User</span>
+            </button>
+          )}
           <button
             onClick={exportUsers}
             className="bg-gray-100 text-gray-700 px-4 py-2 rounded-lg hover:bg-gray-200 transition-colors flex items-center space-x-2"
@@ -285,68 +462,191 @@ const UserManagement: React.FC = () => {
         </div>
       </div>
 
-      {/* Stats Cards */}
-      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-6 gap-4">
-        <div className="bg-white p-4 rounded-lg shadow border">
-          <div className="flex items-center">
-            <Users className="h-8 w-8 text-blue-600" />
-            <div className="ml-3">
-              <p className="text-xs font-medium text-gray-600">Total Users</p>
-              <p className="text-xl font-semibold text-gray-900">{userStats.total}</p>
+      {/* Tabs */}
+      <div className="border-b border-gray-200">
+        <nav className="-mb-px flex space-x-8">
+          <button
+            onClick={() => {
+              setActiveTab('users');
+              setSearchTerm('');
+              setRoleFilter('ALL');
+              setStatusFilter('ALL');
+            }}
+            className={`py-2 px-1 border-b-2 font-medium text-sm ${
+              activeTab === 'users'
+                ? 'border-blue-500 text-blue-600'
+                : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'
+            }`}
+          >
+            <div className="flex items-center space-x-2">
+              <Users className="h-4 w-4" />
+              <span>Platform Users</span>
+              <span className="bg-gray-100 text-gray-600 px-2 py-1 rounded-full text-xs">
+                {userStats.total}
+              </span>
             </div>
-          </div>
-        </div>
-
-        <div className="bg-white p-4 rounded-lg shadow border">
-          <div className="flex items-center">
-            <Shield className="h-8 w-8 text-red-600" />
-            <div className="ml-3">
-              <p className="text-xs font-medium text-gray-600">Admins</p>
-              <p className="text-xl font-semibold text-gray-900">{userStats.admins}</p>
+          </button>
+          <button
+            onClick={() => {
+              setActiveTab('operator-users');
+              setSearchTerm('');
+              setRoleFilter('ALL');
+              setStatusFilter('ALL');
+              setOperatorFilter('ALL');
+            }}
+            className={`py-2 px-1 border-b-2 font-medium text-sm ${
+              activeTab === 'operator-users'
+                ? 'border-blue-500 text-blue-600'
+                : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'
+            }`}
+          >
+            <div className="flex items-center space-x-2">
+              <Building className="h-4 w-4" />
+              <span>Operator Staff</span>
+              <span className="bg-gray-100 text-gray-600 px-2 py-1 rounded-full text-xs">
+                {operatorUserStats.total}
+              </span>
             </div>
-          </div>
-        </div>
-
-        <div className="bg-white p-4 rounded-lg shadow border">
-          <div className="flex items-center">
-            <Users className="h-8 w-8 text-blue-600" />
-            <div className="ml-3">
-              <p className="text-xs font-medium text-gray-600">Operators</p>
-              <p className="text-xl font-semibold text-gray-900">{userStats.operators}</p>
-            </div>
-          </div>
-        </div>
-
-        <div className="bg-white p-4 rounded-lg shadow border">
-          <div className="flex items-center">
-            <Users className="h-8 w-8 text-green-600" />
-            <div className="ml-3">
-              <p className="text-xs font-medium text-gray-600">Passengers</p>
-              <p className="text-xl font-semibold text-gray-900">{userStats.passengers}</p>
-            </div>
-          </div>
-        </div>
-
-        <div className="bg-white p-4 rounded-lg shadow border">
-          <div className="flex items-center">
-            <UserCheck className="h-8 w-8 text-green-600" />
-            <div className="ml-3">
-              <p className="text-xs font-medium text-gray-600">Verified</p>
-              <p className="text-xl font-semibold text-gray-900">{userStats.verified}</p>
-            </div>
-          </div>
-        </div>
-
-        <div className="bg-white p-4 rounded-lg shadow border">
-          <div className="flex items-center">
-            <UserX className="h-8 w-8 text-red-600" />
-            <div className="ml-3">
-              <p className="text-xs font-medium text-gray-600">Unverified</p>
-              <p className="text-xl font-semibold text-gray-900">{userStats.unverified}</p>
-            </div>
-          </div>
-        </div>
+          </button>
+        </nav>
       </div>
+
+      {/* Stats Cards */}
+      {activeTab === 'users' ? (
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-6 gap-4">
+          <div className="bg-white p-4 rounded-lg shadow border">
+            <div className="flex items-center">
+              <Users className="h-8 w-8 text-blue-600" />
+              <div className="ml-3">
+                <p className="text-xs font-medium text-gray-600">Total Users</p>
+                <p className="text-xl font-semibold text-gray-900">{userStats.total}</p>
+              </div>
+            </div>
+          </div>
+
+          <div className="bg-white p-4 rounded-lg shadow border">
+            <div className="flex items-center">
+              <Shield className="h-8 w-8 text-red-600" />
+              <div className="ml-3">
+                <p className="text-xs font-medium text-gray-600">Admins</p>
+                <p className="text-xl font-semibold text-gray-900">{userStats.admins}</p>
+              </div>
+            </div>
+          </div>
+
+          <div className="bg-white p-4 rounded-lg shadow border">
+            <div className="flex items-center">
+              <Users className="h-8 w-8 text-blue-600" />
+              <div className="ml-3">
+                <p className="text-xs font-medium text-gray-600">Operators</p>
+                <p className="text-xl font-semibold text-gray-900">{userStats.operators}</p>
+              </div>
+            </div>
+          </div>
+
+          <div className="bg-white p-4 rounded-lg shadow border">
+            <div className="flex items-center">
+              <Users className="h-8 w-8 text-green-600" />
+              <div className="ml-3">
+                <p className="text-xs font-medium text-gray-600">Passengers</p>
+                <p className="text-xl font-semibold text-gray-900">{userStats.passengers}</p>
+              </div>
+            </div>
+          </div>
+
+          <div className="bg-white p-4 rounded-lg shadow border">
+            <div className="flex items-center">
+              <UserCheck className="h-8 w-8 text-green-600" />
+              <div className="ml-3">
+                <p className="text-xs font-medium text-gray-600">Verified</p>
+                <p className="text-xl font-semibold text-gray-900">{userStats.verified}</p>
+              </div>
+            </div>
+          </div>
+
+          <div className="bg-white p-4 rounded-lg shadow border">
+            <div className="flex items-center">
+              <UserX className="h-8 w-8 text-red-600" />
+              <div className="ml-3">
+                <p className="text-xs font-medium text-gray-600">Unverified</p>
+                <p className="text-xl font-semibold text-gray-900">{userStats.unverified}</p>
+              </div>
+            </div>
+          </div>
+        </div>
+      ) : (
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-7 gap-4">
+          <div className="bg-white p-4 rounded-lg shadow border">
+            <div className="flex items-center">
+              <Users className="h-8 w-8 text-blue-600" />
+              <div className="ml-3">
+                <p className="text-xs font-medium text-gray-600">Total Staff</p>
+                <p className="text-xl font-semibold text-gray-900">{operatorUserStats.total}</p>
+              </div>
+            </div>
+          </div>
+
+          <div className="bg-white p-4 rounded-lg shadow border">
+            <div className="flex items-center">
+              <Settings className="h-8 w-8 text-purple-600" />
+              <div className="ml-3">
+                <p className="text-xs font-medium text-gray-600">Managers</p>
+                <p className="text-xl font-semibold text-gray-900">{operatorUserStats.managers}</p>
+              </div>
+            </div>
+          </div>
+
+          <div className="bg-white p-4 rounded-lg shadow border">
+            <div className="flex items-center">
+              <Users className="h-8 w-8 text-blue-600" />
+              <div className="ml-3">
+                <p className="text-xs font-medium text-gray-600">Drivers</p>
+                <p className="text-xl font-semibold text-gray-900">{operatorUserStats.drivers}</p>
+              </div>
+            </div>
+          </div>
+
+          <div className="bg-white p-4 rounded-lg shadow border">
+            <div className="flex items-center">
+              <Users className="h-8 w-8 text-green-600" />
+              <div className="ml-3">
+                <p className="text-xs font-medium text-gray-600">Conductors</p>
+                <p className="text-xl font-semibold text-gray-900">{operatorUserStats.conductors}</p>
+              </div>
+            </div>
+          </div>
+
+          <div className="bg-white p-4 rounded-lg shadow border">
+            <div className="flex items-center">
+              <Users className="h-8 w-8 text-orange-600" />
+              <div className="ml-3">
+                <p className="text-xs font-medium text-gray-600">Ticketers</p>
+                <p className="text-xl font-semibold text-gray-900">{operatorUserStats.ticketers}</p>
+              </div>
+            </div>
+          </div>
+
+          <div className="bg-white p-4 rounded-lg shadow border">
+            <div className="flex items-center">
+              <UserCheck className="h-8 w-8 text-green-600" />
+              <div className="ml-3">
+                <p className="text-xs font-medium text-gray-600">Active</p>
+                <p className="text-xl font-semibold text-gray-900">{operatorUserStats.active}</p>
+              </div>
+            </div>
+          </div>
+
+          <div className="bg-white p-4 rounded-lg shadow border">
+            <div className="flex items-center">
+              <UserX className="h-8 w-8 text-red-600" />
+              <div className="ml-3">
+                <p className="text-xs font-medium text-gray-600">Inactive</p>
+                <p className="text-xl font-semibold text-gray-900">{operatorUserStats.inactive}</p>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* Filters and Search */}
       <div className="bg-white p-6 rounded-lg shadow border">
