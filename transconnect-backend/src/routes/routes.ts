@@ -1,5 +1,6 @@
 import { Router, Request, Response } from 'express';
 import { prisma } from '../index';
+import { authenticateToken } from '../middleware/auth';
 
 const router = Router();
 
@@ -307,7 +308,9 @@ router.get('/suggestions/destinations', async (req: Request, res: Response) => {
 });
 
 // Create a new route (Admin/Operator only)
-router.post('/', async (req: Request, res: Response) => {
+
+// Create a new route (Admin/Operator only)
+router.post('/', authenticateToken, async (req: Request, res: Response) => {
   try {
     const { 
       origin, 
@@ -321,16 +324,49 @@ router.post('/', async (req: Request, res: Response) => {
       busId 
     } = req.body;
 
+    const userId = (req as any).user.userId;
+    const userRole = (req as any).user.role;
+
     // Validate required fields
-    if (!origin || !destination || !distance || !duration || !price || !departureTime || !operatorId || !busId) {
+    if (!origin || !destination || !distance || !duration || !price || !departureTime || !busId) {
       return res.status(400).json({ 
-        error: 'All fields are required: origin, destination, distance, duration, price, departureTime, operatorId, busId' 
+        error: 'All fields are required: origin, destination, distance, duration, price, departureTime, busId' 
       });
+    }
+
+    let finalOperatorId = operatorId;
+
+    // Handle operator restrictions
+    if (userRole === 'OPERATOR') {
+      // Find the operator profile for this user
+      const userOperator = await prisma.operator.findUnique({
+        where: { userId }
+      });
+
+      if (!userOperator) {
+        return res.status(404).json({ error: 'Operator profile not found for this user' });
+      }
+
+      // Operators can only create routes for themselves
+      finalOperatorId = userOperator.id;
+
+      // Deny if they try to specify a different operator
+      if (operatorId && operatorId !== userOperator.id) {
+        return res.status(403).json({ error: 'Operators can only create routes for their own company' });
+      }
+    } else if (userRole === 'ADMIN') {
+      // Admins must specify an operator
+      if (!operatorId) {
+        return res.status(400).json({ error: 'Admin must specify operatorId' });
+      }
+      finalOperatorId = operatorId;
+    } else {
+      return res.status(403).json({ error: 'Only admins and operators can create routes' });
     }
 
     // Verify operator exists
     const operator = await prisma.operator.findUnique({
-      where: { id: operatorId }
+      where: { id: finalOperatorId }
     });
 
     if (!operator) {
@@ -342,8 +378,8 @@ router.post('/', async (req: Request, res: Response) => {
       where: { id: busId }
     });
 
-    if (!bus || bus.operatorId !== operatorId) {
-      return res.status(404).json({ error: 'Bus not found or does not belong to operator' });
+    if (!bus || bus.operatorId !== finalOperatorId) {
+      return res.status(400).json({ error: 'Bus not found or does not belong to your company' });
     }
 
     // Create route
@@ -356,7 +392,7 @@ router.post('/', async (req: Request, res: Response) => {
         duration: parseInt(duration),
         price: parseFloat(price),
         departureTime,
-        operatorId,
+        operatorId: finalOperatorId,
         busId,
         active: true
       },
