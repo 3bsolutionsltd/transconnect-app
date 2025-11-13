@@ -119,7 +119,7 @@ router.get('/bookings', authenticateToken, async (req: Request, res: Response) =
           model: booking.route.bus.model,
           capacity: booking.route.bus.capacity
         },
-        payment: booking.payment.length > 0 ? {
+        payment: booking.payment && Array.isArray(booking.payment) && booking.payment.length > 0 ? {
           status: booking.payment[0].status,
           method: booking.payment[0].method,
           reference: booking.payment[0].reference
@@ -250,9 +250,9 @@ router.get('/analytics', authenticateToken, async (req: Request, res: Response) 
 
     // Payment method breakdown
     const paymentMethods = bookings
-      .filter(b => b.payment.length > 0)
+      .filter(b => b.payment && Array.isArray(b.payment) && b.payment.length > 0)
       .reduce((acc, booking) => {
-        const method = booking.payment[0].method;
+        const method = booking.payment![0].method;
         acc[method] = (acc[method] || 0) + 1;
         return acc;
       }, {} as Record<string, number>);
@@ -297,6 +297,12 @@ router.get('/dashboard', authenticateToken, async (req: Request, res: Response) 
     const operator = await prisma.operator.findUnique({
       where: { userId },
       include: {
+        user: {
+          select: {
+            phone: true,
+            email: true
+          }
+        },
         routes: {
           include: {
             bus: {
@@ -413,8 +419,8 @@ router.get('/dashboard', authenticateToken, async (req: Request, res: Response) 
       operator: {
         id: operator.id,
         name: operator.companyName,
-        phone: operator.phone,
-        email: operator.email,
+        phone: operator.user.phone,
+        email: operator.user.email,
         approved: operator.approved,
         totalRoutes: operator.routes.length,
         totalBuses: operator.buses.length
@@ -514,16 +520,7 @@ router.put('/bookings/:bookingId/status', [
     const updatedBooking = await prisma.booking.update({
       where: { id: bookingId },
       data: {
-        status,
-        metadata: {
-          ...(booking.metadata as object || {}),
-          operatorUpdate: {
-            updatedBy: operator.companyName,
-            updatedAt: new Date().toISOString(),
-            reason: reason || '',
-            previousStatus: booking.status
-          }
-        }
+        status
       }
     });
 

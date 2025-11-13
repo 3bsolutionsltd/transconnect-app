@@ -23,7 +23,7 @@ router.post('/register-token', [
     }
 
     const { token, platform } = req.body;
-    const userId = req.user.userId;
+    const userId = (req as any).user.userId;
 
     const success = await notificationService.registerDeviceToken(userId, token, platform);
 
@@ -59,7 +59,7 @@ router.get('/', [
       return res.status(400).json({ errors: errors.array() });
     }
 
-    const userId = req.user.userId;
+    const userId = (req as any).user.userId;
     const page = parseInt(req.query.page as string) || 1;
     const limit = parseInt(req.query.limit as string) || 20;
 
@@ -88,7 +88,7 @@ router.put('/:id/read', [
     }
 
     const notificationId = req.params.id;
-    const userId = req.user.userId;
+    const userId = (req as any).user.userId;
 
     const success = await notificationService.markAsRead(notificationId, userId);
 
@@ -126,7 +126,7 @@ router.put('/preferences', [
       return res.status(400).json({ errors: errors.array() });
     }
 
-    const userId = req.user.userId;
+    const userId = (req as any).user.userId;
     const { email, sms, push, marketing } = req.body;
 
     const preferences = {
@@ -176,7 +176,7 @@ router.post('/test', [
       return res.status(400).json({ errors: errors.array() });
     }
 
-    const userId = req.user.userId;
+    const userId = (req as any).user.userId;
     const { title, body, channels, data } = req.body;
 
     const result = await notificationService.sendNotification({
@@ -216,7 +216,7 @@ router.post('/email', [
     }
 
     const { template, data } = req.body;
-    const userId = req.user.userId;
+    const userId = (req as any).user.userId;
 
     // Send notification using the NotificationService which handles email
     const result = await notificationService.sendNotification({
@@ -258,7 +258,7 @@ router.post('/email', [
  */
 router.post('/sms', [
   authenticateToken,
-  body('phoneNumber').isMobilePhone().withMessage('Valid phone number is required'),
+  body('phoneNumber').isMobilePhone('any').withMessage('Valid phone number is required'),
   body('type').isIn(['booking_confirmation', 'payment_success', 'payment_failed', 'trip_reminder', 'general']).withMessage('Valid SMS type required'),
   body('data').optional().isObject().withMessage('SMS data must be an object'),
 ], async (req, res) => {
@@ -269,7 +269,7 @@ router.post('/sms', [
     }
 
     const { phoneNumber, type, data } = req.body;
-    const userId = req.user.userId;
+    const userId = (req as any).user.userId;
 
     // Send SMS notification using the NotificationService
     const result = await notificationService.sendNotification({
@@ -314,7 +314,7 @@ router.post('/sms', [
  */
 router.get('/unread-count', [authenticateToken], async (req, res) => {
   try {
-    const userId = req.user.userId;
+    const userId = (req as any).user.userId;
 
     const { prisma } = await import('../index');
     const unreadCount = await prisma.notification.count({
@@ -341,7 +341,7 @@ router.get('/unread-count', [authenticateToken], async (req, res) => {
  */
 router.get('/preferences', [authenticateToken], async (req, res) => {
   try {
-    const userId = req.user.userId;
+    const userId = (req as any).user.userId;
 
     const { prisma } = await import('../index');
     const preferences = await prisma.userNotificationPreference.findUnique({

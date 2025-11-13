@@ -204,7 +204,7 @@ router.post('/:paymentId/process', [
           passengerName: `${payment.booking.user.firstName} ${payment.booking.user.lastName}`,
           amount: payment.amount,
           method: 'Cash Payment',
-          transactionId: payment.reference,
+          transactionId: payment.reference || '',
         });
       } else {
         await notificationService.sendPaymentFailed({
