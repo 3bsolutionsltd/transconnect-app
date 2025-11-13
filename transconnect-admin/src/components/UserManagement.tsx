@@ -13,10 +13,12 @@ import {
   Download,
   UserPlus,
   Building,
-  Settings,
-  Plus
+  Settings
 } from 'lucide-react';
 import { api } from '../lib/api';
+import OperatorUserTable from './OperatorUserTable';
+import CreateOperatorUserModal from './CreateOperatorUserModal';
+import EditOperatorUserModal from './EditOperatorUserModal';
 
 interface User {
   id: string;
@@ -34,12 +36,13 @@ interface User {
 interface OperatorUser {
   id: string;
   userId: string;
+  operatorId: string;
   firstName: string;
   lastName: string;
   email: string;
   phone: string;
   verified: boolean;
-  operatorRole: 'MANAGER' | 'DRIVER' | 'CONDUCTOR' | 'TICKETER' | 'MAINTENANCE';
+  role: 'MANAGER' | 'DRIVER' | 'CONDUCTOR' | 'TICKETER' | 'MAINTENANCE';
   active: boolean;
   createdAt: string;
   operator?: {
@@ -69,7 +72,7 @@ const UserManagement: React.FC = () => {
   const [showUserModal, setShowUserModal] = useState(false);
   const [showCreateOperatorUserModal, setShowCreateOperatorUserModal] = useState(false);
   const [selectedUser, setSelectedUser] = useState<User | null>(null);
-  const [selectedOperatorUser, setSelectedOperatorUser] = useState<OperatorUser | null>(null);
+
   const [createOperatorUserForm, setCreateOperatorUserForm] = useState({
     operatorId: '',
     firstName: '',
@@ -79,6 +82,21 @@ const UserManagement: React.FC = () => {
     password: '',
     role: 'TICKETER' as 'MANAGER' | 'DRIVER' | 'CONDUCTOR' | 'TICKETER' | 'MAINTENANCE'
   });
+  
+  const [editOperatorUserForm, setEditOperatorUserForm] = useState<{
+    id: string;
+    operatorId: string;
+    firstName: string;
+    lastName: string;
+    email: string;
+    phone: string;
+    role: 'MANAGER' | 'DRIVER' | 'CONDUCTOR' | 'TICKETER' | 'MAINTENANCE';
+    active: boolean;
+  } | null>(null);
+  
+  const [showEditOperatorUserModal, setShowEditOperatorUserModal] = useState(false);
+  const [createLoading, setCreateLoading] = useState(false);
+  const [editLoading, setEditLoading] = useState(false);
 
   useEffect(() => {
     console.log('UserManagement: Component mounted, fetching data...');
@@ -177,6 +195,100 @@ const UserManagement: React.FC = () => {
     }
   };
 
+  const handleCreateOperatorUser = async () => {
+    try {
+      setCreateLoading(true);
+      await api.post('/admin/operator-users/create', createOperatorUserForm);
+      
+      // Reset form
+      setCreateOperatorUserForm({
+        operatorId: '',
+        firstName: '',
+        lastName: '',
+        email: '',
+        phone: '',
+        password: '',
+        role: 'TICKETER'
+      });
+      
+      setShowCreateOperatorUserModal(false);
+      await fetchOperatorUsers();
+      alert('Operator user created successfully');
+    } catch (error: any) {
+      console.error('Error creating operator user:', error);
+      alert(error.message || 'Failed to create operator user');
+    } finally {
+      setCreateLoading(false);
+    }
+  };
+
+  const handleEditOperatorUser = async () => {
+    if (!editOperatorUserForm) return;
+    
+    try {
+      setEditLoading(true);
+      const { id, ...updateData } = editOperatorUserForm;
+      await api.put(`/admin/operator-users/${id}`, updateData);
+      
+      setShowEditOperatorUserModal(false);
+      setEditOperatorUserForm(null);
+      await fetchOperatorUsers();
+      alert('Operator user updated successfully');
+    } catch (error: any) {
+      console.error('Error updating operator user:', error);
+      alert(error.message || 'Failed to update operator user');
+    } finally {
+      setEditLoading(false);
+    }
+  };
+
+  const handleToggleOperatorUser = async (userId: string, currentStatus: boolean) => {
+    try {
+      const operatorUser = operatorUsers.find(u => u.id === userId);
+      if (!operatorUser) return;
+
+      await api.put(`/admin/operator-users/${userId}`, {
+        ...operatorUser,
+        active: !currentStatus
+      });
+      
+      await fetchOperatorUsers();
+      alert(`Operator user ${!currentStatus ? 'activated' : 'deactivated'} successfully`);
+    } catch (error: any) {
+      console.error('Error toggling operator user:', error);
+      alert(error.message || 'Failed to update operator user status');
+    }
+  };
+
+  const handleDeleteOperatorUser = async (userId: string) => {
+    if (!window.confirm('Are you sure you want to delete this operator user? This action cannot be undone.')) {
+      return;
+    }
+    
+    try {
+      await api.delete(`/admin/operator-users/${userId}`);
+      await fetchOperatorUsers();
+      alert('Operator user deleted successfully');
+    } catch (error: any) {
+      console.error('Error deleting operator user:', error);
+      alert(error.message || 'Failed to delete operator user');
+    }
+  };
+
+  const handleEditOperatorUserClick = (operatorUser: OperatorUser) => {
+    setEditOperatorUserForm({
+      id: operatorUser.id,
+      operatorId: operatorUser.operatorId,
+      firstName: operatorUser.firstName,
+      lastName: operatorUser.lastName,
+      email: operatorUser.email,
+      phone: operatorUser.phone,
+      role: operatorUser.role,
+      active: operatorUser.active
+    });
+    setShowEditOperatorUserModal(true);
+  };
+
   const handleUserAction = async (userId: string, action: 'verify' | 'unverify' | 'delete') => {
     try {
       if (action === 'delete') {
@@ -220,65 +332,7 @@ const UserManagement: React.FC = () => {
     setSelectedUsers([]);
   };
 
-  const handleCreateOperatorUser = async () => {
-    try {
-      if (!createOperatorUserForm.operatorId || !createOperatorUserForm.firstName || 
-          !createOperatorUserForm.lastName || !createOperatorUserForm.email || 
-          !createOperatorUserForm.phone || !createOperatorUserForm.password) {
-        alert('Please fill in all required fields');
-        return;
-      }
 
-      await api.post('/admin/operator-users/create', createOperatorUserForm);
-      alert('Operator user created successfully');
-      
-      // Reset form and close modal
-      setCreateOperatorUserForm({
-        operatorId: '',
-        firstName: '',
-        lastName: '',
-        email: '',
-        phone: '',
-        password: '',
-        role: 'TICKETER'
-      });
-      setShowCreateOperatorUserModal(false);
-      
-      // Refresh data
-      fetchOperatorUsers();
-    } catch (error: any) {
-      console.error('Error creating operator user:', error);
-      alert(`Failed to create operator user: ${error.message || 'Unknown error'}`);
-    }
-  };
-
-  const handleOperatorUserAction = async (userId: string, action: 'activate' | 'deactivate' | 'delete') => {
-    try {
-      if (action === 'delete') {
-        if (!window.confirm('Are you sure you want to delete this operator user?')) return;
-        
-        await api.delete(`/admin/operator-users/${userId}`);
-        setOperatorUsers(operatorUsers.filter(u => u.userId !== userId));
-        alert('Operator user deleted successfully');
-      } else {
-        const active = action === 'activate';
-        const operatorUser = operatorUsers.find(u => u.userId === userId);
-        if (!operatorUser) return;
-
-        await api.put(`/admin/operator-users/${userId}`, {
-          active
-        });
-
-        setOperatorUsers(operatorUsers.map(u => 
-          u.userId === userId ? { ...u, active } : u
-        ));
-        alert(`Operator user ${active ? 'activated' : 'deactivated'} successfully`);
-      }
-    } catch (error: any) {
-      console.error('Error updating operator user:', error);
-      alert(`Failed to update operator user: ${error.message || 'Unknown error'}`);
-    }
-  };
 
   const exportUsers = () => {
     const csvContent = [
@@ -330,13 +384,16 @@ const UserManagement: React.FC = () => {
       (user.email || '').toLowerCase().includes(searchTerm.toLowerCase()) ||
       (user.phone || '').includes(searchTerm);
     
-    const matchesRole = roleFilter === 'ALL' || user.operatorRole === roleFilter;
+    const matchesRole = roleFilter === 'ALL' || user.role === roleFilter;
     const matchesStatus = 
       statusFilter === 'ALL' || 
       (statusFilter === 'ACTIVE' && user.active) ||
       (statusFilter === 'INACTIVE' && !user.active);
-
-    const matchesOperator = operatorFilter === 'ALL' || user.operator?.id === operatorFilter;
+    
+    const matchesOperator = 
+      operatorFilter === 'ALL' || 
+      user.operatorId === operatorFilter ||
+      (user.operator && user.operator.id === operatorFilter);
 
     return matchesSearch && matchesRole && matchesStatus && matchesOperator;
   });
@@ -352,11 +409,11 @@ const UserManagement: React.FC = () => {
 
   const operatorUserStats = {
     total: safeOperatorUsers.length,
-    managers: safeOperatorUsers.filter(u => u.operatorRole === 'MANAGER').length,
-    drivers: safeOperatorUsers.filter(u => u.operatorRole === 'DRIVER').length,
-    conductors: safeOperatorUsers.filter(u => u.operatorRole === 'CONDUCTOR').length,
-    ticketers: safeOperatorUsers.filter(u => u.operatorRole === 'TICKETER').length,
-    maintenance: safeOperatorUsers.filter(u => u.operatorRole === 'MAINTENANCE').length,
+    managers: safeOperatorUsers.filter(u => u.role === 'MANAGER').length,
+    drivers: safeOperatorUsers.filter(u => u.role === 'DRIVER').length,
+    conductors: safeOperatorUsers.filter(u => u.role === 'CONDUCTOR').length,
+    ticketers: safeOperatorUsers.filter(u => u.role === 'TICKETER').length,
+    maintenance: safeOperatorUsers.filter(u => u.role === 'MAINTENANCE').length,
     active: safeOperatorUsers.filter(u => u.active).length,
     inactive: safeOperatorUsers.filter(u => !u.active).length
   };
@@ -388,16 +445,7 @@ const UserManagement: React.FC = () => {
     }
   };
 
-  const getOperatorRoleBadgeColor = (role: string) => {
-    switch (role) {
-      case 'MANAGER': return 'bg-purple-100 text-purple-800';
-      case 'DRIVER': return 'bg-blue-100 text-blue-800';
-      case 'CONDUCTOR': return 'bg-green-100 text-green-800';
-      case 'TICKETER': return 'bg-orange-100 text-orange-800';
-      case 'MAINTENANCE': return 'bg-yellow-100 text-yellow-800';
-      default: return 'bg-gray-100 text-gray-800';
-    }
-  };
+
 
   if (loading) {
     return (
@@ -656,7 +704,7 @@ const UserManagement: React.FC = () => {
               <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 h-5 w-5" />
               <input
                 type="text"
-                placeholder="Search users by name, email, or phone..."
+                placeholder={activeTab === 'users' ? "Search users by name, email, or phone..." : "Search operator staff by name, email, or phone..."}
                 value={searchTerm}
                 onChange={(e) => setSearchTerm(e.target.value)}
                 className="w-full pl-10 pr-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
@@ -665,26 +713,68 @@ const UserManagement: React.FC = () => {
           </div>
           
           <div className="flex gap-3">
-            <select
-              value={roleFilter}
-              onChange={(e) => setRoleFilter(e.target.value)}
-              className="px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-            >
-              <option value="ALL">All Roles</option>
-              <option value="ADMIN">Admin</option>
-              <option value="OPERATOR">Operator</option>
-              <option value="PASSENGER">Passenger</option>
-            </select>
+            {activeTab === 'users' ? (
+              <>
+                <select
+                  value={roleFilter}
+                  onChange={(e) => setRoleFilter(e.target.value)}
+                  className="px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                >
+                  <option value="ALL">All Roles</option>
+                  <option value="ADMIN">Admin</option>
+                  <option value="OPERATOR">Operator</option>
+                  <option value="PASSENGER">Passenger</option>
+                </select>
 
-            <select
-              value={statusFilter}
-              onChange={(e) => setStatusFilter(e.target.value)}
-              className="px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-            >
-              <option value="ALL">All Status</option>
-              <option value="VERIFIED">Verified</option>
-              <option value="UNVERIFIED">Unverified</option>
-            </select>
+                <select
+                  value={statusFilter}
+                  onChange={(e) => setStatusFilter(e.target.value)}
+                  className="px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                >
+                  <option value="ALL">All Status</option>
+                  <option value="VERIFIED">Verified</option>
+                  <option value="UNVERIFIED">Unverified</option>
+                </select>
+              </>
+            ) : (
+              <>
+                <select
+                  value={roleFilter}
+                  onChange={(e) => setRoleFilter(e.target.value)}
+                  className="px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                >
+                  <option value="ALL">All Roles</option>
+                  <option value="MANAGER">Manager</option>
+                  <option value="DRIVER">Driver</option>
+                  <option value="CONDUCTOR">Conductor</option>
+                  <option value="TICKETER">Ticketer</option>
+                  <option value="MAINTENANCE">Maintenance</option>
+                </select>
+
+                <select
+                  value={operatorFilter}
+                  onChange={(e) => setOperatorFilter(e.target.value)}
+                  className="px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                >
+                  <option value="ALL">All Operators</option>
+                  {operators.map(operator => (
+                    <option key={operator.id} value={operator.id}>
+                      {operator.companyName}
+                    </option>
+                  ))}
+                </select>
+
+                <select
+                  value={statusFilter}
+                  onChange={(e) => setStatusFilter(e.target.value)}
+                  className="px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                >
+                  <option value="ALL">All Status</option>
+                  <option value="ACTIVE">Active</option>
+                  <option value="INACTIVE">Inactive</option>
+                </select>
+              </>
+            )}
           </div>
         </div>
 
@@ -718,8 +808,10 @@ const UserManagement: React.FC = () => {
         )}
       </div>
 
-      {/* Users Table */}
-      <div className="bg-white rounded-lg shadow border overflow-hidden">
+      {/* Tables */}
+      {activeTab === 'users' ? (
+        /* Users Table */
+        <div className="bg-white rounded-lg shadow border overflow-hidden">
         <div className="overflow-x-auto">
           <table className="w-full">
             <thead className="bg-gray-50">
@@ -884,6 +976,16 @@ const UserManagement: React.FC = () => {
           </div>
         )}
       </div>
+      ) : (
+        /* Operator Users Table */
+        <OperatorUserTable
+          operatorUsers={filteredOperatorUsers}
+          operators={operators}
+          onEdit={handleEditOperatorUserClick}
+          onToggle={handleToggleOperatorUser}
+          onDelete={handleDeleteOperatorUser}
+        />
+      )}
 
       {/* User Details Modal */}
       {showUserModal && selectedUser && (
@@ -976,6 +1078,31 @@ const UserManagement: React.FC = () => {
           </div>
         </div>
       )}
+
+      {/* Create Operator User Modal */}
+      <CreateOperatorUserModal
+        show={showCreateOperatorUserModal}
+        onClose={() => setShowCreateOperatorUserModal(false)}
+        onSubmit={handleCreateOperatorUser}
+        form={createOperatorUserForm}
+        setForm={setCreateOperatorUserForm}
+        operators={operators}
+        loading={createLoading}
+      />
+
+      {/* Edit Operator User Modal */}
+      <EditOperatorUserModal
+        show={showEditOperatorUserModal}
+        onClose={() => {
+          setShowEditOperatorUserModal(false);
+          setEditOperatorUserForm(null);
+        }}
+        onSubmit={handleEditOperatorUser}
+        form={editOperatorUserForm}
+        setForm={setEditOperatorUserForm}
+        operators={operators}
+        loading={editLoading}
+      />
     </div>
   );
 };
