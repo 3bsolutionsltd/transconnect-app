@@ -2,7 +2,7 @@
 import React, { useEffect, useState } from 'react';
 import { useRouter, useParams } from 'next/navigation';
 import { useAuth } from '@/contexts/AuthContext';
-import Header from '@/components/layout/Header';
+import Header from '@/components/Header';
 import { ArrowLeft, MapPin, Calendar, Clock, User, Phone, CreditCard, QrCode, Download } from 'lucide-react';
 import Link from 'next/link';
 
