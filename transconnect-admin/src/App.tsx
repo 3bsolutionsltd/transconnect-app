@@ -46,23 +46,32 @@ const Dashboard = () => {
   const loadDashboardData = useCallback(async () => {
     try {
       const token = localStorage.getItem('admin_token');
+      console.log('🔄 Loading dashboard data from API:', API_BASE_URL);
       
-      // Fetch real data from API
+      // Fetch real data from API with cache busting
+      const timestamp = Date.now();
       const [routesRes, usersRes, operatorsRes] = await Promise.all([
-        fetch(`${API_BASE_URL}/routes`, {
-          headers: { 'Authorization': `Bearer ${token}` }
+        fetch(`${API_BASE_URL}/routes?_t=${timestamp}`, {
+          headers: { 'Authorization': `Bearer ${token}`, 'Cache-Control': 'no-cache' }
         }),
-        fetch(`${API_BASE_URL}/users`, {
-          headers: { 'Authorization': `Bearer ${token}` }
+        fetch(`${API_BASE_URL}/users?_t=${timestamp}`, {
+          headers: { 'Authorization': `Bearer ${token}`, 'Cache-Control': 'no-cache' }
         }),
-        fetch(`${API_BASE_URL}/operators`, {
-          headers: { 'Authorization': `Bearer ${token}` }
+        fetch(`${API_BASE_URL}/operators?_t=${timestamp}`, {
+          headers: { 'Authorization': `Bearer ${token}`, 'Cache-Control': 'no-cache' }
         })
       ]);
 
       const routes = routesRes.ok ? await routesRes.json() : [];
       const users = usersRes.ok ? await usersRes.json() : [];
       const operators = operatorsRes.ok ? await operatorsRes.json() : [];
+
+      console.log('📊 API Data received:', {
+        users: users.length,
+        routes: routes.length,
+        operators: operators.length,
+        passengers: users.filter((u: any) => u.role === 'PASSENGER').length
+      });
 
       // Calculate real stats from actual data
       const passengers = users.filter((u: any) => u.role === 'PASSENGER');
@@ -72,6 +81,14 @@ const Dashboard = () => {
       const estimatedTotalBookings = passengers.length * 3; // Assume 3 bookings per passenger average
       const avgRoutePrice = routes.length > 0 ? routes.reduce((sum: number, r: any) => sum + (r.price || 15000), 0) / routes.length : 15000;
       const estimatedRevenue = estimatedTotalBookings * avgRoutePrice;
+      
+      console.log('💰 Calculated stats:', {
+        passengers: passengers.length,
+        activeRoutes: activeRoutes.length,
+        estimatedBookings: estimatedTotalBookings,
+        avgPrice: Math.round(avgRoutePrice),
+        estimatedRevenue: estimatedRevenue
+      });
       
       setStats({
         totalBookings: estimatedTotalBookings,
@@ -205,7 +222,7 @@ const Dashboard = () => {
           <p className="text-gray-600">Welcome back, {user?.firstName}! Here's your business overview.</p>
         </div>
         <div className="text-sm text-gray-500">
-          Last updated: {new Date().toLocaleString()}
+          Last updated: {new Date().toLocaleString()} | v2.0 Real Data
         </div>
       </div>
       
