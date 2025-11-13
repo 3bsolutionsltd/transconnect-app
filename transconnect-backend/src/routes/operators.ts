@@ -49,9 +49,16 @@ router.get('/', async (req: Request, res: Response) => {
   }
 });
 
-// Create operator
+// Create operator (Admin only)
 router.post('/', authenticateToken, async (req: Request, res: Response) => {
   try {
+    const userRole = (req as any).user.role;
+    
+    // Only admins can create operators
+    if (userRole !== 'ADMIN') {
+      return res.status(403).json({ error: 'Only administrators can create operators' });
+    }
+    
     const { companyName, license, firstName, lastName, email, phone, password, approved } = req.body;
 
     console.log('Creating operator with data:', { companyName, license, firstName, lastName, email, phone, approved }); // Debug log
@@ -169,9 +176,16 @@ router.get('/:id', async (req: Request, res: Response) => {
   }
 });
 
-// Update operator
+// Update operator (Admin only)
 router.put('/:id', authenticateToken, async (req: Request, res: Response) => {
   try {
+    const userRole = (req as any).user.role;
+    
+    // Only admins can update operators
+    if (userRole !== 'ADMIN') {
+      return res.status(403).json({ error: 'Only administrators can update operators' });
+    }
+    
     const { id } = req.params;
     const { companyName, license, firstName, lastName, email, phone, approved } = req.body;
 
@@ -249,9 +263,16 @@ router.put('/:id', authenticateToken, async (req: Request, res: Response) => {
   }
 });
 
-// Delete operator
+// Delete operator (Admin only)
 router.delete('/:id', authenticateToken, async (req: Request, res: Response) => {
   try {
+    const userRole = (req as any).user.role;
+    
+    // Only admins can delete operators
+    if (userRole !== 'ADMIN') {
+      return res.status(403).json({ error: 'Only administrators can delete operators' });
+    }
+    
     const { id } = req.params;
 
     // Get the operator with user info
