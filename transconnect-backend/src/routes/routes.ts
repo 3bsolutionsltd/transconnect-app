@@ -1,18 +1,70 @@
 import { Router, Request, Response } from 'express';
 import { prisma } from '../index';
 import { authenticateToken } from '../middleware/auth';
+import { requireOperatorAccess, requireOperatorPermission } from '../middleware/operator-permissions';
 
 const router = Router();
 
-// Get all routes with optional filtering
+// Smart grouping function for similar routes
+function groupRoutesByDestination(routes: any[]) {
+  const grouped: { [key: string]: any } = {};
+  
+  routes.forEach(route => {
+    const routeKey = `${route.origin}-${route.destination}`;
+    
+    if (!grouped[routeKey]) {
+      grouped[routeKey] = {
+        routeName: `${route.origin} → ${route.destination}`,
+        origin: route.origin,
+        destination: route.destination,
+        operators: [],
+        priceRange: { min: route.price, max: route.price },
+        totalOptions: 0
+      };
+    }
+    
+    // Add operator if not already present
+    const existingOperator = grouped[routeKey].operators.find(
+      (op: any) => op.operatorId === route.operator.id
+    );
+    
+    if (!existingOperator) {
+      grouped[routeKey].operators.push({
+        operatorId: route.operator.id,
+        operatorName: route.operator.companyName,
+        routes: [route],
+        minPrice: route.price,
+        availableSeats: route.availability?.availableSeats || route.bus.capacity
+      });
+    } else {
+      existingOperator.routes.push(route);
+      existingOperator.minPrice = Math.min(existingOperator.minPrice, route.price);
+      if (route.availability) {
+        existingOperator.availableSeats += route.availability.availableSeats;
+      }
+    }
+    
+    // Update price range
+    grouped[routeKey].priceRange.min = Math.min(grouped[routeKey].priceRange.min, route.price);
+    grouped[routeKey].priceRange.max = Math.max(grouped[routeKey].priceRange.max, route.price);
+    grouped[routeKey].totalOptions++;
+  });
+  
+  return grouped;
+}
+
+// Get all routes with optional filtering - Enhanced with operator information
 router.get('/', async (req: Request, res: Response) => {
   try {
-    const { origin, destination, travelDate } = req.query;
-    console.log('Routes API called with params:', { origin, destination, travelDate });
+    const { origin, destination, travelDate, groupByRoute } = req.query;
+    console.log('Routes API called with params:', { origin, destination, travelDate, groupByRoute });
 
     // Build where clause for filtering
     let whereClause: any = {
-      active: true
+      active: true,
+      operator: {
+        approved: true // Only show routes from approved operators
+      }
     };
 
     if (origin) {
@@ -36,7 +88,10 @@ router.get('/', async (req: Request, res: Response) => {
           select: {
             id: true,
             companyName: true,
-            approved: true
+            approved: true,
+            contactPerson: true,
+            phone: true,
+            email: true
           }
         },
         bus: {
@@ -64,40 +119,57 @@ router.get('/', async (req: Request, res: Response) => {
       orderBy: [
         { origin: 'asc' },
         { destination: 'asc' },
+        { price: 'asc' }, // Show cheapest first
         { departureTime: 'asc' }
       ]
     });
 
     // Calculate availability if travelDate is provided
     const routesWithAvailability = routes.map(route => {
+      let routeData: any = {
+        ...route,
+        // Enhanced operator display information
+        operatorInfo: {
+          id: route.operator.id,
+          name: route.operator.companyName,
+          contact: route.operator.contactPerson,
+          phone: route.operator.phone,
+          email: route.operator.email
+        },
+        bookings: undefined // Remove bookings from response for privacy
+      };
+
       if (travelDate && route.bookings) {
         const bookedSeats = route.bookings.length;
         const availableSeats = route.bus.capacity - bookedSeats;
         
-        return {
-          ...route,
-          availability: {
-            totalSeats: route.bus.capacity,
-            bookedSeats,
-            availableSeats,
-            isAvailable: availableSeats > 0
-          },
-          bookings: undefined // Remove bookings from response for privacy
+        routeData.availability = {
+          totalSeats: route.bus.capacity,
+          bookedSeats,
+          availableSeats,
+          isAvailable: availableSeats > 0
         };
       }
       
-      return {
-        ...route,
-        bookings: undefined // Remove bookings from response
-      };
+      return routeData;
     });
+
+    // Smart grouping for similar routes (if requested)
+    if (groupByRoute === 'true') {
+      const groupedRoutes = groupRoutesByDestination(routesWithAvailability);
+      console.log('Grouped routes found:', Object.keys(groupedRoutes).length);
+      return res.json({ 
+        routes: routesWithAvailability,
+        grouped: groupedRoutes 
+      });
+    }
 
     console.log('Routes found:', routesWithAvailability.length);
     console.log('Sample route:', routesWithAvailability[0] ? {
       id: routesWithAvailability[0].id,
       origin: routesWithAvailability[0].origin,
       destination: routesWithAvailability[0].destination,
-      active: routesWithAvailability[0].active
+      operator: routesWithAvailability[0].operatorInfo.name
     } : 'None');
 
     res.json(routesWithAvailability);
@@ -185,6 +257,115 @@ router.get('/:id', async (req: Request, res: Response) => {
   }
 });
 
+// Smart search routes - Groups similar routes by different operators
+router.get('/smart-search/:origin/:destination', async (req: Request, res: Response) => {
+  try {
+    const { origin, destination } = req.params;
+    const { travelDate } = req.query;
+
+    const routes = await prisma.route.findMany({
+      where: {
+        active: true,
+        origin: {
+          contains: origin,
+          mode: 'insensitive'
+        },
+        destination: {
+          contains: destination,
+          mode: 'insensitive'
+        },
+        operator: {
+          approved: true
+        }
+      },
+      include: {
+        operator: {
+          select: {
+            id: true,
+            companyName: true,
+            contactPerson: true,
+            phone: true,
+            email: true,
+            approved: true
+          }
+        },
+        bus: {
+          select: {
+            id: true,
+            plateNumber: true,
+            model: true,
+            capacity: true,
+            amenities: true
+          }
+        },
+        stops: {
+          orderBy: { order: 'asc' }
+        },
+        bookings: travelDate ? {
+          where: {
+            travelDate: new Date(travelDate as string),
+            status: { in: ['PENDING', 'CONFIRMED'] }
+          },
+          select: {
+            seatNumber: true
+          }
+        } : false
+      },
+      orderBy: [
+        { price: 'asc' },
+        { departureTime: 'asc' }
+      ]
+    });
+
+    // Process routes with availability
+    const routesWithAvailability = routes.map(route => {
+      let routeData: any = {
+        ...route,
+        operatorInfo: {
+          id: route.operator.id,
+          name: route.operator.companyName,
+          contact: route.operator.contactPerson,
+          phone: route.operator.phone,
+          email: route.operator.email
+        },
+        bookings: undefined
+      };
+
+      if (travelDate && route.bookings) {
+        const bookedSeats = route.bookings.length;
+        const availableSeats = route.bus.capacity - bookedSeats;
+        
+        routeData.availability = {
+          totalSeats: route.bus.capacity,
+          bookedSeats,
+          availableSeats,
+          isAvailable: availableSeats > 0
+        };
+      }
+      
+      return routeData;
+    });
+
+    // Group routes smartly
+    const grouped = groupRoutesByDestination(routesWithAvailability);
+    
+    res.json({
+      routeInfo: {
+        origin,
+        destination,
+        totalOperators: Object.keys(grouped).length > 0 ? grouped[`${origin}-${destination}`]?.operators?.length || 0 : 0,
+        totalRoutes: routesWithAvailability.length,
+        searchDate: travelDate
+      },
+      routes: routesWithAvailability,
+      groupedByOperator: grouped
+    });
+  } catch (error) {
+    console.error('Error in smart route search:', error);
+    res.status(500).json({ error: 'Failed to search routes' });
+  }
+});
+
 // Search routes by origin and destination
 router.get('/search/:origin/:destination', async (req: Request, res: Response) => {
   try {
@@ -201,6 +382,9 @@ router.get('/search/:origin/:destination', async (req: Request, res: Response) =
         destination: {
           contains: destination,
           mode: 'insensitive'
+        },
+        operator: {
+          approved: true
         }
       },
       include: {
@@ -208,6 +392,9 @@ router.get('/search/:origin/:destination', async (req: Request, res: Response) =
           select: {
             id: true,
             companyName: true,
+            contactPerson: true,
+            phone: true,
+            email: true,
             approved: true
           }
         },
@@ -244,26 +431,31 @@ router.get('/search/:origin/:destination', async (req: Request, res: Response) =
 
     // Calculate availability if travelDate is provided
     const routesWithAvailability = approvedRoutes.map(route => {
+      let routeData: any = {
+        ...route,
+        operatorInfo: {
+          id: route.operator.id,
+          name: route.operator.companyName,
+          contact: route.operator.contactPerson,
+          phone: route.operator.phone,
+          email: route.operator.email
+        },
+        bookings: undefined
+      };
+
       if (travelDate && route.bookings) {
         const bookedSeats = route.bookings.length;
         const availableSeats = route.bus.capacity - bookedSeats;
         
-        return {
-          ...route,
-          availability: {
-            totalSeats: route.bus.capacity,
-            bookedSeats,
-            availableSeats,
-            isAvailable: availableSeats > 0
-          },
-          bookings: undefined
+        routeData.availability = {
+          totalSeats: route.bus.capacity,
+          bookedSeats,
+          availableSeats,
+          isAvailable: availableSeats > 0
         };
       }
       
-      return {
-        ...route,
-        bookings: undefined
-      };
+      return routeData;
     });
 
     res.json(routesWithAvailability);
@@ -307,10 +499,107 @@ router.get('/suggestions/destinations', async (req: Request, res: Response) => {
   }
 });
 
-// Create a new route (Admin/Operator only)
+// Get routes for specific operator (Operator users only see their company's routes)
+router.get('/my-routes', authenticateToken, requireOperatorAccess, async (req: Request, res: Response) => {
+  try {
+    const operatorId = (req as any).operatorId;
+    const operatorRole = (req as any).operatorRole;
+    const operatorCompany = (req as any).operatorCompany;
+    const { travelDate } = req.query;
+
+    const routes = await prisma.route.findMany({
+      where: {
+        operatorId,
+        active: true
+      },
+      include: {
+        operator: {
+          select: {
+            id: true,
+            companyName: true,
+            contactPerson: true,
+            phone: true
+          }
+        },
+        bus: {
+          select: {
+            id: true,
+            plateNumber: true,
+            model: true,
+            capacity: true,
+            amenities: true
+          }
+        },
+        stops: {
+          orderBy: { order: 'asc' }
+        },
+        bookings: travelDate ? {
+          where: {
+            travelDate: new Date(travelDate as string),
+            status: { in: ['PENDING', 'CONFIRMED'] }
+          },
+          select: {
+            seatNumber: true,
+            status: true
+          }
+        } : false
+      },
+      orderBy: [
+        { origin: 'asc' },
+        { destination: 'asc' },
+        { departureTime: 'asc' }
+      ]
+    });
+
+    // Calculate availability and add operator context
+    const routesWithContext = routes.map(route => {
+      let routeData: any = {
+        ...route,
+        operatorInfo: {
+          id: route.operator.id,
+          name: route.operator.companyName,
+          contact: route.operator.contactPerson,
+          phone: route.operator.phone
+        },
+        canEdit: ['OWNER', 'MANAGER', 'TICKETER'].includes(operatorRole || ''),
+        canDelete: ['OWNER', 'MANAGER'].includes(operatorRole || ''),
+        bookings: undefined
+      };
+
+      if (travelDate && route.bookings) {
+        const bookedSeats = route.bookings.length;
+        const availableSeats = route.bus.capacity - bookedSeats;
+        
+        routeData.availability = {
+          totalSeats: route.bus.capacity,
+          bookedSeats,
+          availableSeats,
+          isAvailable: availableSeats > 0
+        };
+      }
+      
+      return routeData;
+    });
+
+    res.json({
+      companyInfo: {
+        operatorId,
+        companyName: operatorCompany,
+        userRole: operatorRole,
+        totalRoutes: routes.length
+      },
+      routes: routesWithContext
+    });
+  } catch (error) {
+    console.error('Error fetching operator routes:', error);
+    res.status(500).json({ error: 'Failed to fetch operator routes' });
+  }
+});
 
 // Create a new route (Admin/Operator only)
-router.post('/', authenticateToken, async (req: Request, res: Response) => {
+
+// Create a new route - Enhanced for operator users (Auto-determine operator)
+router.post('/', authenticateToken, requireOperatorAccess, requireOperatorPermission(['create_route']), async (req: Request, res: Response) => {
   try {
     const { 
       origin, 
@@ -320,12 +609,14 @@ router.post('/', authenticateToken, async (req: Request, res: Response) => {
       duration, 
       price, 
       departureTime, 
-      operatorId, 
       busId 
     } = req.body;
 
     const userId = (req as any).user.userId;
     const userRole = (req as any).user.role;
+    const operatorId = (req as any).operatorId; // Auto-determined by middleware
+    const operatorRole = (req as any).operatorRole;
+    const operatorCompany = (req as any).operatorCompany;
 
     // Validate required fields
     if (!origin || !destination || !distance || !duration || !price || !departureTime || !busId) {
@@ -334,60 +625,47 @@ router.post('/', authenticateToken, async (req: Request, res: Response) => {
       });
     }
 
+    // For admins, they can specify operatorId in the request body
     let finalOperatorId = operatorId;
-
-    // Handle operator restrictions
-    if (userRole === 'OPERATOR') {
-      // Find the operator profile for this user
-      const userOperator = await prisma.operator.findUnique({
-        where: { userId }
+    if (userRole === 'ADMIN' && req.body.operatorId) {
+      finalOperatorId = req.body.operatorId;
+      
+      // Verify the specified operator exists
+      const specifiedOperator = await prisma.operator.findUnique({
+        where: { id: finalOperatorId }
       });
-
-      if (!userOperator) {
-        return res.status(404).json({ error: 'Operator profile not found for this user' });
+      
+      if (!specifiedOperator) {
+        return res.status(404).json({ error: 'Specified operator not found' });
       }
-
-      // Operators can only create routes for themselves
-      finalOperatorId = userOperator.id;
-
-      // Deny if they try to specify a different operator
-      if (operatorId && operatorId !== userOperator.id) {
-        return res.status(403).json({ error: 'Operators can only create routes for their own company' });
-      }
-    } else if (userRole === 'ADMIN') {
-      // Admins must specify an operator
-      if (!operatorId) {
-        return res.status(400).json({ error: 'Admin must specify operatorId' });
-      }
-      finalOperatorId = operatorId;
-    } else {
-      return res.status(403).json({ error: 'Only admins and operators can create routes' });
-    }
-
-    // Verify operator exists
-    const operator = await prisma.operator.findUnique({
-      where: { id: finalOperatorId }
-    });
-
-    if (!operator) {
-      return res.status(404).json({ error: 'Operator not found' });
     }
 
     // Verify bus exists and belongs to the operator
     const bus = await prisma.bus.findUnique({
-      where: { id: busId }
+      where: { id: busId },
+      include: {
+        operator: {
+          select: { id: true, companyName: true }
+        }
+      }
     });
 
-    if (!bus || bus.operatorId !== finalOperatorId) {
-      return res.status(400).json({ error: 'Bus not found or does not belong to your company' });
+    if (!bus) {
+      return res.status(404).json({ error: 'Bus not found' });
     }
 
-    // Create route
+    if (bus.operatorId !== finalOperatorId) {
+      return res.status(400).json({ 
+        error: `Bus belongs to ${bus.operator.companyName}, not ${operatorCompany || 'your company'}` 
+      });
+    }
+
+    // Create route with auto-determined operator
     const route = await prisma.route.create({
       data: {
-        origin,
-        destination,
-        // via: via || null, // Temporarily commented out due to TypeScript issue
+        origin: origin.trim(),
+        destination: destination.trim(),
+        via: via?.trim() || null,
         distance: parseFloat(distance),
         duration: parseInt(duration),
         price: parseFloat(price),
@@ -400,7 +678,9 @@ router.post('/', authenticateToken, async (req: Request, res: Response) => {
         operator: {
           select: {
             id: true,
-            companyName: true
+            companyName: true,
+            contactPerson: true,
+            phone: true
           }
         },
         bus: {
@@ -408,13 +688,32 @@ router.post('/', authenticateToken, async (req: Request, res: Response) => {
             id: true,
             plateNumber: true,
             model: true,
-            capacity: true
+            capacity: true,
+            amenities: true
           }
         }
       }
     });
 
-    res.status(201).json(route);
+    console.log(`Route created by ${operatorRole || 'operator'} user for ${operatorCompany}:`, {
+      id: route.id,
+      route: `${route.origin} → ${route.destination}`,
+      operator: route.operator.companyName,
+      createdBy: operatorRole || userRole
+    });
+
+    res.status(201).json({
+      ...route,
+      // Enhanced response with operator info
+      operatorInfo: {
+        id: route.operator.id,
+        name: route.operator.companyName,
+        contact: route.operator.contactPerson,
+        phone: route.operator.phone
+      },
+      createdByRole: operatorRole || userRole,
+      message: `Route created successfully for ${route.operator.companyName}`
+    });
   } catch (error) {
     console.error('Error creating route:', error);
     res.status(500).json({ error: 'Failed to create route' });
