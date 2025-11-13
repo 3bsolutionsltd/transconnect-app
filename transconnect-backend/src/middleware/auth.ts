@@ -38,9 +38,28 @@ export const authenticateToken = async (req: AuthRequest, res: Response, next: N
     };
 
     next();
-  } catch (error) {
+  } catch (error: any) {
     console.error('Auth middleware error:', error);
-    return res.status(403).json({ error: 'Invalid token' });
+    
+    // Provide specific error messages for different JWT errors
+    if (error.name === 'JsonWebTokenError') {
+      return res.status(401).json({ 
+        error: 'Invalid token signature', 
+        code: 'INVALID_TOKEN',
+        message: 'Please log in again' 
+      });
+    } else if (error.name === 'TokenExpiredError') {
+      return res.status(401).json({ 
+        error: 'Token expired', 
+        code: 'TOKEN_EXPIRED',
+        message: 'Please log in again' 
+      });
+    } else {
+      return res.status(403).json({ 
+        error: 'Invalid or expired token',
+        code: 'AUTH_ERROR'
+      });
+    }
   }
 };
 

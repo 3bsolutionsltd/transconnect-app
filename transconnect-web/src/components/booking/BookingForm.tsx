@@ -13,9 +13,11 @@ type Props = {
   selectedSeats?: string[];
   defaultTravelDate?: string;
   onSuccess?: (booking: any) => void;
+  routeOrigin?: string;
+  routeDestination?: string;
 };
 
-export default function BookingForm({ routeId, price, selectedSeats = [], defaultTravelDate, onSuccess }: Props) {
+export default function BookingForm({ routeId, price, selectedSeats = [], defaultTravelDate, onSuccess, routeOrigin, routeDestination }: Props) {
   const [travelDate, setTravelDate] = useState(defaultTravelDate || '');
   const [passengerDetails, setPassengerDetails] = useState<Array<{name: string, phone: string}>>([]);
   const [loading, setLoading] = useState(false);
@@ -105,7 +107,7 @@ export default function BookingForm({ routeId, price, selectedSeats = [], defaul
       // Show success notifications
       const routeDetails = boardingStop && alightingStop 
         ? `${boardingStop} → ${alightingStop}` 
-        : `${selectedSeats.length} seat${selectedSeats.length > 1 ? 's' : ''} booked`;
+        : `${routeOrigin || 'Origin'} → ${routeDestination || 'Destination'}`;
       
       // Handle API response - it returns an object with bookings array and summary
       const primaryBooking = result.bookings ? result.bookings[0] : result;

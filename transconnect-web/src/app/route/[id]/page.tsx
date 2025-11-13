@@ -244,7 +244,9 @@ export default function RoutePage({ params }: { params: { id: string } }) {
             price={route.price} 
             selectedSeats={selectedSeats}
             defaultTravelDate={travelDate}
-            onSuccess={(b) => router.push('/profile')} 
+            onSuccess={(b) => router.push('/profile')}
+            routeOrigin={route.origin}
+            routeDestination={route.destination}
           />
         </div>
       </div>

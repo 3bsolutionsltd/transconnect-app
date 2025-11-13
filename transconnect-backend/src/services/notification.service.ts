@@ -174,6 +174,7 @@ export class NotificationService {
       subject: `Booking Confirmed - ${bookingData.bookingId}`,
       data: {
         bookingId: bookingData.bookingId,
+        passengerName: bookingData.passengerName,
         route: bookingData.route,
         date: bookingData.date,
         time: bookingData.time,
@@ -204,6 +205,7 @@ export class NotificationService {
       subject: `Payment Confirmed - ${paymentData.transactionId}`,
       data: {
         bookingId: paymentData.bookingId,
+        passengerName: paymentData.passengerName,
         amount: paymentData.amount.toString(),
         method: paymentData.method,
         transactionId: paymentData.transactionId,
@@ -257,6 +259,7 @@ export class NotificationService {
       body: `Your trip ${reminderData.route} is tomorrow at ${reminderData.time}. Seat ${reminderData.seatNumber}.`,
       subject: `Trip Reminder - ${reminderData.route} Tomorrow`,
       data: {
+        passengerName: reminderData.passengerName,
         route: reminderData.route,
         date: reminderData.date,
         time: reminderData.time,
@@ -333,7 +336,7 @@ export class NotificationService {
         boardingPoint: data.data.boardingPoint,
       });
     } else {
-      // Generic email
+      // Generic email fallback
       const htmlContent = `
         <h2>${data.title}</h2>
         <p>${data.body}</p>

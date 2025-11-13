@@ -25,6 +25,16 @@ const getAuthHeaders = () => {
 const handleResponse = async (response: Response) => {
   if (!response.ok) {
     const errorData = await response.json().catch(() => ({}));
+    
+    // Handle JWT signature errors specifically
+    if (response.status === 401 && (errorData.code === 'INVALID_TOKEN' || errorData.code === 'TOKEN_EXPIRED')) {
+      // Clear invalid tokens and force re-login
+      localStorage.removeItem('admin_token');
+      localStorage.removeItem('admin_user');
+      window.location.href = '/';
+      return;
+    }
+    
     throw new ApiError(
       response.status,
       errorData.error || errorData.message || `HTTP error! status: ${response.status}`,

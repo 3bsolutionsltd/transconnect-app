@@ -30,7 +30,8 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   const [user, setUser] = useState<User | null>(null);
   const [loading, setLoading] = useState(true);
 
-  const API_BASE_URL = process.env.REACT_APP_API_URL || 'https://transconnect-app-44ie.onrender.com/api';
+  // Ensure API_BASE_URL includes /api path
+const API_BASE_URL = process.env.REACT_APP_API_URL || 'https://transconnect-app-44ie.onrender.com/api';
 
   useEffect(() => {
     // Check for stored auth token on app load
@@ -42,7 +43,31 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         const parsedUser = JSON.parse(userData);
         // Verify user has admin or operator role
         if (parsedUser.role === 'ADMIN' || parsedUser.role === 'OPERATOR') {
-          setUser(parsedUser);
+          // Test token validity by making a quick API call
+          fetch(`${API_BASE_URL}/users`, {
+            headers: {
+              'Authorization': `Bearer ${token}`,
+              'Content-Type': 'application/json'
+            }
+          }).then(response => {
+            if (response.status === 401) {
+              console.log('🔧 Token invalid, clearing and forcing re-login');
+              localStorage.removeItem('admin_token');
+              localStorage.removeItem('admin_user');
+              setUser(null);
+            } else if (response.ok) {
+              console.log('✅ Token valid, setting user');
+              setUser(parsedUser);
+            }
+            setLoading(false);
+          }).catch(() => {
+            console.log('🔧 Token validation failed, clearing tokens');
+            localStorage.removeItem('admin_token');
+            localStorage.removeItem('admin_user');
+            setUser(null);
+            setLoading(false);
+          });
+          return; // Don't set loading to false here, wait for API call
         } else {
           // Clear invalid role data
           localStorage.removeItem('admin_token');

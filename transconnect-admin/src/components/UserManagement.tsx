@@ -38,18 +38,73 @@ const UserManagement: React.FC = () => {
   const [selectedUser, setSelectedUser] = useState<User | null>(null);
 
   useEffect(() => {
+    console.log('UserManagement: Component mounted, fetching users...');
     fetchUsers();
   }, []);
 
   const fetchUsers = async () => {
     try {
       setLoading(true);
+      console.log('UserManagement: Starting fetchUsers...');
+      
+      // Check if token exists
+      const token = localStorage.getItem('admin_token');
+      console.log('UserManagement: Token exists:', !!token);
+      
+      if (!token) {
+        console.log('UserManagement: No token found, redirecting to login');
+        window.location.href = '/';
+        return;
+      }
+      
       const response = await api.get('/users');
-      setUsers(response.data);
-    } catch (error) {
-      console.error('Error fetching users:', error);
-      // Show error message to user
-      alert('Failed to load users. Please check your connection and try again.');
+      console.log('UserManagement: API response received:', response);
+      
+      // Handle both direct array response and wrapped response
+      const usersData = Array.isArray(response) ? response : (response.data || response);
+      console.log('UserManagement: Processed users data:', {
+        isArray: Array.isArray(usersData),
+        length: Array.isArray(usersData) ? usersData.length : 'N/A',
+        sample: Array.isArray(usersData) && usersData[0] ? {
+          id: usersData[0].id?.substring(0, 8),
+          name: `${usersData[0].firstName} ${usersData[0].lastName}`,
+          email: usersData[0].email,
+          role: usersData[0].role
+        } : 'No sample available'
+      });
+      
+      // Ensure we always set an array, even if the response is unexpected
+      if (Array.isArray(usersData)) {
+        setUsers(usersData);
+      } else {
+        console.error('UserManagement: Response is not an array, setting empty array');
+        setUsers([]);
+      }
+      console.log('UserManagement: Users state updated successfully');
+    } catch (error: any) {
+      console.error('UserManagement: Error fetching users:', {
+        message: error.message,
+        status: error.status,
+        response: error.response,
+        stack: error.stack
+      });
+      
+      // Always ensure users is an array even on error
+      setUsers([]);
+      
+      // More detailed error handling
+      if (error.status === 403) {
+        alert('Access denied. Admin privileges required.');
+      } else if (error.status === 401) {
+        alert('Authentication failed. Please log in again.');
+        // Clear invalid token and reload page
+        localStorage.removeItem('admin_token');
+        localStorage.removeItem('admin_user');
+        window.location.reload();
+      } else {
+        const errorMessage = error.message || error.toString() || 'Unknown error';
+        alert(`Failed to load users: ${errorMessage}. Check console for details.`);
+      }
     } finally {
       setLoading(false);
     }
@@ -121,12 +176,15 @@ const UserManagement: React.FC = () => {
     window.URL.revokeObjectURL(url);
   };
 
-  const filteredUsers = users.filter(user => {
+  // Ensure users is always an array before filtering
+  const safeUsers = Array.isArray(users) ? users : [];
+  
+  const filteredUsers = safeUsers.filter(user => {
     const matchesSearch = 
-      user.firstName.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      user.lastName.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      user.email.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      user.phone.includes(searchTerm);
+      (user.firstName || '').toLowerCase().includes(searchTerm.toLowerCase()) ||
+      (user.lastName || '').toLowerCase().includes(searchTerm.toLowerCase()) ||
+      (user.email || '').toLowerCase().includes(searchTerm.toLowerCase()) ||
+      (user.phone || '').includes(searchTerm);
     
     const matchesRole = roleFilter === 'ALL' || user.role === roleFilter;
     const matchesStatus = 
@@ -138,12 +196,12 @@ const UserManagement: React.FC = () => {
   });
 
   const userStats = {
-    total: users.length,
-    admins: users.filter(u => u.role === 'ADMIN').length,
-    operators: users.filter(u => u.role === 'OPERATOR').length,
-    passengers: users.filter(u => u.role === 'PASSENGER').length,
-    verified: users.filter(u => u.verified).length,
-    unverified: users.filter(u => !u.verified).length
+    total: safeUsers.length,
+    admins: safeUsers.filter(u => u.role === 'ADMIN').length,
+    operators: safeUsers.filter(u => u.role === 'OPERATOR').length,
+    passengers: safeUsers.filter(u => u.role === 'PASSENGER').length,
+    verified: safeUsers.filter(u => u.verified).length,
+    unverified: safeUsers.filter(u => !u.verified).length
   };
 
   const formatDate = (dateString: string) => {
@@ -176,7 +234,34 @@ const UserManagement: React.FC = () => {
   if (loading) {
     return (
       <div className="flex items-center justify-center h-64">
-        <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600"></div>
+        <div className="text-center">
+          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600 mx-auto mb-4"></div>
+          <p className="text-gray-600">Loading users...</p>
+        </div>
+      </div>
+    );
+  }
+
+  // Add error boundary for when users array is not properly set
+  if (!Array.isArray(users)) {
+    console.error('UserManagement: users is not an array:', users);
+    return (
+      <div className="flex items-center justify-center h-64">
+        <div className="text-center">
+          <div className="text-red-600 mb-4">
+            <Users className="h-12 w-12 mx-auto mb-2" />
+            <h3 className="text-lg font-medium">Error Loading Users</h3>
+            <p className="text-sm text-gray-600 mt-2">
+              There was a problem loading the user data. Please refresh the page.
+            </p>
+          </div>
+          <button
+            onClick={fetchUsers}
+            className="bg-blue-600 text-white px-4 py-2 rounded-lg hover:bg-blue-700 transition-colors"
+          >
+            Retry
+          </button>
+        </div>
       </div>
     );
   }
@@ -391,7 +476,7 @@ const UserManagement: React.FC = () => {
                     <div className="flex items-center">
                       <div className="h-10 w-10 rounded-full bg-blue-100 flex items-center justify-center">
                         <span className="text-sm font-medium text-blue-600">
-                          {user.firstName[0]}{user.lastName[0]}
+                          {(user.firstName || '?')[0]}{(user.lastName || '?')[0]}
                         </span>
                       </div>
                       <div className="ml-4">
@@ -518,7 +603,7 @@ const UserManagement: React.FC = () => {
               <div className="flex items-center space-x-4">
                 <div className="h-16 w-16 rounded-full bg-blue-100 flex items-center justify-center">
                   <span className="text-xl font-medium text-blue-600">
-                    {selectedUser.firstName[0]}{selectedUser.lastName[0]}
+                    {(selectedUser.firstName || '?')[0]}{(selectedUser.lastName || '?')[0]}
                   </span>
                 </div>
                 <div>
