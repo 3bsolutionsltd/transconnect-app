@@ -26,12 +26,12 @@ export const useAuth = () => {
   return context;
 };
 
-export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
+export // Ensure API_BASE_URL includes /api path
+const API_BASE_URL = process.env.REACT_APP_API_URL || 'https://transconnect-app-44ie.onrender.com/api';
+
+const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
   const [user, setUser] = useState<User | null>(null);
   const [loading, setLoading] = useState(true);
-
-  // Ensure API_BASE_URL includes /api path
-const API_BASE_URL = process.env.REACT_APP_API_URL || 'https://transconnect-app-44ie.onrender.com/api';
 
   useEffect(() => {
     // Check for stored auth token on app load
@@ -129,3 +129,6 @@ const API_BASE_URL = process.env.REACT_APP_API_URL || 'https://transconnect-app-
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;
 };
+
+export { AuthProvider };
+export default AuthProvider;
