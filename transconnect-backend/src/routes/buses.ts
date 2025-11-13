@@ -7,22 +7,23 @@ const router = Router();
 // Get all buses (filtered by role)
 router.get('/', authenticateToken, async (req: Request, res: Response) => {
   try {
-    const userId = (req as any).user.userId;
     const userRole = (req as any).user.role;
 
     let whereClause = {};
     
     // If operator, only show their own buses
     if (userRole === 'OPERATOR') {
-      const operator = await prisma.operator.findUnique({
+      // Use the operator permissions middleware inline for this check
+      const userId = (req as any).user.userId;
+      const operatorUser = await prisma.operatorUser.findUnique({
         where: { userId }
       });
 
-      if (!operator) {
-        return res.status(404).json({ error: 'Operator profile not found' });
+      if (!operatorUser) {
+        return res.status(404).json({ error: 'Operator user profile not found' });
       }
 
-      whereClause = { operatorId: operator.id };
+      whereClause = { operatorId: operatorUser.operatorId };
     }
     // Admins and passengers can see all buses
     
@@ -77,13 +78,38 @@ router.post('/', authenticateToken, async (req: Request, res: Response) => {
       });
     }
 
-    // Find the operator profile for the logged-in user
-    const operator = await prisma.operator.findUnique({
+    // Find operator ID for this user (either direct operator or operator user)
+    let operatorId: string | null = null;
+
+    // First check if user is a direct operator
+    const directOperator = await prisma.operator.findUnique({
       where: { userId }
     });
 
+    if (directOperator) {
+      operatorId = directOperator.id;
+    } else {
+      // Check if user is an operator user
+      const operatorUser = await prisma.operatorUser.findUnique({
+        where: { userId }
+      });
+      
+      if (operatorUser) {
+        operatorId = operatorUser.operatorId;
+      }
+    }
+
+    if (!operatorId) {
+      return res.status(404).json({ error: 'No operator association found for this user' });
+    }
+
+    // Verify operator exists and is approved
+    const operator = await prisma.operator.findUnique({
+      where: { id: operatorId }
+    });
+
     if (!operator) {
-      return res.status(404).json({ error: 'Operator profile not found for this user' });
+      return res.status(404).json({ error: 'Operator not found' });
     }
 
     if (!operator.approved) {
@@ -108,7 +134,7 @@ router.post('/', authenticateToken, async (req: Request, res: Response) => {
 
     const bus = await prisma.bus.create({
       data: {
-        operatorId: operator.id, // Use the logged-in operator's ID
+        operatorId, // Use the operator ID from operatorUser
         plateNumber,
         model,
         capacity: parseInt(capacity.toString()), // Ensure integer

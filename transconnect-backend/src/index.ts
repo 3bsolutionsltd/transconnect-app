@@ -27,6 +27,7 @@ import qrRoutes from './routes/qr';
 import notificationRoutes from './routes/notifications';
 import operatorPaymentRoutes from './routes/operator-payments';
 import operatorManagementRoutes from './routes/operator-management';
+import adminOperatorUserRoutes from './routes/admin-operator-users';
 import databaseAdminRoutes from './routes/admin/database';
 
 dotenv.config();
@@ -86,6 +87,7 @@ app.use('/api/rides', rideRoutes);
 app.use('/api/notifications', notificationRoutes);
 app.use('/api/operator-payments', operatorPaymentRoutes);
 app.use('/api/operator-management', operatorManagementRoutes);
+app.use('/api/admin/operator-users', adminOperatorUserRoutes);
 app.use('/api/admin/database', databaseAdminRoutes);
 
 // Health check endpoint
