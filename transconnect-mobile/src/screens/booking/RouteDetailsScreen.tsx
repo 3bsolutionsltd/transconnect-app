@@ -1,0 +1,408 @@
+import React from 'react';
+import {
+  View,
+  Text,
+  TouchableOpacity,
+  StyleSheet,
+  ScrollView,
+} from 'react-native';
+import { SafeAreaView } from 'react-native-safe-area-context';
+import { Ionicons } from '@expo/vector-icons';
+import { format } from 'date-fns';
+
+export default function RouteDetailsScreen({ route, navigation }: any) {
+  const { route: routeData, passengers, searchParams } = route.params;
+
+  const handleBookNow = () => {
+    navigation.navigate('SeatSelection', {
+      route: routeData,
+      passengers,
+      searchParams,
+    });
+  };
+
+  const totalPrice = routeData.price * passengers;
+
+  return (
+    <SafeAreaView style={styles.container}>
+      <ScrollView contentContainerStyle={styles.scrollContainer}>
+        <View style={styles.headerCard}>
+          <View style={styles.operatorHeader}>
+            <Text style={styles.operatorName}>{routeData.operatorName}</Text>
+            <View style={styles.busTypeContainer}>
+              <Text style={styles.busType}>{routeData.busType}</Text>
+            </View>
+          </View>
+
+          <View style={styles.routeInfo}>
+            <Text style={styles.routeText}>
+              {searchParams.from} → {searchParams.to}
+            </Text>
+            <Text style={styles.dateText}>
+              {format(new Date(searchParams.date), 'EEEE, MMM dd, yyyy')}
+            </Text>
+          </View>
+        </View>
+
+        <View style={styles.journeyCard}>
+          <Text style={styles.sectionTitle}>Journey Details</Text>
+          
+          <View style={styles.journeyInfo}>
+            <View style={styles.journeyPoint}>
+              <View style={styles.timePoint}>
+                <Ionicons name="radio-button-on" size={16} color="#10B981" />
+                <View style={styles.timeInfo}>
+                  <Text style={styles.journeyTime}>{routeData.departureTime}</Text>
+                  <Text style={styles.journeyLocation}>{searchParams.from}</Text>
+                </View>
+              </View>
+            </View>
+
+            <View style={styles.journeyLine}>
+              <View style={styles.verticalLine} />
+              <Text style={styles.durationText}>{routeData.duration}</Text>
+            </View>
+
+            <View style={styles.journeyPoint}>
+              <View style={styles.timePoint}>
+                <Ionicons name="location" size={16} color="#EF4444" />
+                <View style={styles.timeInfo}>
+                  <Text style={styles.journeyTime}>{routeData.arrivalTime}</Text>
+                  <Text style={styles.journeyLocation}>{searchParams.to}</Text>
+                </View>
+              </View>
+            </View>
+          </View>
+        </View>
+
+        <View style={styles.detailsCard}>
+          <Text style={styles.sectionTitle}>Bus Information</Text>
+          
+          <View style={styles.detailRow}>
+            <Ionicons name="bus-outline" size={20} color="#6B7280" />
+            <Text style={styles.detailLabel}>Bus Type</Text>
+            <Text style={styles.detailValue}>{routeData.busType}</Text>
+          </View>
+
+          <View style={styles.detailRow}>
+            <Ionicons name="people-outline" size={20} color="#6B7280" />
+            <Text style={styles.detailLabel}>Available Seats</Text>
+            <Text style={styles.detailValue}>{routeData.availableSeats} seats</Text>
+          </View>
+
+          <View style={styles.detailRow}>
+            <Ionicons name="shield-checkmark-outline" size={20} color="#6B7280" />
+            <Text style={styles.detailLabel}>Safety Rating</Text>
+            <View style={styles.ratingContainer}>
+              {[1, 2, 3, 4, 5].map((star) => (
+                <Ionicons
+                  key={star}
+                  name="star"
+                  size={16}
+                  color={star <= 4 ? "#F59E0B" : "#D1D5DB"}
+                />
+              ))}
+            </View>
+          </View>
+        </View>
+
+        <View style={styles.facilitiesCard}>
+          <Text style={styles.sectionTitle}>Facilities</Text>
+          
+          <View style={styles.facilitiesGrid}>
+            <View style={styles.facilityItem}>
+              <Ionicons name="wifi-outline" size={24} color="#10B981" />
+              <Text style={styles.facilityText}>Free WiFi</Text>
+            </View>
+
+            <View style={styles.facilityItem}>
+              <Ionicons name="snow-outline" size={24} color="#3B82F6" />
+              <Text style={styles.facilityText}>AC</Text>
+            </View>
+
+            <View style={styles.facilityItem}>
+              <Ionicons name="tv-outline" size={24} color="#8B5CF6" />
+              <Text style={styles.facilityText}>Entertainment</Text>
+            </View>
+
+            <View style={styles.facilityItem}>
+              <Ionicons name="cafe-outline" size={24} color="#F59E0B" />
+              <Text style={styles.facilityText}>Refreshments</Text>
+            </View>
+          </View>
+        </View>
+
+        <View style={styles.pricingCard}>
+          <Text style={styles.sectionTitle}>Pricing</Text>
+          
+          <View style={styles.priceBreakdown}>
+            <View style={styles.priceRow}>
+              <Text style={styles.priceLabel}>
+                Base fare × {passengers} passenger{passengers > 1 ? 's' : ''}
+              </Text>
+              <Text style={styles.priceValue}>UGX {totalPrice.toLocaleString()}</Text>
+            </View>
+
+            <View style={styles.priceRow}>
+              <Text style={styles.priceLabel}>Service fee</Text>
+              <Text style={styles.priceValue}>UGX 0</Text>
+            </View>
+
+            <View style={styles.divider} />
+
+            <View style={styles.totalRow}>
+              <Text style={styles.totalLabel}>Total Amount</Text>
+              <Text style={styles.totalValue}>UGX {totalPrice.toLocaleString()}</Text>
+            </View>
+          </View>
+        </View>
+      </ScrollView>
+
+      <View style={styles.bottomBar}>
+        <View style={styles.priceInfo}>
+          <Text style={styles.bottomPrice}>UGX {totalPrice.toLocaleString()}</Text>
+          <Text style={styles.bottomPriceSubtext}>for {passengers} passenger{passengers > 1 ? 's' : ''}</Text>
+        </View>
+        
+        <TouchableOpacity style={styles.bookButton} onPress={handleBookNow}>
+          <Text style={styles.bookButtonText}>Select Seats</Text>
+        </TouchableOpacity>
+      </View>
+    </SafeAreaView>
+  );
+}
+
+const styles = StyleSheet.create({
+  container: {
+    flex: 1,
+    backgroundColor: '#F3F4F6',
+  },
+  scrollContainer: {
+    flexGrow: 1,
+    padding: 16,
+    paddingBottom: 100,
+  },
+  headerCard: {
+    backgroundColor: '#FFFFFF',
+    borderRadius: 12,
+    padding: 20,
+    marginBottom: 16,
+  },
+  operatorHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginBottom: 12,
+  },
+  operatorName: {
+    fontSize: 20,
+    fontWeight: '700',
+    color: '#1F2937',
+  },
+  busTypeContainer: {
+    backgroundColor: '#EBF8FF',
+    paddingHorizontal: 12,
+    paddingVertical: 6,
+    borderRadius: 20,
+  },
+  busType: {
+    fontSize: 12,
+    color: '#3B82F6',
+    fontWeight: '600',
+  },
+  routeInfo: {
+    marginTop: 8,
+  },
+  routeText: {
+    fontSize: 18,
+    fontWeight: '600',
+    color: '#1F2937',
+  },
+  dateText: {
+    fontSize: 14,
+    color: '#6B7280',
+    marginTop: 4,
+  },
+  journeyCard: {
+    backgroundColor: '#FFFFFF',
+    borderRadius: 12,
+    padding: 20,
+    marginBottom: 16,
+  },
+  sectionTitle: {
+    fontSize: 18,
+    fontWeight: '600',
+    color: '#1F2937',
+    marginBottom: 16,
+  },
+  journeyInfo: {
+    paddingLeft: 8,
+  },
+  journeyPoint: {
+    flexDirection: 'row',
+    alignItems: 'center',
+  },
+  timePoint: {
+    flexDirection: 'row',
+    alignItems: 'center',
+  },
+  timeInfo: {
+    marginLeft: 12,
+  },
+  journeyTime: {
+    fontSize: 16,
+    fontWeight: '600',
+    color: '#1F2937',
+  },
+  journeyLocation: {
+    fontSize: 14,
+    color: '#6B7280',
+    marginTop: 2,
+  },
+  journeyLine: {
+    alignItems: 'center',
+    marginVertical: 12,
+    position: 'relative',
+  },
+  verticalLine: {
+    width: 2,
+    height: 40,
+    backgroundColor: '#D1D5DB',
+    marginLeft: 8,
+  },
+  durationText: {
+    position: 'absolute',
+    left: 30,
+    fontSize: 12,
+    color: '#6B7280',
+    backgroundColor: '#FFFFFF',
+    paddingHorizontal: 8,
+  },
+  detailsCard: {
+    backgroundColor: '#FFFFFF',
+    borderRadius: 12,
+    padding: 20,
+    marginBottom: 16,
+  },
+  detailRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginBottom: 16,
+  },
+  detailLabel: {
+    flex: 1,
+    fontSize: 16,
+    color: '#4B5563',
+    marginLeft: 12,
+  },
+  detailValue: {
+    fontSize: 16,
+    fontWeight: '600',
+    color: '#1F2937',
+  },
+  ratingContainer: {
+    flexDirection: 'row',
+  },
+  facilitiesCard: {
+    backgroundColor: '#FFFFFF',
+    borderRadius: 12,
+    padding: 20,
+    marginBottom: 16,
+  },
+  facilitiesGrid: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    justifyContent: 'space-between',
+  },
+  facilityItem: {
+    alignItems: 'center',
+    width: '48%',
+    marginBottom: 16,
+  },
+  facilityText: {
+    fontSize: 14,
+    color: '#4B5563',
+    marginTop: 8,
+    textAlign: 'center',
+  },
+  pricingCard: {
+    backgroundColor: '#FFFFFF',
+    borderRadius: 12,
+    padding: 20,
+    marginBottom: 16,
+  },
+  priceBreakdown: {
+    marginTop: 8,
+  },
+  priceRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginBottom: 12,
+  },
+  priceLabel: {
+    fontSize: 16,
+    color: '#4B5563',
+  },
+  priceValue: {
+    fontSize: 16,
+    fontWeight: '600',
+    color: '#1F2937',
+  },
+  divider: {
+    height: 1,
+    backgroundColor: '#E5E7EB',
+    marginVertical: 12,
+  },
+  totalRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+  },
+  totalLabel: {
+    fontSize: 18,
+    fontWeight: '600',
+    color: '#1F2937',
+  },
+  totalValue: {
+    fontSize: 20,
+    fontWeight: '700',
+    color: '#059669',
+  },
+  bottomBar: {
+    position: 'absolute',
+    bottom: 0,
+    left: 0,
+    right: 0,
+    backgroundColor: '#FFFFFF',
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingHorizontal: 20,
+    paddingVertical: 16,
+    borderTopWidth: 1,
+    borderTopColor: '#E5E7EB',
+  },
+  priceInfo: {
+    flex: 1,
+  },
+  bottomPrice: {
+    fontSize: 20,
+    fontWeight: '700',
+    color: '#1F2937',
+  },
+  bottomPriceSubtext: {
+    fontSize: 12,
+    color: '#6B7280',
+  },
+  bookButton: {
+    backgroundColor: '#3B82F6',
+    paddingHorizontal: 24,
+    paddingVertical: 14,
+    borderRadius: 12,
+  },
+  bookButtonText: {
+    color: '#FFFFFF',
+    fontSize: 16,
+    fontWeight: '600',
+  },
+});

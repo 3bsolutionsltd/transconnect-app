@@ -1,0 +1,44 @@
+{
+  "expo": {
+    "name": "TransConnect",
+    "slug": "transconnect-mobile",
+    "version": "1.0.0",
+    "orientation": "portrait",
+    "userInterfaceStyle": "automatic",
+    "splash": {
+      "resizeMode": "contain",
+      "backgroundColor": "#3B82F6"
+    },
+    "assetBundlePatterns": [
+      "**/*"
+    ],
+    "ios": {
+      "supportsTablet": false,
+      "bundleIdentifier": "com.transconnect.mobile",
+      "buildNumber": "1"
+    },
+    "android": {
+      "package": "com.transconnect.mobile",
+      "versionCode": 1,
+      "permissions": [
+        "CAMERA",
+        "ACCESS_FINE_LOCATION",
+        "ACCESS_COARSE_LOCATION",
+        "RECEIVE_BOOT_COMPLETED",
+        "WAKE_LOCK"
+      ]
+    },
+    "web": {},
+    "plugins": [
+      "expo-camera",
+      "expo-notifications",
+      "expo-location",
+      "expo-secure-store"
+    ],
+    "extra": {
+      "eas": {
+        "projectId": "transconnect-mobile"
+      }
+    }
+  }
+}
