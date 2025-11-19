@@ -89,12 +89,10 @@ router.get('/', async (req: Request, res: Response) => {
             id: true,
             companyName: true,
             approved: true,
-            contactPerson: true,
             phone: true,
             email: true
           }
-        },
-        bus: {
+        },s: {
           select: {
             id: true,
             plateNumber: true,
@@ -132,7 +130,6 @@ router.get('/', async (req: Request, res: Response) => {
         operatorInfo: {
           id: route.operator.id,
           name: route.operator.companyName,
-          contact: route.operator.contactPerson,
           phone: route.operator.phone,
           email: route.operator.email
         },
@@ -283,7 +280,6 @@ router.get('/smart-search/:origin/:destination', async (req: Request, res: Respo
           select: {
             id: true,
             companyName: true,
-            contactPerson: true,
             phone: true,
             email: true,
             approved: true
@@ -324,7 +320,7 @@ router.get('/smart-search/:origin/:destination', async (req: Request, res: Respo
         operatorInfo: {
           id: route.operator.id,
           name: route.operator.companyName,
-          contact: route.operator.contactPerson,
+          
           phone: route.operator.phone,
           email: route.operator.email
         },
@@ -392,7 +388,7 @@ router.get('/search/:origin/:destination', async (req: Request, res: Response) =
           select: {
             id: true,
             companyName: true,
-            contactPerson: true,
+
             phone: true,
             email: true,
             approved: true
@@ -436,7 +432,7 @@ router.get('/search/:origin/:destination', async (req: Request, res: Response) =
         operatorInfo: {
           id: route.operator.id,
           name: route.operator.companyName,
-          contact: route.operator.contactPerson,
+          
           phone: route.operator.phone,
           email: route.operator.email
         },
@@ -517,7 +513,7 @@ router.get('/my-routes', authenticateToken, requireOperatorAccess, async (req: R
           select: {
             id: true,
             companyName: true,
-            contactPerson: true,
+
             phone: true
           }
         },
@@ -558,7 +554,7 @@ router.get('/my-routes', authenticateToken, requireOperatorAccess, async (req: R
         operatorInfo: {
           id: route.operator.id,
           name: route.operator.companyName,
-          contact: route.operator.contactPerson,
+          
           phone: route.operator.phone
         },
         canEdit: ['OWNER', 'MANAGER', 'TICKETER'].includes(operatorRole || ''),
@@ -679,7 +675,7 @@ router.post('/', authenticateToken, requireOperatorAccess, requireOperatorPermis
           select: {
             id: true,
             companyName: true,
-            contactPerson: true,
+
             phone: true
           }
         },
@@ -708,7 +704,7 @@ router.post('/', authenticateToken, requireOperatorAccess, requireOperatorPermis
       operatorInfo: {
         id: route.operator.id,
         name: route.operator.companyName,
-        contact: route.operator.contactPerson,
+        
         phone: route.operator.phone
       },
       createdByRole: operatorRole || userRole,
