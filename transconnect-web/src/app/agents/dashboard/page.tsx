@@ -47,7 +47,7 @@ export default function AgentDashboardPage() {
       }
       
       try {
-        const resp = await agentApi.getDashboard(agentId, token);
+        const resp = await agentApi.getDashboard(agentId, token || undefined);
         setData(resp);
       } catch (error) {
         console.error('Failed to load dashboard data:', error);
