@@ -102,7 +102,7 @@ export default function OperatorListPage() {
       }
 
       try {
-        const response = await agentOperatorAPI.getAgentOperators(agentId, token);
+        const response = await agentOperatorAPI.getAgentOperators(agentId, token || undefined);
         setOperators(response.operators || []);
       } catch (err: any) {
         setError(err.message);

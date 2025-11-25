@@ -109,7 +109,7 @@ export default function RegisterOperatorPage() {
         return;
       }
 
-      const result = await agentOperatorAPI.registerOperator(agentId, formData, token);
+      const result = await agentOperatorAPI.registerOperator(agentId, formData, token || undefined);
       
       if (result.success) {
         setSuccess(true);

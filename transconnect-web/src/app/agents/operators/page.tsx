@@ -95,7 +95,7 @@ export default function AgentOperatorsPage() {
       }
 
       try {
-        const response = await agentOperatorAPI.getOperatorDashboard(agentId, token);
+        const response = await agentOperatorAPI.getOperatorDashboard(agentId, token || undefined);
         setDashboardData(response.dashboard);
       } catch (err: any) {
         setError(err.message);
