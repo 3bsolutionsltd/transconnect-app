@@ -18,6 +18,8 @@ interface Operator {
   license: string;
   approved: boolean;
   userId: string;
+  agentId?: string;
+  managedByAgent: boolean;
   createdAt: string;
   updatedAt: string;
   user: {
@@ -26,6 +28,14 @@ interface Operator {
     lastName: string;
     email: string;
     phone: string;
+  };
+  managingAgent?: {
+    id: string;
+    name: string;
+    phone: string;
+    email: string;
+    referralCode: string;
+    status: string;
   };
   buses: Bus[];
   routes: any[];
@@ -49,6 +59,7 @@ const OperatorManagement: React.FC = () => {
   const [loading, setLoading] = useState(true);
   const [searchTerm, setSearchTerm] = useState('');
   const [filterStatus, setFilterStatus] = useState('all');
+  const [managementFilter, setManagementFilter] = useState('all');
   const [showAddOperatorModal, setShowAddOperatorModal] = useState(false);
   const [showAddBusModal, setShowAddBusModal] = useState(false);
   const [editingOperator, setEditingOperator] = useState<Operator | null>(null);
@@ -76,7 +87,7 @@ const OperatorManagement: React.FC = () => {
     active: true
   });
 
-  const API_BASE_URL = process.env.REACT_APP_API_URL || 'https://transconnect-app-44ie.onrender.com/api';
+  const API_BASE_URL = process.env.REACT_APP_API_URL || 'http://localhost:5000/api';
 
   const fetchOperators = useCallback(async () => {
     try {
@@ -90,7 +101,9 @@ const OperatorManagement: React.FC = () => {
 
       if (response.ok) {
         const data = await response.json();
-        setOperators(data);
+        // Handle both old array format and new object format
+        const operatorsList = Array.isArray(data) ? data : (data.operators || []);
+        setOperators(operatorsList);
       }
     } catch (error) {
       console.error('Error fetching operators:', error);
@@ -249,6 +262,58 @@ const OperatorManagement: React.FC = () => {
     }
   };
 
+  // Agent-specific approval functions
+  const approveAgentOperator = async (operatorId: string) => {
+    try {
+      const token = localStorage.getItem('admin_token');
+      const response = await fetch(`${API_BASE_URL}/operators/${operatorId}/approve`, {
+        method: 'PUT',
+        headers: {
+          'Authorization': `Bearer ${token}`,
+          'Content-Type': 'application/json'
+        }
+      });
+
+      if (response.ok) {
+        await fetchOperators();
+        alert('Operator approved successfully!');
+      } else {
+        const error = await response.json();
+        alert(error.error || 'Failed to approve operator');
+      }
+    } catch (error) {
+      console.error('Error approving operator:', error);
+      alert('Failed to approve operator');
+    }
+  };
+
+  const rejectAgentOperator = async (operatorId: string) => {
+    const reason = prompt('Please provide a reason for rejection (optional):');
+    
+    try {
+      const token = localStorage.getItem('admin_token');
+      const response = await fetch(`${API_BASE_URL}/operators/${operatorId}/reject`, {
+        method: 'PUT',
+        headers: {
+          'Authorization': `Bearer ${token}`,
+          'Content-Type': 'application/json'
+        },
+        body: JSON.stringify({ reason })
+      });
+
+      if (response.ok) {
+        await fetchOperators();
+        alert('Operator rejected');
+      } else {
+        const error = await response.json();
+        alert(error.error || 'Failed to reject operator');
+      }
+    } catch (error) {
+      console.error('Error rejecting operator:', error);
+      alert('Failed to reject operator');
+    }
+  };
+
   const deleteBus = async (busId: string) => {
     // eslint-disable-next-line no-restricted-globals
     if (!confirm('Are you sure you want to delete this bus? This action cannot be undone.')) {
@@ -335,14 +400,23 @@ const OperatorManagement: React.FC = () => {
     const matchesSearch = 
       operator.companyName.toLowerCase().includes(searchTerm.toLowerCase()) ||
       operator.license.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      operator.user.email.toLowerCase().includes(searchTerm.toLowerCase());
+      operator.user.email.toLowerCase().includes(searchTerm.toLowerCase()) ||
+      operator.user.firstName.toLowerCase().includes(searchTerm.toLowerCase()) ||
+      operator.user.lastName.toLowerCase().includes(searchTerm.toLowerCase()) ||
+      (operator.managingAgent?.name?.toLowerCase().includes(searchTerm.toLowerCase()) || false);
     
     const matchesFilter = 
       filterStatus === 'all' ||
       (filterStatus === 'approved' && operator.approved) ||
       (filterStatus === 'pending' && !operator.approved);
     
-    return matchesSearch && matchesFilter;
+    const matchesManagement = 
+      managementFilter === 'all' ||
+      (managementFilter === 'admin' && !operator.managedByAgent) ||
+      (managementFilter === 'agent' && operator.managedByAgent) ||
+      (managementFilter === 'pending' && operator.managedByAgent && !operator.approved);
+    
+    return matchesSearch && matchesFilter && matchesManagement;
   });
 
   const filteredBuses = buses.filter(bus => {
@@ -360,10 +434,22 @@ const OperatorManagement: React.FC = () => {
     const total = operators.length;
     const approved = operators.filter(op => op.approved).length;
     const pending = total - approved;
+    const adminManaged = operators.filter(op => !op.managedByAgent).length;
+    const agentManaged = operators.filter(op => op.managedByAgent).length;
+    const agentPending = operators.filter(op => op.managedByAgent && !op.approved).length;
     const totalBuses = buses.length;
     const activeBuses = buses.filter(bus => bus.active).length;
 
-    return { total, approved, pending, totalBuses, activeBuses };
+    return { 
+      total, 
+      approved, 
+      pending, 
+      adminManaged, 
+      agentManaged, 
+      agentPending, 
+      totalBuses, 
+      activeBuses 
+    };
   };
 
   const stats = getOperatorStats();
@@ -420,7 +506,7 @@ const OperatorManagement: React.FC = () => {
       </div>
 
       {/* Statistics */}
-      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-6">
+      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-6 gap-4">
         <div className="bg-white p-6 rounded-lg shadow border">
           <div className="flex items-center justify-between">
             <div>
@@ -480,6 +566,18 @@ const OperatorManagement: React.FC = () => {
             </div>
           </div>
         </div>
+
+        <div className="bg-white p-6 rounded-lg shadow border">
+          <div className="flex items-center justify-between">
+            <div>
+              <p className="text-sm font-medium text-gray-600">Agent-Managed</p>
+              <p className="text-3xl font-bold text-indigo-600">{stats.agentManaged}</p>
+            </div>
+            <div className="h-12 w-12 bg-indigo-100 rounded-lg flex items-center justify-center">
+              <Users className="h-6 w-6 text-indigo-600" />
+            </div>
+          </div>
+        </div>
       </div>
 
       {/* Tabs */}
@@ -525,15 +623,28 @@ const OperatorManagement: React.FC = () => {
           </div>
           
           {activeTab === 'operators' && (
-            <select
-              value={filterStatus}
-              onChange={(e) => setFilterStatus(e.target.value)}
-              className="px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-            >
-              <option value="all">All Status</option>
-              <option value="approved">Approved</option>
-              <option value="pending">Pending Approval</option>
-            </select>
+            <>
+              <select
+                value={filterStatus}
+                onChange={(e) => setFilterStatus(e.target.value)}
+                className="px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+              >
+                <option value="all">All Status</option>
+                <option value="approved">Approved</option>
+                <option value="pending">Pending Approval</option>
+              </select>
+              
+              <select
+                value={managementFilter}
+                onChange={(e) => setManagementFilter(e.target.value)}
+                className="px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+              >
+                <option value="all">All Management</option>
+                <option value="admin">Admin-Managed</option>
+                <option value="agent">Agent-Managed</option>
+                <option value="pending">Agent Pending</option>
+              </select>
+            </>
           )}
 
           {activeTab === 'buses' && (
@@ -569,6 +680,9 @@ const OperatorManagement: React.FC = () => {
                   </th>
                   <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
                     License
+                  </th>
+                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                    Management
                   </th>
                   <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
                     Status
@@ -607,26 +721,68 @@ const OperatorManagement: React.FC = () => {
                       </div>
                     </td>
                     <td className="px-6 py-4">
-                      <button
-                        onClick={() => toggleOperatorApproval(operator.id, operator.approved)}
-                        className={`inline-flex items-center px-3 py-1 rounded-full text-xs font-medium border transition-colors ${
-                          operator.approved
-                            ? 'bg-green-50 text-green-700 border-green-200 hover:bg-green-100'
-                            : 'bg-yellow-50 text-yellow-700 border-yellow-200 hover:bg-yellow-100'
-                        }`}
-                      >
-                        {operator.approved ? (
-                          <>
+                      {operator.managedByAgent ? (
+                        <div className="text-sm">
+                          <div className="flex items-center text-blue-600 font-medium mb-1">
+                            <Users className="h-4 w-4 mr-1" />
+                            Agent-Managed
+                          </div>
+                          <div className="text-gray-600">
+                            <strong>{operator.managingAgent?.name}</strong>
+                          </div>
+                          <div className="text-xs text-gray-500">
+                            {operator.managingAgent?.phone}
+                          </div>
+                          <div className="text-xs text-gray-500">
+                            Code: {operator.managingAgent?.referralCode}
+                          </div>
+                        </div>
+                      ) : (
+                        <div className="flex items-center text-green-600 font-medium">
+                          <Building2 className="h-4 w-4 mr-1" />
+                          TransConnect Direct
+                        </div>
+                      )}
+                    </td>
+                    <td className="px-6 py-4">
+                      {operator.managedByAgent && !operator.approved ? (
+                        <div className="flex flex-col space-y-2">
+                          <button
+                            onClick={() => approveAgentOperator(operator.id)}
+                            className="inline-flex items-center px-3 py-1 rounded-md text-xs font-medium bg-green-600 text-white hover:bg-green-700 transition-colors"
+                          >
                             <CheckCircle className="h-3 w-3 mr-1" />
-                            Approved
-                          </>
-                        ) : (
-                          <>
-                            <Clock className="h-3 w-3 mr-1" />
-                            Pending
-                          </>
-                        )}
-                      </button>
+                            Approve
+                          </button>
+                          <button
+                            onClick={() => rejectAgentOperator(operator.id)}
+                            className="inline-flex items-center px-3 py-1 rounded-md text-xs font-medium bg-red-600 text-white hover:bg-red-700 transition-colors"
+                          >
+                            ✕ Reject
+                          </button>
+                        </div>
+                      ) : (
+                        <button
+                          onClick={() => toggleOperatorApproval(operator.id, operator.approved)}
+                          className={`inline-flex items-center px-3 py-1 rounded-full text-xs font-medium border transition-colors ${
+                            operator.approved
+                              ? 'bg-green-50 text-green-700 border-green-200 hover:bg-green-100'
+                              : 'bg-yellow-50 text-yellow-700 border-yellow-200 hover:bg-yellow-100'
+                          }`}
+                        >
+                          {operator.approved ? (
+                            <>
+                              <CheckCircle className="h-3 w-3 mr-1" />
+                              Approved
+                            </>
+                          ) : (
+                            <>
+                              <Clock className="h-3 w-3 mr-1" />
+                              Pending
+                            </>
+                          )}
+                        </button>
+                      )}
                     </td>
                     <td className="px-6 py-4">
                       <div className="text-sm text-gray-900">

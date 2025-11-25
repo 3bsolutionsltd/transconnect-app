@@ -15,7 +15,8 @@ import {
   DollarSign,
   TrendingUp,
   Building2,
-  QrCode
+  QrCode,
+  UserCheck
 } from 'lucide-react';
 import { AuthProvider, useAuth } from './contexts/AuthContext';
 import LoginPage from './components/LoginPage';
@@ -23,6 +24,7 @@ import RouteManagement from './components/RouteManagement';
 import UserManagement from './components/UserManagement';
 import OperatorManagement from './components/OperatorManagement';
 import QRScannerPage from './components/QRScannerPage';
+import AgentManagement from './components/AgentManagement';
 
 // Dashboard Component
 const Dashboard = () => {
@@ -41,7 +43,7 @@ const Dashboard = () => {
   const [routePerformance, setRoutePerformance] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
 
-  const API_BASE_URL = process.env.REACT_APP_API_URL || 'https://transconnect-app-44ie.onrender.com/api';
+  const API_BASE_URL = process.env.REACT_APP_API_URL || 'http://localhost:5000/api';
 
   const loadDashboardData = useCallback(async () => {
     try {
@@ -62,9 +64,14 @@ const Dashboard = () => {
         })
       ]);
 
-      const routes = routesRes.ok ? await routesRes.json() : [];
-      const users = usersRes.ok ? await usersRes.json() : [];
-      const operators = operatorsRes.ok ? await operatorsRes.json() : [];
+      const routesData = routesRes.ok ? await routesRes.json() : { routes: [] };
+      const usersData = usersRes.ok ? await usersRes.json() : { users: [] };
+      const operatorsData = operatorsRes.ok ? await operatorsRes.json() : [];
+
+      // Extract arrays from paginated responses
+      const routes = Array.isArray(routesData) ? routesData : (routesData.routes || []);
+      const users = Array.isArray(usersData) ? usersData : (usersData.users || []);
+      const operators = Array.isArray(operatorsData) ? operatorsData : [];
 
       console.log('📊 API Data received:', {
         users: users.length,
@@ -492,6 +499,7 @@ const AuthenticatedApp = () => {
     { name: 'Dashboard', href: '/', icon: Home },
     { name: 'Routes', href: '/routes', icon: MapPin },
     { name: 'Operators', href: '/operators', icon: Building2 },
+    { name: 'Agents', href: '/agents', icon: UserCheck },
     { name: 'QR Scanner', href: '/qr-scanner', icon: QrCode },
     { name: 'Analytics', href: '/analytics', icon: BarChart3 },
     { name: 'Users', href: '/users', icon: Users },
@@ -605,6 +613,7 @@ const AuthenticatedApp = () => {
               <Route path="/" element={<Dashboard />} />
               <Route path="/routes" element={<RouteManagement />} />
               <Route path="/operators" element={<OperatorManagement />} />
+              <Route path="/agents" element={<AgentManagement />} />
               <Route path="/qr-scanner" element={<QRScannerPage />} />
               <Route path="/analytics" element={<Analytics />} />
               <Route path="/users" element={<UserManagement />} />

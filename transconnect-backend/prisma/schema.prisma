@@ -51,46 +51,50 @@ model User {
   updatedAt DateTime @updatedAt
 
   // Relations
-  bookings     Booking[]
-  rides        Ride[]
-  payments     Payment[]
-  operator     Operator?
-  operatorUser OperatorUser?
-  notifications Notification[]
+  bookings                Booking[]
+  rides                   Ride[]
+  payments                Payment[]
+  operator                Operator?
+  operatorUser            OperatorUser?
+  notifications           Notification[]
   notificationPreferences UserNotificationPreference?
-  deviceTokens DeviceToken[]
+  deviceTokens            DeviceToken[]
 
   @@map("users")
 }
 
 model Operator {
-  id          String   @id @default(cuid())
-  companyName String
-  license     String   @unique
-  approved    Boolean  @default(false)
-  userId      String   @unique
-  createdAt   DateTime @default(now())
-  updatedAt   DateTime @updatedAt
+  id             String   @id @default(cuid())
+  companyName    String
+  license        String   @unique
+  approved       Boolean  @default(false)
+  userId         String   @unique
+  agentId        String?  // NEW: Managing agent
+  managedByAgent Boolean  @default(false) // NEW: Agent vs Admin managed
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
 
   // Relations
-  user   User    @relation(fields: [userId], references: [id], onDelete: Cascade)
-  buses  Bus[]
-  routes Route[]
-  operatorUsers OperatorUser[]
+  user             User           @relation(fields: [userId], references: [id], onDelete: Cascade)
+  managingAgent    Agent?         @relation("ManagedOperators", fields: [agentId], references: [id])
+  buses            Bus[]
+  routes           Route[]
+  operatorUsers    OperatorUser[]
+  agentOperatorRel AgentOperator[]
 
   @@map("operators")
 }
 
 model Bus {
-  id           String   @id @default(cuid())
-  plateNumber  String   @unique
-  model        String
-  capacity     Int
-  amenities    String? // JSON string: AC, WiFi, etc.
-  operatorId   String
-  active       Boolean  @default(true)
-  createdAt    DateTime @default(now())
-  updatedAt    DateTime @updatedAt
+  id          String   @id @default(cuid())
+  plateNumber String   @unique
+  model       String
+  capacity    Int
+  amenities   String? // JSON string: AC, WiFi, etc.
+  operatorId  String
+  active      Boolean  @default(true)
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
 
   // Relations
   operator Operator @relation(fields: [operatorId], references: [id], onDelete: Cascade)
@@ -100,23 +104,23 @@ model Bus {
 }
 
 model Route {
-  id          String   @id @default(cuid())
-  origin      String
-  destination String
-  via         String?  // Optional intermediate stops/towns
-  distance    Float // in kilometers
-  duration    Int   // in minutes
-  price       Float
+  id            String   @id @default(cuid())
+  origin        String
+  destination   String
+  via           String? // Optional intermediate stops/towns
+  distance      Float // in kilometers
+  duration      Int // in minutes
+  price         Float
   departureTime String // Time format: "HH:MM"
-  operatorId  String
-  busId       String
-  active      Boolean  @default(true)
-  createdAt   DateTime @default(now())
-  updatedAt   DateTime @updatedAt
+  operatorId    String
+  busId         String
+  active        Boolean  @default(true)
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
 
   // Relations
-  operator Operator  @relation(fields: [operatorId], references: [id], onDelete: Cascade)
-  bus      Bus       @relation(fields: [busId], references: [id], onDelete: Cascade)
+  operator Operator    @relation(fields: [operatorId], references: [id], onDelete: Cascade)
+  bus      Bus         @relation(fields: [busId], references: [id], onDelete: Cascade)
   bookings Booking[]
   stops    RouteStop[]
 
@@ -124,41 +128,41 @@ model Route {
 }
 
 model RouteStop {
-  id            String   @id @default(cuid())
-  routeId       String
-  stopName      String   // Name of the town/stop
+  id                 String   @id @default(cuid())
+  routeId            String
+  stopName           String // Name of the town/stop
   distanceFromOrigin Float // Distance in km from route origin
   priceFromOrigin    Float // Price in UGX from route origin  
-  order         Int      // Order of stop along the route (1, 2, 3...)
-  estimatedTime String   // Estimated arrival time "HH:MM"
-  createdAt     DateTime @default(now())
-  updatedAt     DateTime @updatedAt
+  order              Int // Order of stop along the route (1, 2, 3...)
+  estimatedTime      String // Estimated arrival time "HH:MM"
+  createdAt          DateTime @default(now())
+  updatedAt          DateTime @updatedAt
 
   // Relations
   route Route @relation(fields: [routeId], references: [id], onDelete: Cascade)
-  
+
   @@unique([routeId, order])
   @@map("route_stops")
 }
 
 model Booking {
-  id           String        @id @default(cuid())
-  userId       String
-  routeId      String
-  seatNumber   String
-  travelDate   DateTime
-  status       BookingStatus @default(PENDING)
-  qrCode       String
-  totalAmount  Float
-  boardingStop String?       // Origin or intermediate stop name
-  alightingStop String?      // Destination or intermediate stop name  
-  actualPrice  Float?        // Price based on distance between stops
-  createdAt    DateTime      @default(now())
-  updatedAt    DateTime      @updatedAt
+  id            String        @id @default(cuid())
+  userId        String
+  routeId       String
+  seatNumber    String
+  travelDate    DateTime
+  status        BookingStatus @default(PENDING)
+  qrCode        String
+  totalAmount   Float
+  boardingStop  String? // Origin or intermediate stop name
+  alightingStop String? // Destination or intermediate stop name  
+  actualPrice   Float? // Price based on distance between stops
+  createdAt     DateTime      @default(now())
+  updatedAt     DateTime      @updatedAt
 
   // Relations
-  user         User           @relation(fields: [userId], references: [id], onDelete: Cascade)
-  route        Route          @relation(fields: [routeId], references: [id], onDelete: Cascade)
+  user         User          @relation(fields: [userId], references: [id], onDelete: Cascade)
+  route        Route         @relation(fields: [routeId], references: [id], onDelete: Cascade)
   payment      Payment?
   verification Verification?
 
@@ -174,13 +178,13 @@ model Payment {
   status        PaymentStatus @default(PENDING)
   transactionId String?       @unique
   reference     String?       @unique
-  metadata      Json?         // Store additional payment data
+  metadata      Json? // Store additional payment data
   createdAt     DateTime      @default(now())
   updatedAt     DateTime      @updatedAt
 
   // Relations
-  booking    Booking      @relation(fields: [bookingId], references: [id], onDelete: Cascade)
-  user       User         @relation(fields: [userId], references: [id], onDelete: Cascade)
+  booking     Booking      @relation(fields: [bookingId], references: [id], onDelete: Cascade)
+  user        User         @relation(fields: [userId], references: [id], onDelete: Cascade)
   webhookLogs WebhookLog[]
 
   @@map("payments")
@@ -188,11 +192,11 @@ model Payment {
 
 model WebhookLog {
   id            String   @id @default(cuid())
-  gateway       String   // mtn, airtel, flutterwave
+  gateway       String // mtn, airtel, flutterwave
   transactionId String
   paymentId     String?
   status        String
-  payload       Json     // The webhook payload
+  payload       Json // The webhook payload
   processedAt   DateTime @default(now())
 
   // Relations
@@ -202,17 +206,17 @@ model WebhookLog {
 }
 
 model Ride {
-  id           String   @id @default(cuid())
-  userId       String
-  origin       String
-  destination  String
-  departureTime DateTime
+  id             String   @id @default(cuid())
+  userId         String
+  origin         String
+  destination    String
+  departureTime  DateTime
   availableSeats Int
-  pricePerSeat Float
-  description  String?
-  active       Boolean  @default(true)
-  createdAt    DateTime @default(now())
-  updatedAt    DateTime @updatedAt
+  pricePerSeat   Float
+  description    String?
+  active         Boolean  @default(true)
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
 
   // Relations
   user User @relation(fields: [userId], references: [id], onDelete: Cascade)
@@ -224,8 +228,8 @@ model Verification {
   id        String   @id @default(cuid())
   bookingId String   @unique
   scannedAt DateTime @default(now())
-  scannedBy String   // Operator/driver ID
-  location  String?  // GPS coordinates
+  scannedBy String // Operator/driver ID
+  location  String? // GPS coordinates
 
   // Relations
   booking Booking @relation(fields: [bookingId], references: [id], onDelete: Cascade)
@@ -235,17 +239,17 @@ model Verification {
 
 // Notification Models
 model NotificationTemplate {
-  id          String   @id @default(cuid())
-  name        String   @unique
-  type        NotificationType
-  channel     NotificationChannel[]
-  subject     String?  // For email notifications
-  title       String   // Push notification title / SMS subject
-  body        String   // Notification content with placeholders
-  variables   Json?    // Available template variables
-  isActive    Boolean  @default(true)
-  createdAt   DateTime @default(now())
-  updatedAt   DateTime @updatedAt
+  id        String                @id @default(cuid())
+  name      String                @unique
+  type      NotificationType
+  channel   NotificationChannel[]
+  subject   String? // For email notifications
+  title     String // Push notification title / SMS subject
+  body      String // Notification content with placeholders
+  variables Json? // Available template variables
+  isActive  Boolean               @default(true)
+  createdAt DateTime              @default(now())
+  updatedAt DateTime              @updatedAt
 
   // Relations
   notifications Notification[]
@@ -254,24 +258,24 @@ model NotificationTemplate {
 }
 
 model Notification {
-  id          String   @id @default(cuid())
-  userId      String
-  templateId  String
-  type        NotificationType
-  channel     NotificationChannel
-  recipient   String   // Phone number, email, or FCM token
-  subject     String?
-  title       String
-  body        String
-  data        Json?    // Additional data for the notification
-  status      NotificationStatus @default(PENDING)
-  sentAt      DateTime?
-  readAt      DateTime?
+  id           String              @id @default(cuid())
+  userId       String
+  templateId   String
+  type         NotificationType
+  channel      NotificationChannel
+  recipient    String // Phone number, email, or FCM token
+  subject      String?
+  title        String
+  body         String
+  data         Json? // Additional data for the notification
+  status       NotificationStatus  @default(PENDING)
+  sentAt       DateTime?
+  readAt       DateTime?
   errorMessage String?
-  retryCount  Int      @default(0)
-  maxRetries  Int      @default(3)
-  createdAt   DateTime @default(now())
-  updatedAt   DateTime @updatedAt
+  retryCount   Int                 @default(0)
+  maxRetries   Int                 @default(3)
+  createdAt    DateTime            @default(now())
+  updatedAt    DateTime            @updatedAt
 
   // Relations
   user     User                 @relation(fields: [userId], references: [id], onDelete: Cascade)
@@ -281,12 +285,12 @@ model Notification {
 }
 
 model UserNotificationPreference {
-  id       String   @id @default(cuid())
-  userId   String   @unique
-  email    Boolean  @default(true)
-  sms      Boolean  @default(true)
-  push     Boolean  @default(true)
-  marketing Boolean @default(false)
+  id        String   @id @default(cuid())
+  userId    String   @unique
+  email     Boolean  @default(true)
+  sms       Boolean  @default(true)
+  push      Boolean  @default(true)
+  marketing Boolean  @default(false)
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
@@ -297,14 +301,14 @@ model UserNotificationPreference {
 }
 
 model DeviceToken {
-  id        String   @id @default(cuid())
+  id        String         @id @default(cuid())
   userId    String
-  token     String   @unique
+  token     String         @unique
   platform  DevicePlatform
-  isActive  Boolean  @default(true)
-  lastUsed  DateTime @default(now())
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
+  isActive  Boolean        @default(true)
+  lastUsed  DateTime       @default(now())
+  createdAt DateTime       @default(now())
+  updatedAt DateTime       @updatedAt
 
   // Relations
   user User @relation(fields: [userId], references: [id], onDelete: Cascade)
@@ -313,14 +317,14 @@ model DeviceToken {
 }
 
 model OperatorUser {
-  id          String   @id @default(cuid())
-  userId      String   @unique
+  id          String           @id @default(cuid())
+  userId      String           @unique
   operatorId  String
   role        OperatorUserRole
-  permissions Json?    // Array of permission strings
-  active      Boolean  @default(true)
-  createdAt   DateTime @default(now())
-  updatedAt   DateTime @updatedAt
+  permissions Json? // Array of permission strings
+  active      Boolean          @default(true)
+  createdAt   DateTime         @default(now())
+  updatedAt   DateTime         @updatedAt
 
   // Relations
   user     User     @relation(fields: [userId], references: [id], onDelete: Cascade)
@@ -372,4 +376,225 @@ enum OperatorUserRole {
   CONDUCTOR
   TICKETER
   MAINTENANCE
+}
+
+// Agent onboarding system enums
+enum AgentStatus {
+  PENDING
+  VERIFIED
+  APPROVED
+  SUSPENDED
+  INACTIVE
+}
+
+enum KYCStatus {
+  PENDING
+  APPROVED
+  REJECTED
+}
+
+enum WithdrawalStatus {
+  PENDING
+  APPROVED
+  REJECTED
+  COMPLETED
+}
+
+enum CommissionStatus {
+  PENDING
+  PAID
+  CANCELLED
+}
+
+enum TransactionType {
+  CREDIT
+  DEBIT
+  COMMISSION
+  WITHDRAWAL_PENDING
+  WITHDRAWAL_COMPLETED
+}
+
+// Agent onboarding system models
+model Agent {
+  id            String      @id @default(cuid())
+  name          String
+  phone         String      @unique
+  email         String?
+  referralCode  String      @unique
+  referredById  String?
+  status        AgentStatus @default(PENDING)
+  kycStatus     KYCStatus   @default(PENDING)
+  path          String? // Hierarchical path for commission calculation
+  level         Int         @default(1)
+  totalEarnings Float       @default(0)
+  createdAt     DateTime    @default(now())
+  updatedAt     DateTime    @updatedAt
+
+  // Relations
+  referredBy          Agent?           @relation("AgentReferrals", fields: [referredById], references: [id])
+  referrals           Agent[]          @relation("AgentReferrals")
+  profile             AgentProfile?
+  wallet              AgentWallet?
+  kycVerification     KYCVerification?
+  commissions         Commission[]     @relation("AgentCommissions")
+  referralCommissions Commission[]     @relation("FromAgentCommissions")
+  withdrawals         Withdrawal[]
+  directReferrals     Referral[]       @relation("AgentDirectReferrals")
+  indirectReferrals   Referral[]       @relation("ReferredAgentReferrals")
+  managedOperators    Operator[]       @relation("ManagedOperators")
+  agentOperatorRels   AgentOperator[]
+
+  @@map("agents")
+}
+
+model AgentProfile {
+  id           String    @id @default(cuid())
+  agentId      String    @unique
+  businessName String?
+  address      String?
+  city         String?
+  region       String?
+  bankAccount  String?
+  bankName     String?
+  nationalId   String?
+  dateOfBirth  DateTime?
+  occupation   String?
+  profileImage String? // S3 URL
+  createdAt    DateTime  @default(now())
+  updatedAt    DateTime  @updatedAt
+
+  // Relations
+  agent Agent @relation(fields: [agentId], references: [id], onDelete: Cascade)
+
+  @@map("agent_profiles")
+}
+
+model AgentWallet {
+  id        String   @id @default(cuid())
+  agentId   String   @unique
+  balance   Float    @default(0)
+  frozen    Float    @default(0)
+  currency  String   @default("UGX")
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  // Relations
+  agent        Agent              @relation(fields: [agentId], references: [id], onDelete: Cascade)
+  transactions AgentTransaction[]
+
+  @@map("agent_wallets")
+}
+
+model AgentTransaction {
+  id            String          @id @default(cuid())
+  walletId      String
+  type          TransactionType
+  amount        Float
+  description   String?
+  reference     String?         @unique
+  metadata      Json?
+  balanceBefore Float?
+  balanceAfter  Float?
+  createdAt     DateTime        @default(now())
+
+  // Relations
+  wallet AgentWallet @relation(fields: [walletId], references: [id], onDelete: Cascade)
+
+  @@map("agent_transactions")
+}
+
+model KYCVerification {
+  id           String    @id @default(cuid())
+  agentId      String    @unique
+  documentType String? // "national_id", "passport", "driving_license"
+  documentUrl  String? // S3 file key
+  status       KYCStatus @default(PENDING)
+  reviewNotes  String?
+  reviewedBy   String? // Admin user ID
+  reviewedAt   DateTime?
+  uploadedAt   DateTime?
+  createdAt    DateTime  @default(now())
+  updatedAt    DateTime  @updatedAt
+
+  // Relations
+  agent Agent @relation(fields: [agentId], references: [id], onDelete: Cascade)
+
+  @@map("kyc_verifications")
+}
+
+model Referral {
+  id          String   @id @default(cuid())
+  agentId     String // The referring agent
+  referredId  String // The referred agent
+  level       Int // 1 = direct, 2 = second level, etc.
+  bonusEarned Float    @default(0)
+  isActive    Boolean  @default(true)
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  // Relations
+  agent    Agent @relation("AgentDirectReferrals", fields: [agentId], references: [id], onDelete: Cascade)
+  referred Agent @relation("ReferredAgentReferrals", fields: [referredId], references: [id], onDelete: Cascade)
+
+  @@unique([agentId, referredId])
+  @@map("referrals")
+}
+
+model Commission {
+  id          String           @id @default(cuid())
+  agentId     String // Agent receiving the commission
+  fromAgentId String // Agent who generated the commission
+  amount      Float
+  level       Int // 1, 2, or 3 (commission level)
+  context     Json? // Additional context about the commission source
+  status      CommissionStatus @default(PENDING)
+  paidAt      DateTime?
+  reference   String?          @unique
+  createdAt   DateTime         @default(now())
+  updatedAt   DateTime         @updatedAt
+
+  // Relations
+  agent     Agent @relation("AgentCommissions", fields: [agentId], references: [id], onDelete: Cascade)
+  fromAgent Agent @relation("FromAgentCommissions", fields: [fromAgentId], references: [id], onDelete: Cascade)
+
+  @@map("commissions")
+}
+
+model Withdrawal {
+  id             String           @id @default(cuid())
+  agentId        String
+  amount         Float
+  status         WithdrawalStatus @default(PENDING)
+  paymentMethod  String? // "bank_transfer", "mobile_money"
+  accountDetails Json? // Bank account or mobile money details
+  processedBy    String? // Admin user ID
+  processedAt    DateTime?
+  reference      String?          @unique
+  notes          String?
+  createdAt      DateTime         @default(now())
+  updatedAt      DateTime         @updatedAt
+
+  // Relations
+  agent Agent @relation(fields: [agentId], references: [id], onDelete: Cascade)
+
+  @@map("withdrawals")
+}
+
+// Agent-Operator Management System
+model AgentOperator {
+  id          String   @id @default(cuid())
+  agentId     String
+  operatorId  String
+  role        String   @default("MANAGER") // MANAGER, SUPPORTER, etc.
+  permissions Json?    // Array of permission strings
+  isActive    Boolean  @default(true)
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  // Relations
+  agent    Agent    @relation(fields: [agentId], references: [id], onDelete: Cascade)
+  operator Operator @relation(fields: [operatorId], references: [id], onDelete: Cascade)
+
+  @@unique([agentId, operatorId])
+  @@map("agent_operators")
 }

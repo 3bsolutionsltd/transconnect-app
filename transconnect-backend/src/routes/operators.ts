@@ -5,7 +5,7 @@ import bcrypt from 'bcryptjs';
 
 const router = Router();
 
-// Get all operators
+// Get all operators (enhanced for agent integration)
 router.get('/', async (req: Request, res: Response) => {
   try {
     const operators = await prisma.operator.findMany({
@@ -17,6 +17,16 @@ router.get('/', async (req: Request, res: Response) => {
             lastName: true,
             email: true,
             phone: true
+          }
+        },
+        managingAgent: {
+          select: {
+            id: true,
+            name: true,
+            phone: true,
+            email: true,
+            referralCode: true,
+            status: true
           }
         },
         buses: {
@@ -42,7 +52,11 @@ router.get('/', async (req: Request, res: Response) => {
       }
     });
 
-    res.json(operators);
+    res.json({
+      success: true,
+      count: operators.length,
+      operators: operators
+    });
   } catch (error) {
     console.error('Error fetching operators:', error);
     res.status(500).json({ error: 'Failed to fetch operators' });
@@ -299,6 +313,101 @@ router.delete('/:id', authenticateToken, async (req: Request, res: Response) => 
   } catch (error) {
     console.error('Error deleting operator:', error);
     res.status(500).json({ error: 'Failed to delete operator' });
+  }
+});
+
+// Admin approve agent-registered operator
+router.put('/:id/approve', authenticateToken, async (req: Request, res: Response) => {
+  try {
+    const userRole = (req as any).user.role;
+    
+    // Only admins can approve operators
+    if (userRole !== 'ADMIN') {
+      return res.status(403).json({ error: 'Only administrators can approve operators' });
+    }
+    
+    const { id } = req.params;
+
+    const operator = await prisma.operator.update({
+      where: { id: id },
+      data: { approved: true },
+      include: {
+        user: {
+          select: {
+            id: true,
+            firstName: true,
+            lastName: true,
+            email: true,
+            phone: true
+          }
+        },
+        managingAgent: {
+          select: {
+            name: true,
+            phone: true,
+            email: true
+          }
+        }
+      }
+    });
+
+    res.json({ 
+      message: 'Operator approved successfully',
+      operator: operator
+    });
+  } catch (error) {
+    console.error('Error approving operator:', error);
+    res.status(500).json({ error: 'Failed to approve operator' });
+  }
+});
+
+// Admin reject agent-registered operator
+router.put('/:id/reject', authenticateToken, async (req: Request, res: Response) => {
+  try {
+    const userRole = (req as any).user.role;
+    
+    // Only admins can reject operators
+    if (userRole !== 'ADMIN') {
+      return res.status(403).json({ error: 'Only administrators can reject operators' });
+    }
+    
+    const { id } = req.params;
+    const { reason } = req.body;
+
+    const operator = await prisma.operator.update({
+      where: { id: id },
+      data: { 
+        approved: false,
+        // Could add rejection reason to schema in future
+      },
+      include: {
+        user: {
+          select: {
+            id: true,
+            firstName: true,
+            lastName: true,
+            email: true,
+            phone: true
+          }
+        },
+        managingAgent: {
+          select: {
+            name: true,
+            phone: true,
+            email: true
+          }
+        }
+      }
+    });
+
+    res.json({ 
+      message: 'Operator rejected',
+      operator: operator,
+      reason: reason
+    });
+  } catch (error) {
+    console.error('Error rejecting operator:', error);
+    res.status(500).json({ error: 'Failed to reject operator' });
   }
 });
 

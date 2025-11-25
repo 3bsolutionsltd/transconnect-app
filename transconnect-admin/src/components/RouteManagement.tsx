@@ -54,7 +54,7 @@ const RouteManagement: React.FC = () => {
     active: true
   });
 
-  const API_BASE_URL = process.env.REACT_APP_API_URL || 'https://transconnect-app-44ie.onrender.com/api';
+  const API_BASE_URL = process.env.REACT_APP_API_URL || 'http://localhost:5000/api';
 
   const fetchRoutes = useCallback(async () => {
     try {
@@ -68,7 +68,9 @@ const RouteManagement: React.FC = () => {
 
       if (response.ok) {
         const data = await response.json();
-        setRoutes(data);
+        // Handle paginated response - extract routes array
+        const routesArray = Array.isArray(data) ? data : (data.routes || []);
+        setRoutes(routesArray);
       }
     } catch (error) {
       console.error('Error fetching routes:', error);

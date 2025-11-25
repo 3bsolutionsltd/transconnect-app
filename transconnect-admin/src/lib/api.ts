@@ -1,4 +1,9 @@
-const API_BASE_URL = process.env.REACT_APP_API_URL || 'https://transconnect-app-44ie.onrender.com/api';
+const API_BASE_URL = process.env.REACT_APP_API_URL || 'http://localhost:5000/api';
+
+// Debug log for development
+if (process.env.NODE_ENV === 'development') {
+  console.log('🔧 Admin Panel API Base URL:', API_BASE_URL);
+}
 
 interface ApiResponse<T = any> {
   success: boolean;

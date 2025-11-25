@@ -26,8 +26,8 @@ export const useAuth = () => {
   return context;
 };
 
-export // Ensure API_BASE_URL includes /api path
-const API_BASE_URL = process.env.REACT_APP_API_URL || 'https://transconnect-app-44ie.onrender.com/api';
+// Use the same API configuration as the main api.ts file
+const API_BASE_URL = process.env.REACT_APP_API_URL || 'http://localhost:5000/api';
 
 const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
   const [user, setUser] = useState<User | null>(null);
