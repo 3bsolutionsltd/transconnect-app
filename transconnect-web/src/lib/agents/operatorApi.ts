@@ -3,7 +3,8 @@
  * Handles API calls for agent operator management
  */
 
-const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:5000';
+// Remove /api suffix since we add it manually in each request
+const API_BASE_URL = (process.env.NEXT_PUBLIC_API_URL || 'http://localhost:5000/api').replace('/api', '');
 
 class AgentOperatorAPI {
   
