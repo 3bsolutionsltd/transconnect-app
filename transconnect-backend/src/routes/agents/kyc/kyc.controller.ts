@@ -3,17 +3,12 @@ import { prisma } from '../../../index';
 import { generatePresignedUploadUrl, uploadBuffer } from '../../../tools/agents/s3.tool';
 import multer from 'multer';
 
-// Extend Request interface to include file property from multer
-interface MulterRequest extends Request {
-  file?: Express.Multer.File;
-}
-
 const upload = multer({ 
   storage: multer.memoryStorage(),
   limits: { fileSize: 10 * 1024 * 1024 } // 10MB limit
 });
 
-export async function uploadKyc(req: MulterRequest, res: Response) {
+export async function uploadKyc(req: Request, res: Response) {
   try {
     upload.single('document')(req, res, async (err) => {
       if (err) {
@@ -21,7 +16,7 @@ export async function uploadKyc(req: MulterRequest, res: Response) {
       }
 
       const { agentId, documentType } = req.body;
-      const file = req.file;
+      const file = (req as any).file;
 
       if (!file) {
         return res.status(400).json({ error: 'No file uploaded' });

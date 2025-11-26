@@ -4,7 +4,7 @@ import { prisma } from '../index';
 
 interface AuthRequest extends Request {
   user?: {
-    userId: string;
+    id: string;
     email: string;
     role: string;
   };
@@ -32,7 +32,7 @@ export const authenticateToken = async (req: AuthRequest, res: Response, next: N
     }
 
     req.user = {
-      userId: user.id,
+      id: user.id,
       email: user.email,
       role: user.role
     };
