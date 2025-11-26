@@ -17,7 +17,23 @@ export async function generatePresignedUploadUrl(
   contentType: string,
   agentId: string
 ): Promise<{ uploadUrl: string; fileKey: string }> {
+  const isDemoMode = process.env.NODE_ENV !== 'production' || process.env.DEMO_MODE === 'true';
   const fileKey = `kyc/${agentId}/${crypto.randomUUID()}-${fileName}`;
+  
+  if (isDemoMode) {
+    console.log(`📄 [DEMO MODE] KYC file upload simulation:`);
+    console.log(`- File: ${fileName}`);
+    console.log(`- Type: ${contentType}`);
+    console.log(`- Agent: ${agentId}`);
+    console.log(`- File Key: ${fileKey}`);
+    console.log(`(In production, this would generate AWS S3 presigned URL)`);
+    
+    // Return a mock upload URL for demo mode
+    return { 
+      uploadUrl: `https://demo-upload.transconnect.app/upload?key=${fileKey}`,
+      fileKey 
+    };
+  }
   
   const command = new PutObjectCommand({
     Bucket: BUCKET,

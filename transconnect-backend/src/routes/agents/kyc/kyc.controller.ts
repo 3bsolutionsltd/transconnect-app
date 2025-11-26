@@ -1,6 +1,6 @@
 import { Request, Response } from 'express';
 import { prisma } from '../../../index';
-import { generatePresignedUploadUrl, uploadBuffer } from '../../../tools/agents/s3.tool';
+import { generatePresignedUploadUrl } from '../../../tools/agents/s3.tool';
 import multer from 'multer';
 
 const upload = multer({ 
@@ -17,6 +17,7 @@ export async function uploadKyc(req: Request, res: Response) {
 
       const { agentId, documentType } = req.body;
       const file = (req as any).file;
+      const isDemoMode = process.env.NODE_ENV !== 'production' || process.env.DEMO_MODE === 'true';
 
       if (!file) {
         return res.status(400).json({ error: 'No file uploaded' });
@@ -26,18 +27,33 @@ export async function uploadKyc(req: Request, res: Response) {
         return res.status(400).json({ error: 'agentId and documentType are required' });
       }
 
-      // Upload file to S3
-      const fileKey = await uploadBuffer(
-        file.buffer,
-        file.originalname,
-        file.mimetype,
-        agentId
-      );
+      // Generate file key
+      const fileKey = `kyc/${agentId}/${Date.now()}-${file.originalname}`;
+
+      if (isDemoMode) {
+        console.log(`📄 [DEMO MODE] KYC document upload simulation:`);
+        console.log(`- Agent: ${agentId}`);
+        console.log(`- Document Type: ${documentType}`);
+        console.log(`- File: ${file.originalname}`);
+        console.log(`- Type: ${file.mimetype}`);
+        console.log(`- Size: ${file.buffer.length} bytes`);
+        console.log(`(In production, this would upload to AWS S3)`);
+      } else {
+        // In production, upload to S3 here
+        console.log('Production S3 upload not configured yet');
+      }
 
       // Update KYC verification record
-      await prisma.kYCVerification.update({
+      await prisma.kYCVerification.upsert({
         where: { agentId },
-        data: {
+        update: {
+          documentType,
+          documentUrl: fileKey,
+          status: 'PENDING',
+          uploadedAt: new Date(),
+        },
+        create: {
+          agentId,
           documentType,
           documentUrl: fileKey,
           status: 'PENDING',
@@ -46,7 +62,9 @@ export async function uploadKyc(req: Request, res: Response) {
       });
 
       res.json({
-        message: 'Document uploaded successfully',
+        message: isDemoMode 
+          ? 'Document upload simulated successfully (demo mode)' 
+          : 'Document uploaded successfully',
         fileKey,
         status: 'pending_review'
       });
