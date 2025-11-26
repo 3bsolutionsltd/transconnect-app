@@ -3,6 +3,7 @@ import React, { useEffect, useState } from 'react';
 import agentApi from '../../../lib/agents/agentApi';
 import { useAgentAuth, logoutAgent } from '../../../lib/agents/authHelpers';
 import { useAgentActivityTracking } from '../../../lib/agents/activityTracker';
+import { getReferralLink } from '../../../lib/utils/baseUrl';
 import BalanceCard from '../../../components/agents/BalanceCard.agent';
 import PendingCommissionsList from '../../../components/agents/PendingCommissionsList.agent';
 import ReferralShare from '../../../components/agents/ReferralShare.agent';
@@ -56,15 +57,13 @@ export default function AgentDashboardPage() {
 
   // Interactive functions
   const copyReferralLink = () => {
-    const baseUrl = process.env.NODE_ENV === 'production' ? 'https://transconnect-web.vercel.app' : 'http://localhost:3000';
-    const link = `${baseUrl}/agents/register?ref=${data?.agent?.referralCode}`;
+    const link = getReferralLink(data?.agent?.referralCode);
     navigator.clipboard.writeText(link);
     setNotifications(prev => ['Referral link copied to clipboard!', ...prev.slice(0, 4)]);
   };
 
   const shareReferralLink = () => {
-    const baseUrl = process.env.NODE_ENV === 'production' ? 'https://transconnect-web.vercel.app' : 'http://localhost:3000';
-    const link = `${baseUrl}/agents/register?ref=${data?.agent?.referralCode}`;
+    const link = getReferralLink(data?.agent?.referralCode);
     const text = `Join TransConnect as an agent and earn commissions! Use my referral link: ${link}`;
     
     if (navigator.share) {
@@ -328,7 +327,7 @@ export default function AgentDashboardPage() {
                 <div className="bg-gray-50 rounded-lg p-3">
                   <div className="text-xs text-gray-500 mb-1">Referral Link</div>
                   <div className="text-sm font-mono text-gray-800 break-all">
-                    {process.env.NODE_ENV === 'production' ? 'https://transconnect-web.vercel.app' : 'http://localhost:3000'}/agents/register?ref={data.agent?.referralCode}
+                    {getReferralLink(data.agent?.referralCode)}
                   </div>
                 </div>
                 <div className="space-y-2">
