@@ -75,6 +75,54 @@ export async function uploadKyc(req: Request, res: Response) {
   }
 }
 
+export async function confirmKycUpload(req: Request, res: Response) {
+  try {
+    const { agentId, fileKey, documentType = 'nationalId' } = req.body;
+    const isDemoMode = process.env.NODE_ENV !== 'production' || process.env.DEMO_MODE === 'true';
+
+    if (!agentId || !fileKey) {
+      return res.status(400).json({ error: 'agentId and fileKey are required' });
+    }
+
+    if (isDemoMode) {
+      console.log(`📄 [DEMO MODE] KYC upload confirmation:`);
+      console.log(`- Agent: ${agentId}`);
+      console.log(`- File Key: ${fileKey}`);
+      console.log(`- Document Type: ${documentType}`);
+      console.log(`(In production, this would verify S3 upload completion)`);
+    }
+
+    // Update KYC verification record
+    await prisma.kYCVerification.upsert({
+      where: { agentId },
+      update: {
+        documentType,
+        documentUrl: fileKey,
+        status: 'PENDING',
+        uploadedAt: new Date(),
+      },
+      create: {
+        agentId,
+        documentType,
+        documentUrl: fileKey,
+        status: 'PENDING',
+        uploadedAt: new Date(),
+      },
+    });
+
+    res.json({
+      message: isDemoMode 
+        ? 'Document upload confirmed successfully (demo mode)' 
+        : 'Document upload confirmed successfully',
+      fileKey,
+      status: 'pending_review'
+    });
+  } catch (error: any) {
+    console.error('KYC upload confirmation error:', error);
+    res.status(500).json({ error: error.message });
+  }
+}
+
 export async function listPendingKyc(req: Request, res: Response) {
   try {
     const pendingKyc = await prisma.kYCVerification.findMany({

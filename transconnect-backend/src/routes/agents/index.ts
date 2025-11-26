@@ -1,7 +1,6 @@
 import { Router } from 'express';
 import { registerAgent, verifyOtp, getDashboard, requestWithdrawal, loginAgent, verifyLoginOtp, getAllAgents, updateAgentStatus } from '../../services/agents/agent.service';
-import { uploadKyc, listPendingKyc, reviewKyc } from './kyc/kyc.controller';
-import { getPresignedUrl } from './kyc/kyc.controller';
+import { uploadKyc, confirmKycUpload, listPendingKyc, reviewKyc, getPresignedUrl } from './kyc/kyc.controller';
 import operatorRoutes from './operators';
 import { authenticateToken } from '../../middleware/auth';
 import { trackAgentActivity, getOnlineAgents, getOnlineAgentsCount, markAgentOffline, cleanupOfflineAgents } from '../../middleware/agentActivity';
@@ -24,6 +23,7 @@ router.post('/:agentId/withdraw', trackAgentActivity, requestWithdrawal);
 
 // KYC
 router.post('/kyc/upload', uploadKyc);
+router.post('/kyc/confirm', confirmKycUpload);
 router.get('/kyc/pending', listPendingKyc);
 router.post('/kyc/:kycId/review', reviewKyc);
 router.get('/kyc/presign', getPresignedUrl);

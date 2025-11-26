@@ -52,9 +52,9 @@ export default {
     return request(`/kyc/presign?${params}`);
   },
 
-  uploadKyc: (agentId: string, fileUrl: string) => request('/kyc/upload', { 
+  uploadKyc: (agentId: string, fileKey: string) => request('/kyc/confirm', { 
     method: 'POST', 
-    body: JSON.stringify({ agentId, fileUrl }) 
+    body: JSON.stringify({ agentId, fileKey }) 
   }),
 
   // Dashboard and agent data
