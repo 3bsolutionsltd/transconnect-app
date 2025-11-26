@@ -8,6 +8,29 @@ export default function uploadToPresigned(
   onProgress: (progress: number) => void
 ): Promise<void> {
   return new Promise<void>((resolve, reject) => {
+    // Check if this is a demo mode URL
+    if (url.includes('demo-upload.transconnect.app')) {
+      console.log('📄 [DEMO MODE] Simulating file upload:', file.name);
+      
+      // Simulate upload progress
+      let progress = 0;
+      const interval = setInterval(() => {
+        progress += Math.random() * 20;
+        if (progress >= 100) {
+          progress = 100;
+          clearInterval(interval);
+          onProgress(100);
+          console.log('✅ [DEMO MODE] Upload simulation completed');
+          resolve();
+        } else {
+          onProgress(Math.floor(progress));
+        }
+      }, 100);
+      
+      return;
+    }
+    
+    // Real upload for production
     const xhr = new XMLHttpRequest();
     
     xhr.open('PUT', url);
