@@ -81,16 +81,64 @@ export async function getDashboard(req: Request, res: Response) {
     if (!agent) return res.status(404).json({ error: 'Not found' });
 
     const pendingCommissions = await prisma.commission.findMany({
-      where: { agentId, status: 'PAID' },
+      where: { agentId, status: 'PENDING' },
+      orderBy: { createdAt: 'desc' },
+      take: 10
     });
 
     const downline = await ReferralService.getDownline(agentId, 3);
+
+    // Calculate monthly earnings (commissions paid this month)
+    const startOfMonth = new Date();
+    startOfMonth.setDate(1);
+    startOfMonth.setHours(0, 0, 0, 0);
+
+    const monthlyCommissions = await prisma.commission.findMany({
+      where: { 
+        agentId, 
+        status: 'PAID',
+        paidAt: { gte: startOfMonth }
+      }
+    });
+
+    const monthlyEarnings = monthlyCommissions.reduce((sum, commission) => sum + commission.amount, 0);
+
+    // Calculate weekly earnings (commissions paid this week)
+    const startOfWeek = new Date();
+    const dayOfWeek = startOfWeek.getDay();
+    const daysToSubtract = dayOfWeek === 0 ? 6 : dayOfWeek - 1; // Monday as start of week
+    startOfWeek.setDate(startOfWeek.getDate() - daysToSubtract);
+    startOfWeek.setHours(0, 0, 0, 0);
+
+    const weeklyCommissions = await prisma.commission.findMany({
+      where: { 
+        agentId, 
+        status: 'PAID',
+        paidAt: { gte: startOfWeek }
+      }
+    });
+
+    const weeklyEarnings = weeklyCommissions.reduce((sum, commission) => sum + commission.amount, 0);
+
+    // Get operator stats for this agent
+    const managedOperators = await prisma.operator.findMany({
+      where: { agentId },
+      include: { routes: true }
+    });
+
+    const operatorStats = {
+      operators: managedOperators.length,
+      routes: managedOperators.reduce((sum, operator) => sum + operator.routes.length, 0)
+    };
 
     res.json({
       agent,
       wallet: agent.wallet,
       pendingCommissions,
       downline,
+      monthlyEarnings,
+      weeklyEarnings,
+      operatorStats,
     });
   } catch (err: any) {
     res.status(500).json({ error: err.message });
