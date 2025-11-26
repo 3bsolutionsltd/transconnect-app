@@ -27,8 +27,8 @@ export default function StepKycUpload({ onNext, onBack, draft }: any) {
         // Try real upload, but continue if it fails in development
         try {
           const presign = await agentApi.getPresign(file.name, file.type, draft.id);
-          await uploadToPresigned(presign.putUrl, file, (p:number)=>setProgress(p));
-          await agentApi.uploadKyc(draft.id, presign.fileUrl);
+          await uploadToPresigned(presign.uploadUrl, file, (p:number)=>setProgress(p));
+          await agentApi.uploadKyc(draft.id, presign.fileKey);
         } catch (apiError) {
           console.warn('API upload failed, continuing in development mode:', apiError);
           // In development, we continue anyway for testing purposes
@@ -36,8 +36,8 @@ export default function StepKycUpload({ onNext, onBack, draft }: any) {
       } else {
         // Production: require successful upload
         const presign = await agentApi.getPresign(file.name, file.type, draft.id);
-        await uploadToPresigned(presign.putUrl, file, (p:number)=>setProgress(p));
-        await agentApi.uploadKyc(draft.id, presign.fileUrl);
+        await uploadToPresigned(presign.uploadUrl, file, (p:number)=>setProgress(p));
+        await agentApi.uploadKyc(draft.id, presign.fileKey);
       }
       
       setLoading(false);
