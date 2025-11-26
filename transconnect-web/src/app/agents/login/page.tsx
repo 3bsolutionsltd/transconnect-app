@@ -4,6 +4,7 @@ import { useRouter } from 'next/navigation';
 import Link from 'next/link';
 import { toast } from 'react-hot-toast';
 import { setAgentToken, setAgentId } from '../../../lib/agents/authHelpers';
+import { endpoints } from '../../../lib/config';
 
 export default function AgentLoginPage() {
   const router = useRouter();
@@ -22,7 +23,7 @@ export default function AgentLoginPage() {
 
     setLoading(true);
     try {
-      const response = await fetch('http://localhost:5000/api/agents/login', {
+      const response = await fetch(endpoints.agents.login, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ phone }),
@@ -54,7 +55,7 @@ export default function AgentLoginPage() {
 
     setLoading(true);
     try {
-      const response = await fetch('http://localhost:5000/api/agents/login/verify', {
+      const response = await fetch(endpoints.agents.verifyLogin, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ phone, otp }),
