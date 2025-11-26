@@ -17,7 +17,8 @@ export async function uploadKyc(req: Request, res: Response) {
 
       const { agentId, documentType } = req.body;
       const file = (req as any).file;
-      const isDemoMode = process.env.NODE_ENV !== 'production' || process.env.DEMO_MODE === 'true';
+      const hasAwsCredentials = process.env.AWS_ACCESS_KEY_ID && process.env.AWS_SECRET_ACCESS_KEY;
+      const isDemoMode = process.env.DEMO_MODE === 'true' || !hasAwsCredentials;
 
       if (!file) {
         return res.status(400).json({ error: 'No file uploaded' });
@@ -78,7 +79,8 @@ export async function uploadKyc(req: Request, res: Response) {
 export async function confirmKycUpload(req: Request, res: Response) {
   try {
     const { agentId, fileKey, documentType = 'nationalId' } = req.body;
-    const isDemoMode = process.env.NODE_ENV !== 'production' || process.env.DEMO_MODE === 'true';
+    const hasAwsCredentials = process.env.AWS_ACCESS_KEY_ID && process.env.AWS_SECRET_ACCESS_KEY;
+    const isDemoMode = process.env.DEMO_MODE === 'true' || !hasAwsCredentials;
 
     if (!agentId || !fileKey) {
       return res.status(400).json({ error: 'agentId and fileKey are required' });

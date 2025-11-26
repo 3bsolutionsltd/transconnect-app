@@ -17,7 +17,9 @@ export async function generatePresignedUploadUrl(
   contentType: string,
   agentId: string
 ): Promise<{ uploadUrl: string; fileKey: string }> {
-  const isDemoMode = process.env.NODE_ENV !== 'production' || process.env.DEMO_MODE === 'true';
+  // Use demo mode if explicitly enabled OR if AWS credentials are not configured
+  const hasAwsCredentials = process.env.AWS_ACCESS_KEY_ID && process.env.AWS_SECRET_ACCESS_KEY;
+  const isDemoMode = process.env.DEMO_MODE === 'true' || !hasAwsCredentials;
   const fileKey = `kyc/${agentId}/${crypto.randomUUID()}-${fileName}`;
   
   if (isDemoMode) {
