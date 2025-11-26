@@ -1,0 +1,156 @@
+config:
+  target: 'http://localhost:5000/api'
+  phases:
+    - duration: 120
+      arrivalRate: 50
+      name: "Gradual ramp up"
+    - duration: 300
+      arrivalRate: 150
+      name: "Heavy sustained load"
+    - duration: 180
+      arrivalRate: 300
+      name: "Peak production load"
+    - duration: 120
+      arrivalRate: 100
+      name: "Sustained peak"
+    - duration: 120
+      arrivalRate: 20
+      name: "Cool down"
+  processor: "../scripts/processor.js"
+  defaults:
+    headers:
+      'Content-Type': 'application/json'
+  timeout: 30
+  variables:
+    maxUsers: 1000
+
+scenarios:
+  - name: "Production Agent Simulation"
+    weight: 30
+    flow:
+      - post:
+          url: "/auth/login"
+          json:
+            email: "prodagent{{ $randomInt(1, 500) }}@transconnect.ug"
+            password: "ProdPassword123!"
+          capture:
+            - json: "$.token"
+              as: "authToken"
+            - json: "$.agent.id"
+              as: "agentId"
+          ifTrue: "authToken"
+      - loop:
+          - post:
+              url: "/agents/activity"
+              headers:
+                Authorization: "Bearer {{ authToken }}"
+              json:
+                action: "heartbeat"
+                location:
+                  lat: "{{ $randomFloat(0.0, 1.0) }}"
+                  lng: "{{ $randomFloat(32.0, 33.0) }}"
+                timestamp: "{{ $timestamp() }}"
+          - get:
+              url: "/agents/{{ agentId }}/dashboard"
+              headers:
+                Authorization: "Bearer {{ authToken }}"
+          - think: 3
+        count: 100
+
+  - name: "High Volume Booking Stress"
+    weight: 40
+    flow:
+      - post:
+          url: "/auth/register"
+          json:
+            email: "stressuser{{ $randomInt(1, 50000) }}@test.com"
+            password: "StressTest123!"
+            name: "Stress User {{ $randomInt(1, 10000) }}"
+            phone: "+25677{{ $randomInt(1000000, 9999999) }}"
+            role: "customer"
+          capture:
+            - json: "$.token"
+              as: "customerToken"
+            - json: "$.user.id"
+              as: "customerId"
+      - parallel:
+          - get:
+              url: "/routes"
+              qs:
+                origin: "{{ $randomPick(['Kampala', 'Entebbe', 'Jinja', 'Mbarara', 'Gulu', 'Lira']) }}"
+                destination: "{{ $randomPick(['Kampala', 'Entebbe', 'Jinja', 'Mbarara', 'Gulu', 'Lira']) }}"
+                date: "{{ $futureDate() }}"
+          - get:
+              url: "/buses"
+              qs:
+                status: "active"
+                capacity: ">30"
+      - post:
+          url: "/bookings"
+          headers:
+            Authorization: "Bearer {{ customerToken }}"
+          json:
+            routeId: "{{ $randomInt(1, 20) }}"
+            seatNumber: "{{ $randomInt(1, 50) }}"
+            passengerName: "Stress Passenger {{ $randomInt(1, 1000) }}"
+            passengerPhone: "+25677{{ $randomInt(1000000, 9999999) }}"
+          capture:
+            - json: "$.id"
+              as: "bookingId"
+      - post:
+          url: "/payments/initialize"
+          headers:
+            Authorization: "Bearer {{ customerToken }}"
+          json:
+            bookingId: "{{ bookingId }}"
+            amount: "{{ $randomInt(10000, 50000) }}"
+            method: "{{ $randomPick(['mtn', 'airtel', 'flutterwave']) }}"
+
+  - name: "Database Intensive Operations"
+    weight: 20
+    flow:
+      - get:
+          url: "/agents/admin/all"
+          qs:
+            page: "{{ $randomInt(1, 10) }}"
+            limit: 50
+      - get:
+          url: "/bookings/admin/analytics"
+          qs:
+            startDate: "{{ $pastDate() }}"
+            endDate: "{{ $futureDate() }}"
+      - get:
+          url: "/routes/popular"
+      - get:
+          url: "/operators/statistics"
+
+  - name: "Concurrent Real-time Updates"
+    weight: 10
+    flow:
+      - post:
+          url: "/auth/login"
+          json:
+            email: "realtimeagent{{ $randomInt(1, 100) }}@test.com"
+            password: "RealtimeTest123!"
+          capture:
+            - json: "$.token"
+              as: "authToken"
+      - loop:
+          - parallel:
+              - post:
+                  url: "/agents/activity"
+                  headers:
+                    Authorization: "Bearer {{ authToken }}"
+                  json:
+                    action: "heartbeat"
+                    timestamp: "{{ $timestamp() }}"
+              - get:
+                  url: "/agents/online"
+              - post:
+                  url: "/qr/validate"
+                  headers:
+                    Authorization: "Bearer {{ authToken }}"
+                  json:
+                    qrCode: "TXN{{ $randomInt(100000, 999999) }}"
+          - think: 1
+        count: 200

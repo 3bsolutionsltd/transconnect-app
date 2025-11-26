@@ -1,11 +1,11 @@
 import { Request, Response } from 'express';
 import { prisma } from '../../../index';
 import { generatePresignedUploadUrl, uploadBuffer } from '../../../tools/agents/s3.tool';
-import multer, { File } from 'multer';
+import multer from 'multer';
 
 // Extend Request interface to include file property from multer
 interface MulterRequest extends Request {
-  file?: File;
+  file?: Express.Multer.File;
 }
 
 const upload = multer({ 

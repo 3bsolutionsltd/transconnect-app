@@ -1,0 +1,84 @@
+config:
+  target: 'http://localhost:5000/api'
+  phases:
+    - duration: 60
+      arrivalRate: 2
+      name: "Warm up"
+    - duration: 120
+      arrivalRate: 5
+      name: "Light load"
+    - duration: 60
+      arrivalRate: 1
+      name: "Cool down"
+  processor: "../scripts/processor.js"
+  variables:
+    testAgentEmail: "test.agent@transconnect.test"
+    testPassword: "TestPassword123!"
+
+scenarios:
+  - name: "Agent Authentication Flow"
+    weight: 30
+    flow:
+      - post:
+          url: "/auth/register"
+          json:
+            email: "{{ $randomEmail() }}"
+            password: "{{ testPassword }}"
+            name: "Test Agent {{ $randomInt(1, 1000) }}"
+            phone: "+25670{{ $randomInt(1000000, 9999999) }}"
+            role: "agent"
+          capture:
+            - json: "$.token"
+              as: "authToken"
+      - post:
+          url: "/auth/login"
+          json:
+            email: "{{ testAgentEmail }}"
+            password: "{{ testPassword }}"
+          capture:
+            - json: "$.token"
+              as: "loginToken"
+
+  - name: "Agent Dashboard & Activity"
+    weight: 40
+    flow:
+      - post:
+          url: "/auth/login"
+          json:
+            email: "{{ testAgentEmail }}"
+            password: "{{ testPassword }}"
+          capture:
+            - json: "$.token"
+              as: "authToken"
+            - json: "$.agent.id"
+              as: "agentId"
+      - get:
+          url: "/agents/{{ agentId }}/dashboard"
+          headers:
+            Authorization: "Bearer {{ authToken }}"
+      - post:
+          url: "/agents/activity"
+          headers:
+            Authorization: "Bearer {{ authToken }}"
+          json:
+            action: "heartbeat"
+            timestamp: "{{ $timestamp() }}"
+
+  - name: "Route & Booking Search"
+    weight: 30
+    flow:
+      - get:
+          url: "/routes"
+          qs:
+            origin: "Kampala"
+            destination: "Jinja"
+            date: "{{ $futureDate() }}"
+      - get:
+          url: "/buses"
+          qs:
+            status: "active"
+      - get:
+          url: "/bookings/search"
+          qs:
+            origin: "Kampala"
+            destination: "Entebbe"

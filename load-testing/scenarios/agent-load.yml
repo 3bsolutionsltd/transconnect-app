@@ -1,0 +1,52 @@
+config:
+  target: 'http://localhost:5000/api'
+  phases:
+    - duration: 180
+      arrivalRate: 20
+      name: "Agent activity simulation"
+  processor: "../scripts/processor.js"
+
+scenarios:
+  - name: "Agent Online Tracking Load"
+    weight: 60
+    flow:
+      - post:
+          url: "/auth/login"
+          json:
+            email: "loadagent{{ $randomInt(1, 200) }}@test.com"
+            password: "LoadTest123!"
+          capture:
+            - json: "$.token"
+              as: "authToken"
+            - json: "$.agent.id"
+              as: "agentId"
+      - loop:
+          - post:
+              url: "/agents/activity"
+              headers:
+                Authorization: "Bearer {{ authToken }}"
+              json:
+                action: "heartbeat"
+                location:
+                  lat: "{{ $randomFloat(0.0, 1.0) }}"
+                  lng: "{{ $randomFloat(32.0, 33.0) }}"
+                timestamp: "{{ $timestamp() }}"
+          - get:
+              url: "/agents/{{ agentId }}/dashboard"
+              headers:
+                Authorization: "Bearer {{ authToken }}"
+          - think: 5
+        count: 36  # 3 minutes of 5-second intervals
+
+  - name: "Admin Monitoring Load"
+    weight: 40
+    flow:
+      - loop:
+          - get:
+              url: "/agents/admin/all"
+          - get:
+              url: "/agents/online"
+          - get:
+              url: "/agents/admin/analytics"
+          - think: 10
+        count: 18  # Every 10 seconds for 3 minutes

@@ -1,0 +1,31 @@
+{
+  "name": "transconnect-load-testing",
+  "version": "1.0.0",
+  "description": "Load testing suite for TransConnect MVP1",
+  "main": "index.js",
+  "scripts": {
+    "test:light": "artillery run scenarios/light-load.yml",
+    "test:moderate": "artillery run scenarios/moderate-load.yml",
+    "test:heavy": "artillery run scenarios/heavy-load.yml",
+    "test:spike": "artillery run scenarios/spike-test.yml",
+    "test:agents": "artillery run scenarios/agent-load.yml",
+    "test:booking": "artillery run scenarios/booking-load.yml",
+    "test:api": "node scripts/api-load-test.js",
+    "test:database": "node scripts/db-performance-test.js",
+    "test:concurrent": "node scripts/concurrent-users-test.js",
+    "report": "artillery report --output reports/",
+    "all": "npm run test:light && npm run test:moderate && npm run test:heavy"
+  },
+  "devDependencies": {
+    "artillery": "^2.0.0",
+    "axios": "^1.6.0",
+    "faker": "^5.5.3",
+    "pg": "^8.11.0",
+    "dotenv": "^16.3.1",
+    "chalk": "^4.1.2",
+    "cli-progress": "^3.12.0"
+  },
+  "keywords": ["load-testing", "performance", "transconnect", "api-testing"],
+  "author": "TransConnect Team",
+  "license": "MIT"
+}

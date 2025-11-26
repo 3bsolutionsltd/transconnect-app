@@ -127,14 +127,22 @@ export async function verifyLoginOtp(req: Request, res: Response) {
     const agent = await prisma.agent.findUnique({ where: { phone } });
     if (!agent) return res.status(404).json({ error: 'Agent not found' });
 
-    // Update agent status to VERIFIED if not already
+    // Update agent status to VERIFIED if not already and mark as online
     let updatedAgent = agent;
+    const updateData: any = {
+      isOnline: true,
+      lastActiveAt: new Date(),
+      lastLoginAt: new Date(),
+    };
+    
     if (agent.status === 'PENDING') {
-      updatedAgent = await prisma.agent.update({
-        where: { id: agent.id },
-        data: { status: 'VERIFIED' }
-      });
+      updateData.status = 'VERIFIED';
     }
+    
+    updatedAgent = await prisma.agent.update({
+      where: { id: agent.id },
+      data: updateData
+    });
 
     // Generate new JWT token
     const token = jwt.sign({ sub: agent.id, type: 'agent' }, JWT_SECRET, { expiresIn: '7d' });
@@ -243,13 +251,21 @@ export async function getAllAgents(req: Request, res: Response) {
         walletBalance: wallet?.balance || 0,
         operatorsCount: counts?.operatorsCount || 0,
         commissionsCount: counts?.commissionsCount || 0,
-        totalEarnings: agent.totalEarnings || 0
+        totalEarnings: agent.totalEarnings || 0,
+        // Add online status fields for admin dashboard
+        isOnline: agent.isOnline || false,
+        lastActiveAt: agent.lastActiveAt,
+        lastLoginAt: agent.lastLoginAt
       };
     });
+
+    // Calculate online count
+    const onlineCount = agents.filter(a => a.isOnline).length;
 
     res.json({
       agents: agentsWithStats,
       total: agents.length,
+      online: onlineCount, // Add online count for admin dashboard
       byStatus: {
         PENDING: agents.filter(a => a.status === 'PENDING').length,
         VERIFIED: agents.filter(a => a.status === 'VERIFIED').length,

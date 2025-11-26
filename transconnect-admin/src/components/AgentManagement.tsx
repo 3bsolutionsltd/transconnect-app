@@ -32,10 +32,14 @@ interface Agent {
   operatorsCount: number;
   commissionsCount: number;
   totalEarnings: number;
+  isOnline: boolean;
+  lastActiveAt: string | null;
+  lastLoginAt: string | null;
 }
 
 interface AgentStats {
   total: number;
+  online: number;
   byStatus: {
     PENDING: number;
     VERIFIED: number;
@@ -47,7 +51,7 @@ interface AgentStats {
 
 const AgentManagement = () => {
   const [agents, setAgents] = useState<Agent[]>([]);
-  const [stats, setStats] = useState<AgentStats>({ total: 0, byStatus: { PENDING: 0, VERIFIED: 0, APPROVED: 0, SUSPENDED: 0, INACTIVE: 0 } });
+  const [stats, setStats] = useState<AgentStats>({ total: 0, online: 0, byStatus: { PENDING: 0, VERIFIED: 0, APPROVED: 0, SUSPENDED: 0, INACTIVE: 0 } });
   const [loading, setLoading] = useState(true);
   const [searchTerm, setSearchTerm] = useState('');
   const [statusFilter, setStatusFilter] = useState<string>('all');
@@ -81,12 +85,12 @@ const AgentManagement = () => {
 
       const data = await response.json();
       setAgents(data.agents || []);
-      setStats({ total: data.total || 0, byStatus: data.byStatus || {} });
+      setStats({ total: data.total || 0, online: data.online || 0, byStatus: data.byStatus || {} });
     } catch (error) {
       console.error('Error loading agents:', error);
       // Set fallback data for development
       setAgents([]);
-      setStats({ total: 0, byStatus: { PENDING: 0, VERIFIED: 0, APPROVED: 0, SUSPENDED: 0, INACTIVE: 0 } });
+      setStats({ total: 0, online: 0, byStatus: { PENDING: 0, VERIFIED: 0, APPROVED: 0, SUSPENDED: 0, INACTIVE: 0 } });
     } finally {
       setLoading(false);
     }
@@ -206,7 +210,7 @@ const AgentManagement = () => {
       </div>
 
       {/* Stats Cards */}
-      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-6">
+      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-6 gap-6">
         <div className="bg-white p-6 rounded-lg shadow border">
           <div className="flex items-center justify-between">
             <div>
@@ -215,6 +219,18 @@ const AgentManagement = () => {
             </div>
             <div className="h-12 w-12 bg-blue-100 rounded-lg flex items-center justify-center">
               <Users className="h-6 w-6 text-blue-600" />
+            </div>
+          </div>
+        </div>
+
+        <div className="bg-white p-6 rounded-lg shadow border">
+          <div className="flex items-center justify-between">
+            <div>
+              <p className="text-sm font-medium text-gray-600">Online Now</p>
+              <p className="text-3xl font-bold text-green-600">{stats.online}</p>
+            </div>
+            <div className="h-12 w-12 bg-green-100 rounded-lg flex items-center justify-center">
+              <div className="h-3 w-3 bg-green-500 rounded-full animate-pulse"></div>
             </div>
           </div>
         </div>
@@ -323,6 +339,9 @@ const AgentManagement = () => {
                   Status
                 </th>
                 <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                  Online Status
+                </th>
+                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
                   Operators
                 </th>
                 <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
@@ -365,6 +384,21 @@ const AgentManagement = () => {
                       {getStatusIcon(agent.status)}
                       <span className="ml-1">{agent.status}</span>
                     </span>
+                  </td>
+                  <td className="px-6 py-4 whitespace-nowrap">
+                    <div className="flex flex-col">
+                      <div className="flex items-center mb-1">
+                        <div className={`h-2 w-2 rounded-full mr-2 ${agent.isOnline ? 'bg-green-500 animate-pulse' : 'bg-gray-400'}`}></div>
+                        <span className={`text-xs font-medium ${agent.isOnline ? 'text-green-600' : 'text-gray-500'}`}>
+                          {agent.isOnline ? 'Online' : 'Offline'}
+                        </span>
+                      </div>
+                      {agent.lastActiveAt && (
+                        <div className="text-xs text-gray-400">
+                          {agent.isOnline ? 'Active now' : `Last: ${new Date(agent.lastActiveAt).toLocaleString()}`}
+                        </div>
+                      )}
+                    </div>
                   </td>
                   <td className="px-6 py-4 whitespace-nowrap">
                     <div className="flex items-center">

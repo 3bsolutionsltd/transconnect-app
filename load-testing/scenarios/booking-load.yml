@@ -1,0 +1,82 @@
+config:
+  target: 'http://localhost:5000/api'
+  phases:
+    - duration: 240
+      arrivalRate: 15
+      name: "Booking system stress test"
+  processor: "../scripts/processor.js"
+
+scenarios:
+  - name: "End-to-End Booking Flow"
+    weight: 80
+    flow:
+      - post:
+          url: "/auth/register"
+          json:
+            email: "bookinguser{{ $randomInt(1, 5000) }}@test.com"
+            password: "BookingTest123!"
+            name: "Booking User {{ $randomInt(1, 1000) }}"
+            phone: "+25677{{ $randomInt(1000000, 9999999) }}"
+            role: "customer"
+          capture:
+            - json: "$.token"
+              as: "customerToken"
+            - json: "$.user.id"
+              as: "customerId"
+      - get:
+          url: "/routes"
+          qs:
+            origin: "{{ $randomPick(['Kampala', 'Entebbe', 'Jinja']) }}"
+            destination: "{{ $randomPick(['Mbarara', 'Gulu', 'Lira']) }}"
+            date: "{{ $futureDate() }}"
+      - get:
+          url: "/buses"
+          qs:
+            status: "active"
+      - post:
+          url: "/bookings"
+          headers:
+            Authorization: "Bearer {{ customerToken }}"
+          json:
+            routeId: "{{ $randomInt(1, 15) }}"
+            seatNumber: "{{ $randomInt(1, 50) }}"
+            passengerName: "Test Passenger {{ $randomInt(1, 1000) }}"
+            passengerPhone: "+25677{{ $randomInt(1000000, 9999999) }}"
+          capture:
+            - json: "$.id"
+              as: "bookingId"
+      - post:
+          url: "/payments/initialize"
+          headers:
+            Authorization: "Bearer {{ customerToken }}"
+          json:
+            bookingId: "{{ bookingId }}"
+            amount: "{{ $randomInt(15000, 45000) }}"
+            method: "{{ $randomPick(['mtn', 'airtel']) }}"
+      - get:
+          url: "/bookings/{{ bookingId }}"
+          headers:
+            Authorization: "Bearer {{ customerToken }}"
+
+  - name: "Concurrent Seat Selection"
+    weight: 20
+    flow:
+      - post:
+          url: "/auth/login"
+          json:
+            email: "concurrentuser{{ $randomInt(1, 100) }}@test.com"
+            password: "ConcurrentTest123!"
+          capture:
+            - json: "$.token"
+              as: "customerToken"
+      - get:
+          url: "/routes/1/seats"
+      - post:
+          url: "/bookings"
+          headers:
+            Authorization: "Bearer {{ customerToken }}"
+          json:
+            routeId: 1
+            seatNumber: "{{ $randomInt(1, 20) }}"  # High chance of conflicts
+            passengerName: "Concurrent Test"
+            passengerPhone: "+256771234567"

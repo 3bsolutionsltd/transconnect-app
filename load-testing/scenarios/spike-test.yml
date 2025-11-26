@@ -1,0 +1,38 @@
+config:
+  target: 'http://localhost:5000/api'
+  phases:
+    - duration: 30
+      arrivalRate: 5
+      name: "Baseline"
+    - duration: 10
+      arrivalRate: 500
+      name: "Spike!"
+    - duration: 60
+      arrivalRate: 10
+      name: "Recovery"
+  processor: "../scripts/processor.js"
+
+scenarios:
+  - name: "Traffic Spike Simulation"
+    weight: 100
+    flow:
+      - post:
+          url: "/auth/login"
+          json:
+            email: "spiketest{{ $randomInt(1, 1000) }}@test.com"
+            password: "SpikeTest123!"
+          capture:
+            - json: "$.token"
+              as: "authToken"
+      - get:
+          url: "/routes"
+          qs:
+            origin: "Kampala"
+            destination: "Entebbe"
+      - post:
+          url: "/agents/activity"
+          headers:
+            Authorization: "Bearer {{ authToken }}"
+          json:
+            action: "heartbeat"
+            timestamp: "{{ $timestamp() }}"
