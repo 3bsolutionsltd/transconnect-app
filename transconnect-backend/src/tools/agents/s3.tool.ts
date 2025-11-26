@@ -22,6 +22,12 @@ export async function generatePresignedUploadUrl(
   const isDemoMode = process.env.DEMO_MODE === 'true' || !hasAwsCredentials;
   const fileKey = `kyc/${agentId}/${crypto.randomUUID()}-${fileName}`;
   
+  console.log(`🔍 [S3 TOOL] Upload mode detection:`);
+  console.log(`- NODE_ENV: ${process.env.NODE_ENV}`);
+  console.log(`- DEMO_MODE: ${process.env.DEMO_MODE}`);
+  console.log(`- Has AWS credentials: ${hasAwsCredentials}`);
+  console.log(`- Using demo mode: ${isDemoMode}`);
+  
   if (isDemoMode) {
     console.log(`📄 [DEMO MODE] KYC file upload simulation:`);
     console.log(`- File: ${fileName}`);
