@@ -46,7 +46,7 @@ export default {
   getPresign: (fileName: string, type: string, agentId?: string) => {
     const params = new URLSearchParams({
       fileName,
-      type,
+      contentType: type,
       ...(agentId && { agentId })
     });
     return request(`/kyc/presign?${params}`);
