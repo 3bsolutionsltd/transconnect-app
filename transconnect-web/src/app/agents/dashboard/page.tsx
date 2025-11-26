@@ -56,13 +56,15 @@ export default function AgentDashboardPage() {
 
   // Interactive functions
   const copyReferralLink = () => {
-    const link = `http://localhost:3000/agents/register?ref=${data?.agent?.referralCode}`;
+    const baseUrl = process.env.NODE_ENV === 'production' ? 'https://transconnect-web.vercel.app' : 'http://localhost:3000';
+    const link = `${baseUrl}/agents/register?ref=${data?.agent?.referralCode}`;
     navigator.clipboard.writeText(link);
     setNotifications(prev => ['Referral link copied to clipboard!', ...prev.slice(0, 4)]);
   };
 
   const shareReferralLink = () => {
-    const link = `http://localhost:3000/agents/register?ref=${data?.agent?.referralCode}`;
+    const baseUrl = process.env.NODE_ENV === 'production' ? 'https://transconnect-web.vercel.app' : 'http://localhost:3000';
+    const link = `${baseUrl}/agents/register?ref=${data?.agent?.referralCode}`;
     const text = `Join TransConnect as an agent and earn commissions! Use my referral link: ${link}`;
     
     if (navigator.share) {
@@ -282,11 +284,11 @@ export default function AgentDashboardPage() {
                 <div className="space-y-4">
                   <div className="grid grid-cols-2 gap-4 text-center">
                     <div className="p-3 bg-gray-50 rounded-lg">
-                      <div className="text-lg font-bold text-gray-900">UGX 125K</div>
+                      <div className="text-lg font-bold text-gray-900">UGX {data.monthlyEarnings?.toLocaleString() || '0'}</div>
                       <div className="text-xs text-gray-500">This Month</div>
                     </div>
                     <div className="p-3 bg-gray-50 rounded-lg">
-                      <div className="text-lg font-bold text-gray-900">UGX 45K</div>
+                      <div className="text-lg font-bold text-gray-900">UGX {data.weeklyEarnings?.toLocaleString() || '0'}</div>
                       <div className="text-xs text-gray-500">This Week</div>
                     </div>
                   </div>
@@ -326,7 +328,7 @@ export default function AgentDashboardPage() {
                 <div className="bg-gray-50 rounded-lg p-3">
                   <div className="text-xs text-gray-500 mb-1">Referral Link</div>
                   <div className="text-sm font-mono text-gray-800 break-all">
-                    http://localhost:3000/agents/register?ref={data.agent?.referralCode}
+                    {process.env.NODE_ENV === 'production' ? 'https://transconnect-web.vercel.app' : 'http://localhost:3000'}/agents/register?ref={data.agent?.referralCode}
                   </div>
                 </div>
                 <div className="space-y-2">
@@ -385,11 +387,11 @@ export default function AgentDashboardPage() {
               <div className="space-y-4">
                 <div className="grid grid-cols-2 gap-4 text-center">
                   <div className="p-3 bg-gray-50 rounded-lg">
-                    <div className="text-lg font-bold text-gray-900">3</div>
+                    <div className="text-lg font-bold text-gray-900">{data.operatorStats?.operators || '0'}</div>
                     <div className="text-xs text-gray-500">Operators</div>
                   </div>
                   <div className="p-3 bg-gray-50 rounded-lg">
-                    <div className="text-lg font-bold text-gray-900">12</div>
+                    <div className="text-lg font-bold text-gray-900">{data.operatorStats?.routes || '0'}</div>
                     <div className="text-xs text-gray-500">Routes</div>
                   </div>
                 </div>
