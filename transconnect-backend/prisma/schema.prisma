@@ -459,6 +459,7 @@ model AgentProfile {
   region       String?
   bankAccount  String?
   bankName     String?
+  momoNumber   String?
   nationalId   String?
   dateOfBirth  DateTime?
   occupation   String?

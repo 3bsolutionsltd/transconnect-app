@@ -1,6 +1,7 @@
 import { Router } from 'express';
 import { registerAgent, verifyOtp, getDashboard, requestWithdrawal, loginAgent, verifyLoginOtp, getAllAgents, updateAgentStatus } from '../../services/agents/agent.service';
 import { uploadKyc, confirmKycUpload, listPendingKyc, reviewKyc, getPresignedUrl } from './kyc/kyc.controller';
+import { updateProfile, getProfile } from './profile/profile.controller';
 import operatorRoutes from './operators';
 import { authenticateToken } from '../../middleware/auth';
 import { trackAgentActivity, getOnlineAgents, getOnlineAgentsCount, markAgentOffline, cleanupOfflineAgents } from '../../middleware/agentActivity';
@@ -27,6 +28,10 @@ router.post('/kyc/confirm', confirmKycUpload);
 router.get('/kyc/pending', listPendingKyc);
 router.post('/kyc/:kycId/review', reviewKyc);
 router.get('/kyc/presign', getPresignedUrl);
+
+// Profile management
+router.put('/profile', updateProfile);
+router.get('/profile/:agentId', getProfile);
 
 // Admin routes for agent management
 router.get('/admin/all', authenticateToken, getAllAgents);
