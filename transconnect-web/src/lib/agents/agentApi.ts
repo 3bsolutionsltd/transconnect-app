@@ -2,12 +2,9 @@
  * Lightweight wrapper for agent API calls.
  * All calls return parsed JSON or throw.
  */
-const getAgentApiBase = () => {
-  const backendPort = process.env.NEXT_PUBLIC_BACKEND_PORT || '5000';
-  return process.env.NEXT_PUBLIC_AGENT_API_BASE || `http://localhost:${backendPort}/api/agents`;
-};
+import { endpoints } from '../config';
 
-const BASE = getAgentApiBase();
+const BASE = endpoints.agents.register.replace('/register', ''); // Get base agents URL
 
 async function request(path: string, opts: any = {}) {
   const url = `${BASE}${path}`;
