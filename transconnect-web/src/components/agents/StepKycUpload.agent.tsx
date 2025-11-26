@@ -18,7 +18,7 @@ export default function StepKycUpload({ onNext, onBack, draft }: any) {
       const presign = await agentApi.getPresign(file.name, file.type, draft.id);
       
       // Check if we're in demo mode based on the URL
-      const isDemoMode = presign.uploadUrl.includes('demo-upload.transconnect.app');
+      const isDemoMode = presign.uploadUrl.startsWith('DEMO_MODE:');
       
       if (isDemoMode) {
         console.log('📄 [DEMO MODE] Starting KYC upload simulation...');

@@ -8,8 +8,8 @@ export default function uploadToPresigned(
   onProgress: (progress: number) => void
 ): Promise<void> {
   return new Promise<void>((resolve, reject) => {
-    // Check if this is a demo mode URL
-    if (url.includes('demo-upload.transconnect.app')) {
+    // Check if this is demo mode (URL starts with DEMO_MODE:)
+    if (url.startsWith('DEMO_MODE:')) {
       console.log('📄 [DEMO MODE] Simulating file upload:', file.name);
       
       // Simulate upload progress

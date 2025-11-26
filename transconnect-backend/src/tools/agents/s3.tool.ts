@@ -36,9 +36,9 @@ export async function generatePresignedUploadUrl(
     console.log(`- File Key: ${fileKey}`);
     console.log(`(In production, this would generate AWS S3 presigned URL)`);
     
-    // Return a mock upload URL for demo mode
+    // Return a special demo mode indicator instead of fake URL
     return { 
-      uploadUrl: `https://demo-upload.transconnect.app/upload?key=${fileKey}`,
+      uploadUrl: `DEMO_MODE:${fileKey}`,
       fileKey 
     };
   }
