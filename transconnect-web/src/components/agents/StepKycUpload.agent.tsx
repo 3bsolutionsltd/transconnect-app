@@ -14,31 +14,21 @@ export default function StepKycUpload({ onNext, onBack, draft }: any) {
     
     setLoading(true);
     try {
-      // Simulate progress for demo/development when backend is down
-      const isDevelopment = process.env.NODE_ENV === 'development';
+      // Get presigned URL from backend
+      const presign = await agentApi.getPresign(file.name, file.type, draft.id);
       
-      if (isDevelopment) {
-        // Simulate upload progress
-        for (let i = 0; i <= 100; i += 10) {
-          setProgress(i);
-          await new Promise(resolve => setTimeout(resolve, 100));
-        }
-        
-        // Try real upload, but continue if it fails in development
-        try {
-          const presign = await agentApi.getPresign(file.name, file.type, draft.id);
-          await uploadToPresigned(presign.uploadUrl, file, (p:number)=>setProgress(p));
-          await agentApi.uploadKyc(draft.id, presign.fileKey);
-        } catch (apiError) {
-          console.warn('API upload failed, continuing in development mode:', apiError);
-          // In development, we continue anyway for testing purposes
-        }
-      } else {
-        // Production: require successful upload
-        const presign = await agentApi.getPresign(file.name, file.type, draft.id);
-        await uploadToPresigned(presign.uploadUrl, file, (p:number)=>setProgress(p));
-        await agentApi.uploadKyc(draft.id, presign.fileKey);
+      // Check if we're in demo mode based on the URL
+      const isDemoMode = presign.uploadUrl.includes('demo-upload.transconnect.app');
+      
+      if (isDemoMode) {
+        console.log('📄 [DEMO MODE] Starting KYC upload simulation...');
       }
+      
+      // Upload file (will be simulated if demo mode)
+      await uploadToPresigned(presign.uploadUrl, file, (p:number)=>setProgress(p));
+      
+      // Confirm upload with backend
+      await agentApi.uploadKyc(draft.id, presign.fileKey);
       
       setLoading(false);
       onNext({ kycUploaded: true, fileName: file.name, fileSize: file.size });
@@ -59,6 +49,13 @@ export default function StepKycUpload({ onNext, onBack, draft }: any) {
         </div>
         <h2 className="text-2xl font-bold text-gray-900 mb-2">Upload Your ID</h2>
         <p className="text-gray-600">We need to verify your identity for security and compliance</p>
+        {process.env.NODE_ENV === 'development' && (
+          <div className="mt-2 px-3 py-1 bg-yellow-100 border border-yellow-300 rounded-md">
+            <p className="text-xs text-yellow-800">
+              🧪 Demo Mode: File uploads will be simulated
+            </p>
+          </div>
+        )}
       </div>
 
       <form onSubmit={submit} className="space-y-6">
