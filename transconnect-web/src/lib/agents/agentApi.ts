@@ -2,7 +2,12 @@
  * Lightweight wrapper for agent API calls.
  * All calls return parsed JSON or throw.
  */
-const BASE = process.env.NEXT_PUBLIC_AGENT_API_BASE || 'http://localhost:5000/api/agents';
+const getAgentApiBase = () => {
+  const backendPort = process.env.NEXT_PUBLIC_BACKEND_PORT || '5000';
+  return process.env.NEXT_PUBLIC_AGENT_API_BASE || `http://localhost:${backendPort}/api/agents`;
+};
+
+const BASE = getAgentApiBase();
 
 async function request(path: string, opts: any = {}) {
   const url = `${BASE}${path}`;
@@ -56,7 +61,7 @@ export default {
   }),
 
   // Dashboard and agent data
-  getDashboard: (agentId: string, token?: string) => request(`/dashboard`, { 
+  getDashboard: (agentId: string, token?: string) => request(`/${agentId}/dashboard`, { 
     headers: token ? { Authorization: `Bearer ${token}` } : {} 
   }),
 

@@ -1,6 +1,20 @@
 import axios from 'axios';
 
-const API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:5000/api';
+// Dynamic API URL configuration
+const getBackendPort = () => {
+  return process.env.NEXT_PUBLIC_BACKEND_PORT || '5000';
+};
+
+const getApiBaseUrl = () => {
+  if (typeof window !== 'undefined') {
+    // In browser, try to detect backend port
+    const backendPort = getBackendPort();
+    return `http://localhost:${backendPort}/api`;
+  }
+  return process.env.NEXT_PUBLIC_API_URL || `http://localhost:${getBackendPort()}/api`;
+};
+
+const API_URL = getApiBaseUrl();
 
 export const api = axios.create({
   baseURL: API_URL,

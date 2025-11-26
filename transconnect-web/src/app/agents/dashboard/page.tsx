@@ -2,6 +2,7 @@
 import React, { useEffect, useState } from 'react';
 import agentApi from '../../../lib/agents/agentApi';
 import { useAgentAuth, logoutAgent } from '../../../lib/agents/authHelpers';
+import { useAgentActivityTracking } from '../../../lib/agents/activityTracker';
 import BalanceCard from '../../../components/agents/BalanceCard.agent';
 import PendingCommissionsList from '../../../components/agents/PendingCommissionsList.agent';
 import ReferralShare from '../../../components/agents/ReferralShare.agent';
@@ -9,6 +10,7 @@ import DownlineView from '../../../components/agents/DownlineView.agent';
 
 export default function AgentDashboardPage() {
   const { token, agentId } = useAgentAuth();
+  const { startTracking, stopTracking } = useAgentActivityTracking(agentId, token);
   const [data, setData] = useState<any>(null);
   const [notifications, setNotifications] = useState<string[]>([]);
   const [showWithdrawalModal, setShowWithdrawalModal] = useState(false);
@@ -17,51 +19,40 @@ export default function AgentDashboardPage() {
   useEffect(() => {
     async function load() {
       if (!agentId) {
-        console.warn('No agent ID found. Setting demo data for testing...');
-        // Set demo data when no agent ID is found (for testing)
-        setData({
-          agent: { name: 'Stephen Omwony', referralCode: 'STEP6946' },
-          wallet: { balance: 25000 },
-          pendingCommissions: [
-            { id: 1, amount: 2500, type: 'Direct Referral', date: '2025-11-24', status: 'pending' },
-            { id: 2, amount: 1250, type: 'Level 2 Commission', date: '2025-11-23', status: 'pending' }
-          ],
-          downline: [
-            { id: 1, name: 'John Doe', phone: '256701234567', joinDate: '2025-11-20', status: 'active' },
-            { id: 2, name: 'Jane Smith', phone: '256709876543', joinDate: '2025-11-22', status: 'pending' }
-          ]
-        });
-        // Set some demo notifications
-        setNotifications([
-          'New referral: John Doe joined using your link!',
-          'Commission earned: UGX 2,500 from direct referral',
-          'KYC verification pending - complete to unlock withdrawals'
-        ]);
-        // Set some demo notifications
-        setNotifications([
-          'New referral: John Doe joined using your link!',
-          'Commission earned: UGX 2,500 from direct referral',
-          'KYC verification pending - complete to unlock withdrawals'
-        ]);
+        console.error('❌ No agent ID found. User must be properly authenticated.');
+        setNotifications(['Authentication error. Please log in again.']);
+        // Redirect to login instead of showing demo data
+        if (typeof window !== 'undefined') {
+          window.location.href = '/agents/login';
+        }
         return;
       }
       
       try {
         const resp = await agentApi.getDashboard(agentId, token || undefined);
         setData(resp);
+        console.log('✅ Dashboard data loaded for agent:', agentId, resp);
       } catch (error) {
-        console.error('Failed to load dashboard data:', error);
-        // Set fallback data on API error
-        setData({
-          agent: { name: 'Stephen Omwony', referralCode: 'STEP6946' },
-          wallet: { balance: 25000 },
-          pendingCommissions: [],
-          downline: []
-        });
+        console.error('❌ Failed to load dashboard data:', error);
+        setNotifications(prev => ['Failed to load dashboard data. Please try refreshing the page.', ...prev.slice(0, 4)]);
+        // Don't set fallback data - this was masking authentication issues
       }
     }
     load();
   }, [token, agentId]);
+
+  // Activity tracking effect
+  useEffect(() => {
+    if (agentId && token) {
+      startTracking();
+      console.log('🔄 Agent activity tracking started');
+      
+      return () => {
+        stopTracking();
+        console.log('🛑 Agent activity tracking stopped');
+      };
+    }
+  }, [agentId, token, startTracking, stopTracking]);
 
   // Interactive functions
   const copyReferralLink = () => {
@@ -248,21 +239,21 @@ export default function AgentDashboardPage() {
 
       {/* Main Content */}
       <div className="max-w-6xl mx-auto px-4 py-8">
-        {/* Demo Notice */}
-        {!agentId && (
-          <div className="bg-yellow-50 border border-yellow-200 rounded-lg p-4 mb-6">
+        {/* Authentication Error Notice */}
+        {(!agentId || !data) && (
+          <div className="bg-red-50 border border-red-200 rounded-lg p-4 mb-6">
             <div className="flex items-center">
               <div className="flex-shrink-0">
-                <svg className="h-5 w-5 text-yellow-400" viewBox="0 0 20 20" fill="currentColor">
-                  <path fillRule="evenodd" d="M8.257 3.099c.765-1.36 2.722-1.36 3.486 0l5.58 9.92c.75 1.334-.213 2.98-1.742 2.98H4.42c-1.53 0-2.493-1.646-1.743-2.98l5.58-9.92zM11 13a1 1 0 11-2 0 1 1 0 012 0zm-1-8a1 1 0 00-1 1v3a1 1 0 002 0V6a1 1 0 00-1-1z" clipRule="evenodd" />
+                <svg className="h-5 w-5 text-red-400" viewBox="0 0 20 20" fill="currentColor">
+                  <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zM8.707 7.293a1 1 0 00-1.414 1.414L8.586 10l-1.293 1.293a1 1 0 101.414 1.414L10 11.414l1.293 1.293a1 1 0 001.414-1.414L11.414 10l1.293-1.293a1 1 0 00-1.414-1.414L10 8.586 8.707 7.293z" clipRule="evenodd" />
                 </svg>
               </div>
               <div className="ml-3">
-                <p className="text-sm text-yellow-800">
-                  <strong>Demo Mode:</strong> This dashboard is showing sample data. 
-                  <a href="/agents/onboard" className="font-medium underline hover:text-yellow-900 ml-1">
-                    Complete your registration
-                  </a> to access your real dashboard.
+                <p className="text-sm text-red-800">
+                  <strong>Authentication Required:</strong> Please log in to access your dashboard.
+                  <a href="/agents/login" className="font-medium underline hover:text-red-900 ml-1">
+                    Go to Login
+                  </a>
                 </p>
               </div>
             </div>
