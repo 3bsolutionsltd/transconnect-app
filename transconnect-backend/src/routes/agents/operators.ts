@@ -32,7 +32,7 @@ const validateAgentAccess = async (req: Request, res: Response, next: any) => {
  * Register a new operator under agent management
  * POST /api/agents/:agentId/operators
  */
-router.post('/:agentId/operators',
+router.post('/',
   authenticateAgentToken,
   validateAgentAccess,
   [
@@ -71,7 +71,7 @@ router.post('/:agentId/operators',
  * Get all operators managed by an agent
  * GET /api/agents/:agentId/operators
  */
-router.get('/:agentId/operators',
+router.get('/',
   authenticateAgentToken,
   validateAgentAccess,
   [
@@ -106,7 +106,7 @@ router.get('/:agentId/operators',
  * Get agent's operator management dashboard
  * GET /api/agents/:agentId/operators/dashboard
  */
-router.get('/:agentId/operators/dashboard',
+router.get('/dashboard',
   authenticateAgentToken,
   validateAgentAccess,
   [
@@ -140,7 +140,7 @@ router.get('/:agentId/operators/dashboard',
  * Get detailed operator information
  * GET /api/agents/:agentId/operators/:operatorId
  */
-router.get('/:agentId/operators/:operatorId',
+router.get('/:operatorId',
   authenticateAgentToken,
   validateAgentAccess,
   [
@@ -175,7 +175,7 @@ router.get('/:agentId/operators/:operatorId',
  * Update operator information
  * PUT /api/agents/:agentId/operators/:operatorId
  */
-router.put('/:agentId/operators/:operatorId',
+router.put('/:operatorId',
   authenticateAgentToken,
   validateAgentAccess,
   [
@@ -213,7 +213,7 @@ router.put('/:agentId/operators/:operatorId',
  * Get operator analytics
  * GET /api/agents/:agentId/operators/:operatorId/analytics
  */
-router.get('/:agentId/operators/:operatorId/analytics',
+router.get('/:operatorId/analytics',
   authenticateAgentToken,
   validateAgentAccess,
   [

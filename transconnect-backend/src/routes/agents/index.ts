@@ -150,7 +150,7 @@ router.post('/test/:agentId/ping', trackAgentActivity, async (req, res) => {
   }
 });
 
-// Operator Management
-router.use('/', operatorRoutes);
+// Operator Management - mount under /:agentId/operators path
+router.use('/:agentId/operators', operatorRoutes);
 
 export default router;
