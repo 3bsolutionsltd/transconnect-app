@@ -130,6 +130,19 @@ Contact support for rebooking assistance.`
   }
 
   public async sendSMS(data: SMSData): Promise<{ success: boolean; messageId?: string; error?: string }> {
+    // Development/Demo mode - always succeed and log
+    const isDemoMode = process.env.NODE_ENV !== 'production' || process.env.DEMO_MODE === 'true';
+    
+    if (isDemoMode) {
+      console.log(`📱 [DEMO MODE] SMS to ${data.phoneNumber}:`);
+      console.log(`Message: ${data.message}`);
+      console.log(`(In production, this would be sent via Twilio)`);
+      return { 
+        success: true, 
+        messageId: 'demo-' + Date.now() 
+      };
+    }
+
     if (!this.isConfigured || !this.client) {
       console.log(`📱 SMS would be sent to ${data.phoneNumber}: ${data.message}`);
       return { 

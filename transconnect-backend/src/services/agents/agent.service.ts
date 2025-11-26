@@ -1,6 +1,6 @@
 import { prisma } from '../../index';
 import { sendOtp, verifyOtpCode } from '../../tools/agents/otp.tool';
-import { sendSms } from '../../tools/agents/notification.tool';
+import SMSService from '../sms.service';
 import WalletService from './agent-wallet.service';
 import ReferralService from './agent-referral.service';
 import jwt from 'jsonwebtoken';
@@ -31,8 +31,14 @@ export async function registerAgent(req: Request, res: Response) {
     await WalletService.createWallet(agent.id);
     await prisma.kYCVerification.create({ data: { agentId: agent.id } });
 
-    await sendOtp(phone);
-    await sendSms(phone, `Your TransConnect OTP code has been sent.`);
+    const otpResult = await sendOtp(phone);
+    
+    // Send actual SMS with OTP code
+    const smsService = SMSService.getInstance();
+    await smsService.sendSMS({
+      phoneNumber: phone,
+      message: `Your TransConnect verification code is: ${otpResult.otp}\n\nThis code expires in 10 minutes.\n\nDo not share this code with anyone.`
+    });
 
     return res.status(201).json({ agent, next_step: 'verify_phone' });
   } catch (err: any) {
@@ -102,8 +108,14 @@ export async function loginAgent(req: Request, res: Response) {
     }
 
     // Send OTP
-    await sendOtp(phone);
-    await sendSms(phone, `Your TransConnect login OTP code has been sent.`);
+    const otpResult = await sendOtp(phone);
+    
+    // Send actual SMS with OTP code
+    const smsService = SMSService.getInstance();
+    await smsService.sendSMS({
+      phoneNumber: phone,
+      message: `Your TransConnect login code is: ${otpResult.otp}\n\nThis code expires in 10 minutes.\n\nDo not share this code with anyone.`
+    });
 
     return res.status(200).json({ 
       message: 'OTP sent successfully',

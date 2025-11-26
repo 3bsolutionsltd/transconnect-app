@@ -165,3 +165,6 @@ deployment/
 # Local development
 .local/
 .temp/
+
+# Strategic documents (exclude from git)
+BLOCKCHAIN_STRATEGY.md
