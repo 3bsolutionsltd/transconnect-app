@@ -5,7 +5,7 @@ import MultiProviderSMSService from '../multi-provider-sms.service';
 import EmailOTPService from '../email-otp.service';
 import WalletService from './agent-wallet.service';
 import ReferralService from './agent-referral.service';
-import { PhoneNormalizer, normalizePhone } from '../../utils/phone-normalizer';
+import { PhoneNormalizer } from '../../utils/phone-normalizer';
 import jwt from 'jsonwebtoken';
 import { Request, Response } from 'express';
 
@@ -16,7 +16,7 @@ export async function registerAgent(req: Request, res: Response) {
     const { name, phone, email, referralCode } = req.body;
 
     // Normalize phone number
-    const phoneValidation = normalizePhone(phone, 'UG'); // Default to Uganda
+    const phoneValidation = PhoneNormalizer.normalize(phone, 'UG'); // Default to Uganda
     
     if (!phoneValidation.isValid) {
       console.log(`❌ Invalid phone number: ${phone}`);
@@ -174,7 +174,7 @@ export async function verifyOtp(req: Request, res: Response) {
     const { phone, otp } = req.body;
 
     // Normalize phone number for verification
-    const phoneValidation = normalizePhone(phone, 'UG');
+    const phoneValidation = PhoneNormalizer.normalize(phone, 'UG');
     const normalizedPhone = phoneValidation.isValid ? phoneValidation.normalizedNumber! : phone;
     
     console.log(`📱 OTP verification for: "${phone}" → "${normalizedPhone}"`);
@@ -278,7 +278,7 @@ export async function loginAgent(req: Request, res: Response) {
     const { phone } = req.body;
 
     // Normalize phone number
-    const phoneValidation = normalizePhone(phone, 'UG');
+    const phoneValidation = PhoneNormalizer.normalize(phone, 'UG');
     
     if (!phoneValidation.isValid) {
       return res.status(400).json({ 
@@ -344,7 +344,7 @@ export async function verifyLoginOtp(req: Request, res: Response) {
     const { phone, otp } = req.body;
 
     // Normalize phone number for verification
-    const phoneValidation = normalizePhone(phone, 'UG');
+    const phoneValidation = PhoneNormalizer.normalize(phone, 'UG');
     const normalizedPhone = phoneValidation.isValid ? phoneValidation.normalizedNumber! : phone;
     
     console.log(`📱 Login OTP verification for: "${phone}" → "${normalizedPhone}"`);
@@ -557,7 +557,7 @@ export async function resendRegistrationOtp(req: Request, res: Response) {
     }
 
     // Normalize phone number
-    const phoneValidation = normalizePhone(phone, 'UG');
+    const phoneValidation = PhoneNormalizer.normalize(phone, 'UG');
     
     if (!phoneValidation.isValid) {
       return res.status(400).json({ 
@@ -658,7 +658,7 @@ export async function checkRegistrationStatus(req: Request, res: Response) {
     }
 
     // Normalize phone number
-    const phoneValidation = normalizePhone(phone, 'UG');
+    const phoneValidation = PhoneNormalizer.normalize(phone, 'UG');
     
     if (!phoneValidation.isValid) {
       return res.status(400).json({ 
@@ -745,7 +745,7 @@ export async function resendLoginOtp(req: Request, res: Response) {
     }
 
     // Normalize phone number
-    const phoneValidation = normalizePhone(phone, 'UG');
+    const phoneValidation = PhoneNormalizer.normalize(phone, 'UG');
     
     if (!phoneValidation.isValid) {
       return res.status(400).json({ 

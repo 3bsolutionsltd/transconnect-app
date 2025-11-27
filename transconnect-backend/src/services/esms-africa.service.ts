@@ -39,14 +39,17 @@ export class ESMSAfricaService {
   }
 
   private formatPhoneNumber(phoneNumber: string): string {
-    // Use the PhoneNormalizer utility for consistent formatting
-    const { PhoneNormalizer } = require('../utils/phone-normalizer');
+    // Import PhoneNormalizer properly
+    try {
+      const { PhoneNormalizer } = require('../utils/phone-normalizer');
+      const result = PhoneNormalizer.normalize(phoneNumber, 'UG');
     
-    const result = PhoneNormalizer.normalize(phoneNumber, 'UG');
-    
-    if (result.isValid && result.normalizedNumber) {
-      console.log(`📱 eSMS Africa formatted: "${phoneNumber}" → "${result.normalizedNumber}"`);
-      return result.normalizedNumber;
+      if (result.isValid && result.normalizedNumber) {
+        console.log(`📱 eSMS Africa formatted: "${phoneNumber}" → "${result.normalizedNumber}"`);
+        return result.normalizedNumber;
+      }
+    } catch (error) {
+      console.log(`⚠️ PhoneNormalizer error: ${error}`);
     }
     
     // Fallback to original logic if normalization fails
