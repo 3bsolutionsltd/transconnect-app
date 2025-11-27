@@ -147,13 +147,23 @@ export class ESMSAfricaService {
       
       console.log(`📱 Sending SMS via eSMS Africa to ${formattedPhone}...`);
       
+      // Official eSMS Africa format per documentation
+      const payload = {
+        phoneNumber: formattedPhone,
+        text: data.message,
+        senderId: data.senderId || this.senderId
+      };
+
+      console.log(`🔍 eSMS Africa request payload:`, JSON.stringify(payload, null, 2));
+      console.log(`🔍 eSMS Africa headers:`, {
+        'X-Account-ID': this.accountId,
+        'X-API-Key': `${this.apiKey.substring(0, 8)}...`,
+        'Content-Type': 'application/json'
+      });
+
       const response = await axios.post(
         this.apiUrl,
-        {
-          phoneNumber: formattedPhone,
-          text: data.message,
-          senderId: data.senderId || this.senderId
-        },
+        payload,
         {
           headers: {
             'X-Account-ID': this.accountId,
@@ -208,10 +218,20 @@ export class ESMSAfricaService {
   public async verifyCredentials(): Promise<{ valid: boolean; error?: string; details?: any }> {
     try {
       console.log('🔍 Verifying eSMS Africa credentials...');
+      console.log(`🔍 Account ID: ${this.accountId}`);
+      console.log(`🔍 API Key: ${this.apiKey.substring(0, 8)}...${this.apiKey.substring(-4)}`);
+      console.log(`🔍 Sender ID: ${this.senderId}`);
       
-      // Try a simple balance check or account info request
-      const response = await axios.get(
-        'https://api.esmsafrica.com/v1/account/balance', // or whatever balance endpoint they have
+      // Official eSMS Africa test format per documentation
+      const testPayload = {
+        phoneNumber: '+256700000000', // Test number
+        text: 'Credential verification test - ignore',
+        senderId: this.senderId
+      };
+
+      const response = await axios.post(
+        this.apiUrl,
+        testPayload,
         {
           headers: {
             'X-Account-ID': this.accountId,
@@ -223,13 +243,22 @@ export class ESMSAfricaService {
       );
 
       console.log('✅ eSMS Africa credentials verified successfully');
+      console.log('✅ Response:', response.data);
       return { valid: true, details: response.data };
     } catch (error: any) {
-      console.error('❌ eSMS Africa credential verification failed:', error.response?.data || error.message);
+      console.error('❌ eSMS Africa credential verification failed:');
+      console.error(`   Status: ${error.response?.status}`);
+      console.error(`   Response: ${JSON.stringify(error.response?.data)}`);
+      console.error(`   Message: ${error.message}`);
+      
       return { 
         valid: false, 
         error: error.response?.data?.reason || error.message,
-        details: error.response?.data
+        details: {
+          status: error.response?.status,
+          data: error.response?.data,
+          message: error.message
+        }
       };
     }
   }

@@ -19,6 +19,42 @@ router.post('/login', loginAgent);
 router.post('/login/verify', verifyLoginOtp);
 router.post('/login/resend-otp', resendLoginOtp); // <- New login resend endpoint
 
+// SMS service testing
+router.post('/test-sms', async (req, res) => {
+  try {
+    const { phoneNumber } = req.body;
+    
+    if (!phoneNumber) {
+      return res.status(400).json({ success: false, error: 'phoneNumber is required' });
+    }
+
+    // Import the SMS service
+    const { ESMSAfricaService } = require('../../services/esms-africa.service');
+    const smsService = ESMSAfricaService.getInstance();
+    
+    // Verify credentials first
+    const credentialCheck = await smsService.verifyCredentials();
+    console.log('🔍 Credential verification result:', credentialCheck);
+    
+    // Send test SMS
+    const result = await smsService.sendTestSMS(phoneNumber);
+    
+    res.json({
+      success: result.success,
+      credentialCheck,
+      smsResult: result,
+      timestamp: new Date().toISOString()
+    });
+  } catch (error: any) {
+    console.error('❌ SMS test error:', error);
+    res.status(500).json({
+      success: false,
+      error: error.message,
+      timestamp: new Date().toISOString()
+    });
+  }
+});
+
 // dashboard
 router.get('/:agentId/dashboard', trackAgentActivity, getDashboard);
 
