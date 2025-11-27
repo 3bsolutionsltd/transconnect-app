@@ -1,5 +1,5 @@
 import { Router } from 'express';
-import { registerAgent, verifyOtp, getDashboard, requestWithdrawal, loginAgent, verifyLoginOtp, getAllAgents, updateAgentStatus } from '../../services/agents/agent.service';
+import { registerAgent, verifyOtp, getDashboard, requestWithdrawal, loginAgent, verifyLoginOtp, getAllAgents, updateAgentStatus, resendRegistrationOtp, resendLoginOtp, checkRegistrationStatus } from '../../services/agents/agent.service';
 import { uploadKyc, confirmKycUpload, listPendingKyc, reviewKyc, getPresignedUrl } from './kyc/kyc.controller';
 import { updateProfile, getProfile } from './profile/profile.controller';
 import operatorRoutes from './operators';
@@ -11,10 +11,13 @@ const router = Router();
 // onboarding
 router.post('/register', registerAgent);
 router.post('/verify-otp', verifyOtp);
+router.post('/resend-otp', resendRegistrationOtp); // <- New resend endpoint
+router.post('/check-status', checkRegistrationStatus); // <- Check registration status
 
 // login
 router.post('/login', loginAgent);
 router.post('/login/verify', verifyLoginOtp);
+router.post('/login/resend-otp', resendLoginOtp); // <- New login resend endpoint
 
 // dashboard
 router.get('/:agentId/dashboard', trackAgentActivity, getDashboard);

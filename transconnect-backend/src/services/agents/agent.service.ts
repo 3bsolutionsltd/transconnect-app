@@ -36,24 +36,97 @@ export async function registerAgent(req: Request, res: Response) {
     }
 
     // Check for existing agent with normalized number
-    const exists = await prisma.agent.findUnique({ where: { phone: normalizedPhone } });
-    if (exists) {
+    const existingAgent = await prisma.agent.findUnique({ where: { phone: normalizedPhone } });
+    
+    if (existingAgent) {
+      // If agent exists and is already VERIFIED, block registration
+      if (existingAgent.status === 'VERIFIED' || existingAgent.status === 'APPROVED') {
+        return res.status(400).json({ 
+          error: 'Phone number already registered and verified',
+          normalizedPhone,
+          hint: 'Please use login instead',
+          action: 'redirect_to_login'
+        });
+      }
+      
+      // If agent exists but is PENDING (never verified), allow re-registration
+      // This handles the case where user registered but never got/verified OTP
+      if (existingAgent.status === 'PENDING') {
+        console.log(`🔄 Re-registration attempt for unverified agent: ${existingAgent.name}`);
+        
+        // Update existing agent with new registration data (in case they want to change name/email)
+        const updatedAgent = await prisma.agent.update({
+          where: { id: existingAgent.id },
+          data: {
+            name: name || existingAgent.name, // Use new name or keep existing
+            email: email || existingAgent.email, // Use new email or keep existing
+            // Keep existing referral code and other data
+            updatedAt: new Date()
+          },
+        });
+
+        console.log(`✅ Updated existing pending agent registration`);
+        
+        // Continue with OTP sending process for the updated agent
+        const otpResult = await sendOtp(normalizedPhone);
+        
+        // Send OTP via intelligent SMS routing
+        const smsService = MultiProviderSMSService.getInstance();
+        const smsResult = await smsService.sendOTP(normalizedPhone, otpResult.otp, 'registration');
+        
+        console.log(`📱 Re-registration SMS Result: ${smsResult.success ? '✅' : '❌'} via ${smsResult.provider}`);
+        if (smsResult.cost) console.log(`💰 Estimated cost: ${smsResult.cost}`);
+        if (smsResult.fallbackUsed) console.log('🔄 Fallback provider was used');
+
+        // If SMS fails and agent has email, send email backup
+        if (!smsResult.success && updatedAgent.email) {
+          console.log('📧 SMS failed, sending email backup...');
+          const emailService = EmailOTPService.getInstance();
+          const emailResult = await emailService.sendOTP({
+            email: updatedAgent.email,
+            otp: otpResult.otp,
+            agentName: updatedAgent.name,
+            type: 'registration'
+          });
+          
+          if (emailResult.success) {
+            console.log('✅ Email OTP sent as backup');
+          } else {
+            console.log('❌ Both SMS and Email failed:', emailResult.error);
+          }
+        }
+
+        return res.status(201).json({ 
+          agent: updatedAgent, 
+          message: 'Registration updated, OTP sent',
+          isReRegistration: true,
+          next_step: 'verify_phone' 
+        });
+      }
+
+      // For any other status, block registration
       return res.status(400).json({ 
-        error: 'Phone number already registered',
+        error: `Phone number already registered with status: ${existingAgent.status}`,
         normalizedPhone,
-        hint: 'This number might be registered in a different format'
+        hint: 'Contact support if you need assistance',
+        status: existingAgent.status
       });
     }
 
+    // Create new agent
     const agent = await prisma.agent.create({
       data: {
         name,
         phone: normalizedPhone, // Use normalized phone number
         email,
         referralCode: generateReferralCode(name),
+        status: 'PENDING' // Explicitly set as pending until OTP verification
       },
     });
 
+    console.log(`✅ New agent created: ${agent.name} (${normalizedPhone})`);
+
+    // Set up agent infrastructure
     if (referralCode) {
       await ReferralService.linkReferral(agent.id, referralCode);
     }
@@ -471,6 +544,289 @@ export async function updateAgentStatus(req: Request, res: Response) {
     });
   } catch (err: any) {
     console.error('Update agent status error:', err);
+    res.status(500).json({ error: err.message });
+  }
+}
+
+export async function resendRegistrationOtp(req: Request, res: Response) {
+  try {
+    const { phone } = req.body;
+
+    if (!phone) {
+      return res.status(400).json({ error: 'Phone number is required' });
+    }
+
+    // Normalize phone number
+    const phoneValidation = normalizePhone(phone, 'UG');
+    
+    if (!phoneValidation.isValid) {
+      return res.status(400).json({ 
+        error: 'Invalid phone number format',
+        details: phoneValidation.issues,
+        expected: 'Use formats like: +256700123456, 0700123456, or 700123456'
+      });
+    }
+
+    const normalizedPhone = phoneValidation.normalizedNumber!;
+    console.log(`📱 Resend registration OTP for: "${phone}" → "${normalizedPhone}"`);
+
+    // Check if agent exists and is not yet verified
+    const agent = await prisma.agent.findUnique({ where: { phone: normalizedPhone } });
+    if (!agent) {
+      return res.status(404).json({ 
+        error: 'Agent not found. Please register first.',
+        hint: 'Make sure you use the same phone number you registered with'
+      });
+    }
+
+    if (agent.status === 'VERIFIED') {
+      return res.status(400).json({ 
+        error: 'Agent already verified. Please login instead.',
+        redirect: 'login'
+      });
+    }
+
+    // Generate new OTP
+    const otpResult = await sendOtp(normalizedPhone);
+    
+    // Send OTP via intelligent SMS routing
+    const smsService = MultiProviderSMSService.getInstance();
+    const smsResult = await smsService.sendOTP(normalizedPhone, otpResult.otp, 'registration');
+    
+    console.log(`📱 Resend SMS Result: ${smsResult.success ? '✅' : '❌'} via ${smsResult.provider}`);
+    if (smsResult.cost) console.log(`💰 Estimated cost: ${smsResult.cost}`);
+    if (smsResult.fallbackUsed) console.log('🔄 Fallback provider was used');
+
+    // If SMS fails and agent has email, send email backup
+    if (!smsResult.success && agent.email) {
+      console.log('📧 SMS failed, sending email backup...');
+      const emailService = EmailOTPService.getInstance();
+      const emailResult = await emailService.sendOTP({
+        email: agent.email,
+        otp: otpResult.otp,
+        agentName: agent.name,
+        type: 'registration'
+      });
+      
+      if (emailResult.success) {
+        console.log('✅ Email OTP sent as backup');
+        return res.status(200).json({ 
+          message: 'SMS failed but OTP sent to your email',
+          method: 'email',
+          email: agent.email.replace(/(.{2}).*(@.*)/, '$1***$2'), // Mask email
+          next_step: 'check_email_and_verify'
+        });
+      } else {
+        console.log('❌ Both SMS and Email failed:', emailResult.error);
+        return res.status(500).json({
+          error: 'Failed to send OTP via SMS and email',
+          details: {
+            sms: smsResult.error,
+            email: emailResult.error
+          }
+        });
+      }
+    }
+
+    if (smsResult.success) {
+      return res.status(200).json({ 
+        message: 'OTP resent successfully',
+        method: 'sms',
+        provider: smsResult.provider,
+        cost: smsResult.cost,
+        next_step: 'verify_phone'
+      });
+    } else {
+      return res.status(500).json({
+        error: 'Failed to resend OTP',
+        details: smsResult.error
+      });
+    }
+
+  } catch (err: any) {
+    console.error('Resend registration OTP error:', err);
+    res.status(500).json({ error: err.message });
+  }
+}
+
+export async function checkRegistrationStatus(req: Request, res: Response) {
+  try {
+    const { phone } = req.body;
+
+    if (!phone) {
+      return res.status(400).json({ error: 'Phone number is required' });
+    }
+
+    // Normalize phone number
+    const phoneValidation = normalizePhone(phone, 'UG');
+    
+    if (!phoneValidation.isValid) {
+      return res.status(400).json({ 
+        error: 'Invalid phone number format',
+        details: phoneValidation.issues,
+        expected: 'Use formats like: +256700123456, 0700123456, or 700123456'
+      });
+    }
+
+    const normalizedPhone = phoneValidation.normalizedNumber!;
+    console.log(`🔍 Checking registration status for: "${phone}" → "${normalizedPhone}"`);
+
+    // Check if agent exists
+    const agent = await prisma.agent.findUnique({ where: { phone: normalizedPhone } });
+
+    if (!agent) {
+      return res.status(200).json({
+        exists: false,
+        message: 'Phone number not registered',
+        action: 'register',
+        normalizedPhone
+      });
+    }
+
+    // Return status information
+    const statusInfo = {
+      exists: true,
+      status: agent.status,
+      name: agent.name,
+      email: agent.email ? agent.email.replace(/(.{2}).*(@.*)/, '$1***$2') : null, // Mask email
+      createdAt: agent.createdAt,
+      updatedAt: agent.updatedAt,
+      normalizedPhone
+    };
+
+    // Provide action guidance based on status
+    let action = '';
+    let message = '';
+
+    switch (agent.status) {
+      case 'PENDING':
+        action = 'verify_or_resend_otp';
+        message = 'Registration started but not verified. You can resend OTP or try registering again.';
+        break;
+      case 'VERIFIED':
+        action = 'login';
+        message = 'Agent verified. Please login to continue.';
+        break;
+      case 'APPROVED':
+        action = 'login';
+        message = 'Agent approved and active. Please login.';
+        break;
+      case 'SUSPENDED':
+        action = 'contact_support';
+        message = 'Agent account suspended. Please contact support.';
+        break;
+      case 'INACTIVE':
+        action = 'contact_support';
+        message = 'Agent account inactive. Please contact support.';
+        break;
+      default:
+        action = 'contact_support';
+        message = 'Unknown agent status. Please contact support.';
+    }
+
+    res.status(200).json({
+      ...statusInfo,
+      action,
+      message
+    });
+
+  } catch (err: any) {
+    console.error('Check registration status error:', err);
+    res.status(500).json({ error: err.message });
+  }
+}
+
+export async function resendLoginOtp(req: Request, res: Response) {
+  try {
+    const { phone } = req.body;
+
+    if (!phone) {
+      return res.status(400).json({ error: 'Phone number is required' });
+    }
+
+    // Normalize phone number
+    const phoneValidation = normalizePhone(phone, 'UG');
+    
+    if (!phoneValidation.isValid) {
+      return res.status(400).json({ 
+        error: 'Invalid phone number format',
+        details: phoneValidation.issues,
+        expected: 'Use formats like: +256700123456, 0700123456, or 700123456'
+      });
+    }
+
+    const normalizedPhone = phoneValidation.normalizedNumber!;
+    console.log(`📱 Resend login OTP for: "${phone}" → "${normalizedPhone}"`);
+
+    // Check if agent exists
+    const agent = await prisma.agent.findUnique({ where: { phone: normalizedPhone } });
+    if (!agent) {
+      return res.status(404).json({ 
+        error: 'Agent not found. Please register first.',
+        hint: 'Make sure you use the same phone number you registered with',
+        redirect: 'register'
+      });
+    }
+
+    // Generate new OTP
+    const otpResult = await sendOtp(normalizedPhone);
+    
+    // Send OTP via intelligent SMS routing
+    const smsService = MultiProviderSMSService.getInstance();
+    const smsResult = await smsService.sendOTP(normalizedPhone, otpResult.otp, 'login');
+    
+    console.log(`📱 Resend Login SMS Result: ${smsResult.success ? '✅' : '❌'} via ${smsResult.provider}`);
+    if (smsResult.cost) console.log(`💰 Estimated cost: ${smsResult.cost}`);
+    if (smsResult.fallbackUsed) console.log('🔄 Fallback provider was used');
+
+    // If SMS fails and agent has email, send email backup
+    if (!smsResult.success && agent.email) {
+      console.log('📧 SMS failed, sending email backup...');
+      const emailService = EmailOTPService.getInstance();
+      const emailResult = await emailService.sendOTP({
+        email: agent.email,
+        otp: otpResult.otp,
+        agentName: agent.name,
+        type: 'login'
+      });
+      
+      if (emailResult.success) {
+        console.log('✅ Email OTP sent as backup');
+        return res.status(200).json({ 
+          message: 'SMS failed but OTP sent to your email',
+          method: 'email',
+          email: agent.email.replace(/(.{2}).*(@.*)/, '$1***$2'), // Mask email
+          next_step: 'check_email_and_verify'
+        });
+      } else {
+        console.log('❌ Both SMS and Email failed:', emailResult.error);
+        return res.status(500).json({
+          error: 'Failed to send OTP via SMS and email',
+          details: {
+            sms: smsResult.error,
+            email: emailResult.error
+          }
+        });
+      }
+    }
+
+    if (smsResult.success) {
+      return res.status(200).json({ 
+        message: 'Login OTP resent successfully',
+        method: 'sms',
+        provider: smsResult.provider,
+        cost: smsResult.cost,
+        next_step: 'verify_login_otp'
+      });
+    } else {
+      return res.status(500).json({
+        error: 'Failed to resend login OTP',
+        details: smsResult.error
+      });
+    }
+
+  } catch (err: any) {
+    console.error('Resend login OTP error:', err);
     res.status(500).json({ error: err.message });
   }
 }
