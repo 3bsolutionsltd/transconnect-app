@@ -183,10 +183,53 @@ export class ESMSAfricaService {
     } catch (error: any) {
       console.error('❌ eSMS Africa API error:', error.response?.data || error.message);
       
+      // Enhanced debugging for 401 errors
+      if (error.response?.status === 401) {
+        console.error('🔑 Authentication failed - checking credentials:');
+        console.error(`   Account ID: ${this.accountId}`);
+        console.error(`   API Key: ${this.apiKey?.substring(0, 8)}...${this.apiKey?.substring(-4)}`);
+        console.error(`   Sender ID: ${this.senderId}`);
+        console.error(`   API URL: ${this.apiUrl}`);
+        console.error('   Possible issues:');
+        console.error('   • API key is incorrect/expired');
+        console.error('   • Account is suspended/inactive');
+        console.error('   • Wrong account ID');
+      }
+      
       return {
         success: false,
         error: error.response?.data?.reason || error.message || 'Failed to send SMS via eSMS Africa',
         provider: 'eSMS Africa'
+      };
+    }
+  }
+
+  // Verify credentials method
+  public async verifyCredentials(): Promise<{ valid: boolean; error?: string; details?: any }> {
+    try {
+      console.log('🔍 Verifying eSMS Africa credentials...');
+      
+      // Try a simple balance check or account info request
+      const response = await axios.get(
+        'https://api.esmsafrica.com/v1/account/balance', // or whatever balance endpoint they have
+        {
+          headers: {
+            'X-Account-ID': this.accountId,
+            'X-API-Key': this.apiKey,
+            'Content-Type': 'application/json'
+          },
+          timeout: 10000
+        }
+      );
+
+      console.log('✅ eSMS Africa credentials verified successfully');
+      return { valid: true, details: response.data };
+    } catch (error: any) {
+      console.error('❌ eSMS Africa credential verification failed:', error.response?.data || error.message);
+      return { 
+        valid: false, 
+        error: error.response?.data?.reason || error.message,
+        details: error.response?.data
       };
     }
   }

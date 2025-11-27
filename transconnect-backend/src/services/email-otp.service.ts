@@ -13,7 +13,10 @@ export class EmailOTPService {
   private isConfigured: boolean = false;
 
   private constructor() {
-    this.initializeTransporter();
+    // Initialize synchronously to avoid timing issues
+    this.initializeTransporter().catch(error => {
+      console.error('Email service initialization failed:', error);
+    });
   }
 
   public static getInstance(): EmailOTPService {
