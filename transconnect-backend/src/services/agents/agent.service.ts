@@ -1,6 +1,7 @@
 import { prisma } from '../../index';
 import { sendOtp, verifyOtpCode } from '../../tools/agents/otp.tool';
 import SMSService from '../sms.service';
+import MultiProviderSMSService from '../multi-provider-sms.service';
 import EmailOTPService from '../email-otp.service';
 import WalletService from './agent-wallet.service';
 import ReferralService from './agent-referral.service';
@@ -34,12 +35,13 @@ export async function registerAgent(req: Request, res: Response) {
 
     const otpResult = await sendOtp(phone);
     
-    // Send actual SMS with OTP code (with email fallback)
-    const smsService = SMSService.getInstance();
-    const smsResult = await smsService.sendSMS({
-      phoneNumber: phone,
-      message: `Your TransConnect verification code is: ${otpResult.otp}\n\nThis code expires in 10 minutes.\n\nDo not share this code with anyone.`
-    });
+    // Send OTP via intelligent SMS routing (eSMS Africa for African numbers, Twilio for others)
+    const smsService = MultiProviderSMSService.getInstance();
+    const smsResult = await smsService.sendOTP(phone, otpResult.otp, 'registration');
+    
+    console.log(`📱 SMS Result: ${smsResult.success ? '✅' : '❌'} via ${smsResult.provider}`);
+    if (smsResult.cost) console.log(`💰 Estimated cost: ${smsResult.cost}`);
+    if (smsResult.fallbackUsed) console.log('🔄 Fallback provider was used');
 
     // If SMS fails and agent has email, send email backup
     if (!smsResult.success && email) {
@@ -177,12 +179,13 @@ export async function loginAgent(req: Request, res: Response) {
     // Send OTP
     const otpResult = await sendOtp(phone);
     
-    // Send actual SMS with OTP code (with email fallback)
-    const smsService = SMSService.getInstance();
-    const smsResult = await smsService.sendSMS({
-      phoneNumber: phone,
-      message: `Your TransConnect login code is: ${otpResult.otp}\n\nThis code expires in 10 minutes.\n\nDo not share this code with anyone.`
-    });
+    // Send OTP via intelligent SMS routing (eSMS Africa for African numbers, Twilio for others)
+    const smsService = MultiProviderSMSService.getInstance();
+    const smsResult = await smsService.sendOTP(phone, otpResult.otp, 'login');
+    
+    console.log(`📱 SMS Result: ${smsResult.success ? '✅' : '❌'} via ${smsResult.provider}`);
+    if (smsResult.cost) console.log(`💰 Estimated cost: ${smsResult.cost}`);
+    if (smsResult.fallbackUsed) console.log('🔄 Fallback provider was used');
 
     // If SMS fails and agent has email, send email backup
     if (!smsResult.success && agent.email) {
