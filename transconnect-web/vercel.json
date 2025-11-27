@@ -8,7 +8,9 @@
     }
   ],
   "env": {
-    "NEXT_PUBLIC_API_URL": "https://transconnect-app-44ie.onrender.com",
+    "NEXT_PUBLIC_API_URL": "https://transconnect-app-44ie.onrender.com/api",
+    "NEXT_PUBLIC_SOCKET_URL": "https://transconnect-app-44ie.onrender.com",
+    "NEXT_PUBLIC_SITE_URL": "https://transconnect.app",
     "NEXT_PUBLIC_ENVIRONMENT": "production"
   },
   "functions": {
@@ -31,6 +33,30 @@
         {
           "key": "X-XSS-Protection",
           "value": "1; mode=block"
+        }
+      ]
+    }
+  ],
+  "redirects": [
+    {
+      "source": "/admin",
+      "destination": "https://admin.transconnect.app",
+      "permanent": false,
+      "has": [
+        {
+          "type": "host",
+          "value": "transconnect.app"
+        }
+      ]
+    },
+    {
+      "source": "/operators",
+      "destination": "https://operators.transconnect.app",
+      "permanent": false,
+      "has": [
+        {
+          "type": "host",
+          "value": "transconnect.app"
         }
       ]
     }
