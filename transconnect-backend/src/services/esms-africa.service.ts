@@ -125,6 +125,21 @@ export class ESMSAfricaService {
       };
     }
 
+    // Delivery issues detection - if we get SUCCESS but phones aren't receiving
+    const hasDeliveryIssues = process.env.ESMS_DELIVERY_ISSUES === 'true';
+    
+    if (hasDeliveryIssues) {
+      console.log('⚠️ eSMS Africa delivery issues detected - using email fallback strategy');
+      console.log(`📱 Would send SMS to ${data.phoneNumber}: ${data.message}`);
+      console.log('🎯 Platform shows SUCCESS but phone delivery failing');
+      console.log('💡 Recommendation: Use email OTP or contact eSMS support');
+      return { 
+        success: false, 
+        error: 'eSMS Africa delivery issues - use email fallback',
+        provider: 'eSMS Africa (Delivery Issues)'
+      };
+    }
+
     if (!this.isConfigured) {
       console.log(`📱 eSMS Africa would send SMS to ${data.phoneNumber}: ${data.message}`);
       return { 

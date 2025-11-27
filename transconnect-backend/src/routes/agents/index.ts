@@ -94,6 +94,66 @@ router.post('/test-delivery', async (req, res) => {
   }
 });
 
+// Comprehensive delivery diagnosis
+router.post('/diagnose-sms', async (req, res) => {
+  try {
+    const { phoneNumber } = req.body;
+    
+    if (!phoneNumber) {
+      return res.status(400).json({ success: false, error: 'phoneNumber is required' });
+    }
+
+    const { ESMSAfricaService } = require('../../services/esms-africa.service');
+    const smsService = ESMSAfricaService.getInstance();
+    
+    const tests = [];
+    
+    // Test 1: Ultra simple message
+    console.log('🧪 Test 1: Ultra simple message');
+    const test1 = await smsService.sendSMS({
+      phoneNumber,
+      message: 'Hi'
+    });
+    tests.push({ name: 'Ultra Simple', message: 'Hi', result: test1 });
+    
+    // Test 2: Number only
+    console.log('🧪 Test 2: Numbers only');
+    const test2 = await smsService.sendSMS({
+      phoneNumber,
+      message: '123456'
+    });
+    tests.push({ name: 'Numbers Only', message: '123456', result: test2 });
+    
+    // Test 3: No special characters
+    console.log('🧪 Test 3: Plain text');
+    const test3 = await smsService.sendSMS({
+      phoneNumber,
+      message: 'Test message from TransConnect'
+    });
+    tests.push({ name: 'Plain Text', message: 'Test message from TransConnect', result: test3 });
+    
+    res.json({
+      phoneNumber,
+      tests,
+      summary: {
+        totalTests: tests.length,
+        successfulSends: tests.filter(t => t.result.success).length,
+        recommendation: tests.every(t => t.result.success) 
+          ? 'All API calls successful - delivery issue is with eSMS Africa or carriers'
+          : 'API issues detected - check credentials and configuration'
+      },
+      timestamp: new Date().toISOString()
+    });
+  } catch (error: any) {
+    console.error('❌ SMS diagnosis error:', error);
+    res.status(500).json({
+      success: false,
+      error: error.message,
+      timestamp: new Date().toISOString()
+    });
+  }
+});
+
 // dashboard
 router.get('/:agentId/dashboard', trackAgentActivity, getDashboard);
 
