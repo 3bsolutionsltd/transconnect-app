@@ -106,7 +106,7 @@ router.post('/diagnose-sms', async (req, res) => {
     const { ESMSAfricaService } = require('../../services/esms-africa.service');
     const smsService = ESMSAfricaService.getInstance();
     
-    const tests = [];
+    const tests: Array<{ name: string; message: string; result: any }> = [];
     
     // Test 1: Ultra simple message
     console.log('🧪 Test 1: Ultra simple message');
@@ -164,7 +164,7 @@ router.post('/test-api-formats', async (req, res) => {
     }
 
     const axios = require('axios');
-    const results = [];
+    const results: Array<{ format: string; success: boolean; response?: any; error?: any }> = [];
     
     // Format 1: Current format
     console.log('🧪 Testing Format 1: Current API format');

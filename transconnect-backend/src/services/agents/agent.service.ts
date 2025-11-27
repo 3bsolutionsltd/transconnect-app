@@ -79,6 +79,7 @@ export async function registerAgent(req: Request, res: Response) {
         if (smsResult.fallbackUsed) console.log('🔄 Fallback provider was used');
 
         // If SMS fails and agent has email, send email backup
+        let emailBackupSent = false;
         if (!smsResult.success && updatedAgent.email) {
           console.log('📧 SMS failed, sending email backup...');
           const emailService = EmailOTPService.getInstance();
@@ -91,6 +92,7 @@ export async function registerAgent(req: Request, res: Response) {
           
           if (emailResult.success) {
             console.log('✅ Email OTP sent as backup');
+            emailBackupSent = true;
           } else {
             console.log('❌ Both SMS and Email failed:', emailResult.error);
           }
@@ -98,9 +100,22 @@ export async function registerAgent(req: Request, res: Response) {
 
         return res.status(201).json({ 
           agent: updatedAgent, 
-          message: 'Registration updated, OTP sent',
+          message: smsResult.success 
+            ? 'Registration updated, OTP sent via SMS'
+            : emailBackupSent
+              ? 'Registration updated, OTP sent to your email'
+              : 'Registration updated, OTP sent',
           isReRegistration: true,
-          next_step: 'verify_phone' 
+          next_step: 'verify_phone',
+          delivery: {
+            sms: smsResult.success,
+            email: emailBackupSent,
+            instruction: !smsResult.success && emailBackupSent 
+              ? 'SMS delivery failed. Please check your email for the OTP code.'
+              : smsResult.success
+                ? 'OTP sent via SMS'
+                : 'Please wait for OTP delivery'
+          }
         });
       }
 
@@ -145,6 +160,7 @@ export async function registerAgent(req: Request, res: Response) {
     if (smsResult.fallbackUsed) console.log('🔄 Fallback provider was used');
 
     // If SMS fails and agent has email, send email backup
+    let emailBackupSent = false;
     if (!smsResult.success && email) {
       console.log('📧 SMS failed, sending email backup...');
       const emailService = EmailOTPService.getInstance();
@@ -157,12 +173,30 @@ export async function registerAgent(req: Request, res: Response) {
       
       if (emailResult.success) {
         console.log('✅ Email OTP sent as backup');
+        emailBackupSent = true;
       } else {
         console.log('❌ Both SMS and Email failed:', emailResult.error);
       }
     }
 
-    return res.status(201).json({ agent, next_step: 'verify_phone' });
+    return res.status(201).json({ 
+      agent, 
+      next_step: 'verify_phone',
+      message: smsResult.success 
+        ? 'Registration successful, OTP sent via SMS'
+        : emailBackupSent
+          ? 'Registration successful, OTP sent to your email'
+          : 'Registration successful, OTP sent',
+      delivery: {
+        sms: smsResult.success,
+        email: emailBackupSent,
+        instruction: !smsResult.success && emailBackupSent 
+          ? 'SMS delivery failed. Please check your email for the OTP code.'
+          : smsResult.success
+            ? 'OTP sent via SMS'
+            : 'Please wait for OTP delivery'
+      }
+    });
   } catch (err: any) {
     console.error(err);
     res.status(500).json({ error: err.message });
@@ -312,6 +346,7 @@ export async function loginAgent(req: Request, res: Response) {
     if (smsResult.fallbackUsed) console.log('🔄 Fallback provider was used');
 
     // If SMS fails and agent has email, send email backup
+    let emailBackupSent = false;
     if (!smsResult.success && agent.email) {
       console.log('📧 SMS failed, sending email backup...');
       const emailService = EmailOTPService.getInstance();
@@ -324,14 +359,28 @@ export async function loginAgent(req: Request, res: Response) {
       
       if (emailResult.success) {
         console.log('✅ Email OTP sent as backup');
+        emailBackupSent = true;
       } else {
         console.log('❌ Both SMS and Email failed:', emailResult.error);
       }
     }
 
     return res.status(200).json({ 
-      message: 'OTP sent successfully',
-      next_step: 'verify_login_otp'
+      message: smsResult.success 
+        ? 'OTP sent via SMS'
+        : emailBackupSent
+          ? 'OTP sent to your email'
+          : 'OTP sent successfully',
+      next_step: 'verify_login_otp',
+      delivery: {
+        sms: smsResult.success,
+        email: emailBackupSent,
+        instruction: !smsResult.success && emailBackupSent 
+          ? 'SMS delivery failed. Please check your email for the OTP code.'
+          : smsResult.success
+            ? 'OTP sent via SMS'
+            : 'Please wait for OTP delivery'
+      }
     });
   } catch (err: any) {
     console.error('Login error:', err);
@@ -611,10 +660,15 @@ export async function resendRegistrationOtp(req: Request, res: Response) {
       if (emailResult.success) {
         console.log('✅ Email OTP sent as backup');
         return res.status(200).json({ 
-          message: 'SMS failed but OTP sent to your email',
+          message: 'OTP sent to your email',
           method: 'email',
           email: agent.email.replace(/(.{2}).*(@.*)/, '$1***$2'), // Mask email
-          next_step: 'check_email_and_verify'
+          next_step: 'check_email_and_verify',
+          delivery: {
+            sms: false,
+            email: true,
+            instruction: 'SMS delivery failed. Please check your email for the OTP code.'
+          }
         });
       } else {
         console.log('❌ Both SMS and Email failed:', emailResult.error);
@@ -623,23 +677,30 @@ export async function resendRegistrationOtp(req: Request, res: Response) {
           details: {
             sms: smsResult.error,
             email: emailResult.error
-          }
+          },
+          message: 'Unable to deliver OTP via SMS or email. Please try again or contact support.'
         });
       }
     }
 
     if (smsResult.success) {
       return res.status(200).json({ 
-        message: 'OTP resent successfully',
+        message: 'OTP resent via SMS',
         method: 'sms',
         provider: smsResult.provider,
         cost: smsResult.cost,
-        next_step: 'verify_phone'
+        next_step: 'verify_phone',
+        delivery: {
+          sms: true,
+          email: false,
+          instruction: 'OTP sent via SMS'
+        }
       });
     } else {
       return res.status(500).json({
         error: 'Failed to resend OTP',
-        details: smsResult.error
+        details: smsResult.error,
+        message: 'Unable to send OTP via SMS. Please try again or contact support.'
       });
     }
 
@@ -793,10 +854,15 @@ export async function resendLoginOtp(req: Request, res: Response) {
       if (emailResult.success) {
         console.log('✅ Email OTP sent as backup');
         return res.status(200).json({ 
-          message: 'SMS failed but OTP sent to your email',
+          message: 'OTP sent to your email',
           method: 'email',
           email: agent.email.replace(/(.{2}).*(@.*)/, '$1***$2'), // Mask email
-          next_step: 'check_email_and_verify'
+          next_step: 'check_email_and_verify',
+          delivery: {
+            sms: false,
+            email: true,
+            instruction: 'SMS delivery failed. Please check your email for the OTP code.'
+          }
         });
       } else {
         console.log('❌ Both SMS and Email failed:', emailResult.error);
@@ -805,23 +871,30 @@ export async function resendLoginOtp(req: Request, res: Response) {
           details: {
             sms: smsResult.error,
             email: emailResult.error
-          }
+          },
+          message: 'Unable to deliver OTP via SMS or email. Please try again or contact support.'
         });
       }
     }
 
     if (smsResult.success) {
       return res.status(200).json({ 
-        message: 'Login OTP resent successfully',
+        message: 'Login OTP resent via SMS',
         method: 'sms',
         provider: smsResult.provider,
         cost: smsResult.cost,
-        next_step: 'verify_login_otp'
+        next_step: 'verify_login_otp',
+        delivery: {
+          sms: true,
+          email: false,
+          instruction: 'OTP sent via SMS'
+        }
       });
     } else {
       return res.status(500).json({
         error: 'Failed to resend login OTP',
-        details: smsResult.error
+        details: smsResult.error,
+        message: 'Unable to send OTP via SMS. Please try again or contact support.'
       });
     }
 
