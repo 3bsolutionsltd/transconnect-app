@@ -3,40 +3,39 @@ import { NextRequest, NextResponse } from 'next/server'
 export function middleware(request: NextRequest) {
   const hostname = request.headers.get('host') || ''
   const url = request.nextUrl.clone()
+  
+  console.log(`[Middleware] Host: ${hostname}, Path: ${url.pathname}`)
 
-  // Handle admin subdomain - redirect to separate admin deployment
-  if (hostname === 'admin.transconnect.app') {
-    // This shouldn't happen since DNS points to separate admin deployment
-    // But if it does, redirect to proper admin site
-    url.host = 'admin.transconnect.app'
-    return NextResponse.redirect(url, 301)
+  // Handle www redirect - FIRST to prevent loops
+  if (hostname === 'www.transconnect.app') {
+    const redirectUrl = new URL(request.url)
+    redirectUrl.hostname = 'transconnect.app'
+    console.log(`[Middleware] Redirecting www to: ${redirectUrl.toString()}`)
+    return NextResponse.redirect(redirectUrl, 301)
   }
 
   // Handle admin path on main domain - redirect to admin subdomain
-  if (hostname === 'transconnect.app' && url.pathname.startsWith('/admin')) {
-    url.host = 'admin.transconnect.app'
-    url.pathname = url.pathname.replace('/admin', '')
-    if (url.pathname === '') url.pathname = '/'
-    return NextResponse.redirect(url, 301)
+  if ((hostname === 'transconnect.app' || hostname === 'localhost:3000') && url.pathname.startsWith('/admin')) {
+    const redirectUrl = new URL(request.url)
+    redirectUrl.hostname = 'admin.transconnect.app'
+    redirectUrl.pathname = url.pathname.replace('/admin', '') || '/'
+    console.log(`[Middleware] Redirecting admin to: ${redirectUrl.toString()}`)
+    return NextResponse.redirect(redirectUrl, 301)
   }
 
-  // Handle operators subdomain
+  // Handle operators subdomain routing
   if (hostname === 'operators.transconnect.app') {
     // Rewrite to operators pages
     if (url.pathname === '/') {
       url.pathname = '/operators'
+      console.log(`[Middleware] Rewriting operators root to: ${url.pathname}`)
       return NextResponse.rewrite(url)
     }
     if (!url.pathname.startsWith('/operators')) {
       url.pathname = `/operators${url.pathname}`
+      console.log(`[Middleware] Rewriting operators path to: ${url.pathname}`)
       return NextResponse.rewrite(url)
     }
-  }
-
-  // Handle www redirect
-  if (hostname === 'www.transconnect.app') {
-    url.host = 'transconnect.app'
-    return NextResponse.redirect(url, 301)
   }
 
   // Default behavior for main domain

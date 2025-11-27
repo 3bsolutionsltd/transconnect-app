@@ -41,12 +41,24 @@
     {
       "source": "/admin",
       "destination": "https://admin.transconnect.app",
-      "permanent": false
+      "permanent": false,
+      "has": [
+        {
+          "type": "host",
+          "value": "transconnect.app"
+        }
+      ]
     },
     {
       "source": "/admin/(.*)",
       "destination": "https://admin.transconnect.app/$1",
-      "permanent": false
+      "permanent": false,
+      "has": [
+        {
+          "type": "host",
+          "value": "transconnect.app"
+        }
+      ]
     }
   ]
 }
