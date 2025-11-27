@@ -38,8 +38,15 @@ const app = express();
 const server = createServer(app);
 const io = new Server(server, {
   cors: {
-    origin: process.env.FRONTEND_URL || "http://localhost:3000",
-    methods: ["GET", "POST"]
+    origin: [
+      "http://localhost:3000",
+      "http://localhost:3001", 
+      "https://transconnect.app",
+      "https://www.transconnect.app",
+      "https://admin.transconnect.app",
+      "https://operators.transconnect.app"
+    ],
+    methods: ["GET", "POST", "PUT", "DELETE"]
   }
 });
 
@@ -70,7 +77,19 @@ const limiter = rateLimit({
 // Middleware
 app.use(limiter);
 app.use(helmet());
-app.use(cors());
+app.use(cors({
+  origin: [
+    "http://localhost:3000",
+    "http://localhost:3001",
+    "https://transconnect.app",
+    "https://www.transconnect.app", 
+    "https://admin.transconnect.app",
+    "https://operators.transconnect.app"
+  ],
+  credentials: true,
+  methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
+  allowedHeaders: ['Content-Type', 'Authorization', 'X-Requested-With']
+}));
 app.use(compression());
 app.use(morgan('combined'));
 app.use(express.json({ limit: '10mb' }));

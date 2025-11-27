@@ -10,6 +10,10 @@ export const metadata: Metadata = {
   title: 'TransConnect - Bus Ticketing & Ride Connector',
   description: 'Book bus tickets and connect with ride sharing in Uganda',
   keywords: ['bus tickets', 'travel', 'Uganda', 'ride sharing', 'transportation'],
+  metadataBase: new URL('https://transconnect.app'),
+  alternates: {
+    canonical: '/',
+  },
 }
 
 export default function RootLayout({
