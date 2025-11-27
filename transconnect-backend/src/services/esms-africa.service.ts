@@ -17,7 +17,7 @@ export class ESMSAfricaService {
   private constructor() {
     this.accountId = process.env.ESMS_AFRICA_ACCOUNT_ID || '';
     this.apiKey = process.env.ESMS_AFRICA_API_KEY || '';
-    this.senderId = process.env.ESMS_AFRICA_SENDER_ID || 'TransConnect';
+    this.senderId = process.env.ESMS_AFRICA_SENDER_ID || 'eSMSAfrica';
     this.apiUrl = 'https://api.esmsafrica.io/api/sms/send';
     
     this.isConfigured = !!(this.accountId && this.apiKey);
