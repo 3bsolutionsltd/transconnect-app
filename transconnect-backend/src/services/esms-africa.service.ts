@@ -157,9 +157,10 @@ export class ESMSAfricaService {
       console.log(`🔍 eSMS Africa request payload:`, JSON.stringify(payload, null, 2));
       console.log(`🔍 eSMS Africa headers:`, {
         'X-Account-ID': this.accountId,
-        'X-API-Key': `${this.apiKey.substring(0, 8)}...`,
+        'X-API-Key': `${this.apiKey.substring(0, 8)}...${this.apiKey.slice(-8)}`,
         'Content-Type': 'application/json'
       });
+      console.log(`🔍 Full API Key Length: ${this.apiKey.length} characters`);
 
       const response = await axios.post(
         this.apiUrl,
@@ -197,13 +198,19 @@ export class ESMSAfricaService {
       if (error.response?.status === 401) {
         console.error('🔑 Authentication failed - checking credentials:');
         console.error(`   Account ID: ${this.accountId}`);
-        console.error(`   API Key: ${this.apiKey?.substring(0, 8)}...${this.apiKey?.substring(-4)}`);
+        console.error(`   API Key: ${this.apiKey?.substring(0, 8)}...${this.apiKey?.slice(-8)}`); // Fixed substring
+        console.error(`   Full API Key Length: ${this.apiKey?.length} characters`);
+        console.error(`   Expected: a323393abcee40489cc09bdf5a646fd0 (32 chars)`);
         console.error(`   Sender ID: ${this.senderId}`);
         console.error(`   API URL: ${this.apiUrl}`);
+        console.error('   Environment check:');
+        console.error(`   • ESMS_AFRICA_ACCOUNT_ID: ${process.env.ESMS_AFRICA_ACCOUNT_ID}`);
+        console.error(`   • ESMS_AFRICA_API_KEY: ${process.env.ESMS_AFRICA_API_KEY?.substring(0, 8)}...${process.env.ESMS_AFRICA_API_KEY?.slice(-8)}`);
         console.error('   Possible issues:');
         console.error('   • API key is incorrect/expired');
         console.error('   • Account is suspended/inactive');
         console.error('   • Wrong account ID');
+        console.error('   • Environment variable not set correctly');
       }
       
       return {
@@ -219,7 +226,9 @@ export class ESMSAfricaService {
     try {
       console.log('🔍 Verifying eSMS Africa credentials...');
       console.log(`🔍 Account ID: ${this.accountId}`);
-      console.log(`🔍 API Key: ${this.apiKey.substring(0, 8)}...${this.apiKey.substring(-4)}`);
+      console.log(`🔍 API Key: ${this.apiKey.substring(0, 8)}...${this.apiKey.slice(-8)}`);
+      console.log(`🔍 API Key Length: ${this.apiKey.length} characters`);
+      console.log(`🔍 Expected: a323393abcee40489cc09bdf5a646fd0 (32 chars)`);
       console.log(`🔍 Sender ID: ${this.senderId}`);
       
       // Official eSMS Africa test format per documentation
