@@ -55,6 +55,45 @@ router.post('/test-sms', async (req, res) => {
   }
 });
 
+// Simple SMS delivery test
+router.post('/test-delivery', async (req, res) => {
+  try {
+    const { phoneNumber, message, senderId } = req.body;
+    
+    if (!phoneNumber) {
+      return res.status(400).json({ success: false, error: 'phoneNumber is required' });
+    }
+
+    const { ESMSAfricaService } = require('../../services/esms-africa.service');
+    const smsService = ESMSAfricaService.getInstance();
+    
+    // Test with custom parameters
+    const result = await smsService.sendSMS({
+      phoneNumber,
+      message: message || `Simple test: ${new Date().toLocaleTimeString()}`,
+      senderId: senderId || undefined // Use default if not specified
+    });
+    
+    res.json({
+      success: result.success,
+      result,
+      parameters: {
+        phoneNumber,
+        message: message || 'Default test message',
+        senderId: senderId || 'default'
+      },
+      timestamp: new Date().toISOString()
+    });
+  } catch (error: any) {
+    console.error('❌ SMS delivery test error:', error);
+    res.status(500).json({
+      success: false,
+      error: error.message,
+      timestamp: new Date().toISOString()
+    });
+  }
+});
+
 // dashboard
 router.get('/:agentId/dashboard', trackAgentActivity, getDashboard);
 

@@ -17,7 +17,7 @@ export class ESMSAfricaService {
   private constructor() {
     this.accountId = process.env.ESMS_AFRICA_ACCOUNT_ID || '';
     this.apiKey = process.env.ESMS_AFRICA_API_KEY || '';
-    this.senderId = process.env.ESMS_AFRICA_SENDER_ID || 'eSMSAfrica';
+    this.senderId = process.env.ESMS_AFRICA_SENDER_ID || ''; // Empty default for better delivery
     this.apiUrl = 'https://api.esmsafrica.io/api/sms/send';
     
     this.isConfigured = !!(this.accountId && this.apiKey);
@@ -25,7 +25,8 @@ export class ESMSAfricaService {
     if (this.isConfigured) {
       console.log('✅ eSMS Africa service initialized successfully');
       console.log(`📱 Account ID: ${this.accountId}`);
-      console.log(`🏷️  Sender ID: ${this.senderId}`);
+      console.log(`🏷️  Sender ID: ${this.senderId || 'default/empty'}`);
+      console.log('ℹ️  Using empty sender ID for better delivery rates');
     } else {
       console.warn('⚠️ eSMS Africa configuration incomplete. Check ESMS_AFRICA_ACCOUNT_ID and ESMS_AFRICA_API_KEY');
     }
@@ -148,11 +149,19 @@ export class ESMSAfricaService {
       console.log(`📱 Sending SMS via eSMS Africa to ${formattedPhone}...`);
       
       // Official eSMS Africa format per documentation
-      const payload = {
+      const payload: any = {
         phoneNumber: formattedPhone,
-        text: data.message,
-        senderId: data.senderId || this.senderId
+        text: data.message
       };
+      
+      // Only add senderId if it's not empty (better delivery rates)
+      const senderId = data.senderId || this.senderId;
+      if (senderId && senderId.trim() !== '') {
+        payload.senderId = senderId;
+        console.log(`📤 Using Sender ID: ${senderId}`);
+      } else {
+        console.log('📤 Using default sender (no custom ID for better delivery)');
+      }
 
       console.log(`🔍 eSMS Africa request payload:`, JSON.stringify(payload, null, 2));
       console.log(`🔍 eSMS Africa headers:`, {
@@ -272,16 +281,46 @@ export class ESMSAfricaService {
     }
   }
 
-  // Test method
-  public async sendTestSMS(phoneNumber: string): Promise<{ success: boolean; messageId?: string; error?: string; provider?: string }> {
-    return this.sendSMS({
+  // Test method with multiple sender ID attempts
+  public async sendTestSMS(phoneNumber: string): Promise<{ success: boolean; messageId?: string; error?: string; provider?: string; tests?: any[] }> {
+    const tests: any[] = [];
+    
+    // Test 1: Default sender (no custom sender)
+    console.log('🧪 Test 1: Default sender (no senderId)');
+    const test1 = await this.sendSMS({
       phoneNumber,
-      message: `🧪 TransConnect SMS Test via eSMS Africa
-This is a test message from TransConnect MVP1.
-eSMS Africa SMS integration is working!
-Time: ${new Date().toLocaleString()}
-Cost: ~UGX 30 (vs Twilio ~UGX 180)`
+      message: `Test SMS 1: Default sender. Time: ${new Date().toLocaleTimeString()}`
     });
+    tests.push({ test: 'Default sender', result: test1 });
+    
+    if (test1.success) return { ...test1, tests };
+    
+    // Test 2: Empty sender
+    console.log('🧪 Test 2: Empty sender');
+    const test2 = await this.sendSMS({
+      phoneNumber,
+      message: `Test SMS 2: Empty sender. Time: ${new Date().toLocaleTimeString()}`,
+      senderId: ''
+    });
+    tests.push({ test: 'Empty sender', result: test2 });
+    
+    if (test2.success) return { ...test2, tests };
+    
+    // Test 3: Simple sender
+    console.log('🧪 Test 3: Simple sender');
+    const test3 = await this.sendSMS({
+      phoneNumber,
+      message: `Test SMS 3: Simple sender. Time: ${new Date().toLocaleTimeString()}`,
+      senderId: 'SMS'
+    });
+    tests.push({ test: 'Simple sender', result: test3 });
+    
+    return test3.success ? { ...test3, tests } : { 
+      success: false, 
+      error: 'All sender ID tests failed', 
+      provider: 'eSMS Africa',
+      tests 
+    };
   }
 
   // Configuration check
