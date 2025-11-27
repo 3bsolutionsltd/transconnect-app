@@ -6,16 +6,8 @@ export function middleware(request: NextRequest) {
   
   console.log(`[Middleware] Host: ${hostname}, Path: ${url.pathname}`)
 
-  // Handle www redirect - FIRST to prevent loops
-  if (hostname === 'www.transconnect.app') {
-    const redirectUrl = new URL(request.url)
-    redirectUrl.hostname = 'transconnect.app'
-    console.log(`[Middleware] Redirecting www to: ${redirectUrl.toString()}`)
-    return NextResponse.redirect(redirectUrl, 301)
-  }
-
   // Handle admin path on main domain - redirect to admin subdomain
-  if ((hostname === 'transconnect.app' || hostname === 'localhost:3000') && url.pathname.startsWith('/admin')) {
+  if ((hostname === 'transconnect.app' || hostname === 'www.transconnect.app' || hostname === 'localhost:3000') && url.pathname.startsWith('/admin')) {
     const redirectUrl = new URL(request.url)
     redirectUrl.hostname = 'admin.transconnect.app'
     redirectUrl.pathname = url.pathname.replace('/admin', '') || '/'
@@ -38,7 +30,7 @@ export function middleware(request: NextRequest) {
     }
   }
 
-  // Default behavior for main domain
+  // Default behavior - let DNS CNAME handle www redirect
   return NextResponse.next()
 }
 

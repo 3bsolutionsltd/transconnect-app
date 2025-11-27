@@ -13,23 +13,7 @@ const nextConfig = {
     NEXT_PUBLIC_API_URL: process.env.NEXT_PUBLIC_API_URL || 'http://localhost:5000/api',
     NEXT_PUBLIC_SOCKET_URL: process.env.NEXT_PUBLIC_SOCKET_URL || 'http://localhost:5000',
   },
-  // Handle redirects for subdomain routing
-  async redirects() {
-    return [
-      // Redirect www to non-www
-      {
-        source: '/(.*)',
-        has: [
-          {
-            type: 'host',
-            value: 'www.transconnect.app',
-          },
-        ],
-        destination: 'https://transconnect.app/$1',
-        permanent: true,
-      },
-    ];
-  },
+  // DNS CNAME handles www redirect, so no redirects needed here
   // Enable rewrites for subdomain handling
   async rewrites() {
     return {
