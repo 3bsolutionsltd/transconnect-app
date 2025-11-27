@@ -1,6 +1,7 @@
 import { prisma } from '../../index';
 import { sendOtp, verifyOtpCode } from '../../tools/agents/otp.tool';
 import SMSService from '../sms.service';
+import EmailOTPService from '../email-otp.service';
 import WalletService from './agent-wallet.service';
 import ReferralService from './agent-referral.service';
 import jwt from 'jsonwebtoken';
@@ -33,12 +34,30 @@ export async function registerAgent(req: Request, res: Response) {
 
     const otpResult = await sendOtp(phone);
     
-    // Send actual SMS with OTP code
+    // Send actual SMS with OTP code (with email fallback)
     const smsService = SMSService.getInstance();
-    await smsService.sendSMS({
+    const smsResult = await smsService.sendSMS({
       phoneNumber: phone,
       message: `Your TransConnect verification code is: ${otpResult.otp}\n\nThis code expires in 10 minutes.\n\nDo not share this code with anyone.`
     });
+
+    // If SMS fails and agent has email, send email backup
+    if (!smsResult.success && email) {
+      console.log('📧 SMS failed, sending email backup...');
+      const emailService = EmailOTPService.getInstance();
+      const emailResult = await emailService.sendOTP({
+        email,
+        otp: otpResult.otp,
+        agentName: name,
+        type: 'registration'
+      });
+      
+      if (emailResult.success) {
+        console.log('✅ Email OTP sent as backup');
+      } else {
+        console.log('❌ Both SMS and Email failed:', emailResult.error);
+      }
+    }
 
     return res.status(201).json({ agent, next_step: 'verify_phone' });
   } catch (err: any) {
@@ -158,12 +177,30 @@ export async function loginAgent(req: Request, res: Response) {
     // Send OTP
     const otpResult = await sendOtp(phone);
     
-    // Send actual SMS with OTP code
+    // Send actual SMS with OTP code (with email fallback)
     const smsService = SMSService.getInstance();
-    await smsService.sendSMS({
+    const smsResult = await smsService.sendSMS({
       phoneNumber: phone,
       message: `Your TransConnect login code is: ${otpResult.otp}\n\nThis code expires in 10 minutes.\n\nDo not share this code with anyone.`
     });
+
+    // If SMS fails and agent has email, send email backup
+    if (!smsResult.success && agent.email) {
+      console.log('📧 SMS failed, sending email backup...');
+      const emailService = EmailOTPService.getInstance();
+      const emailResult = await emailService.sendOTP({
+        email: agent.email,
+        otp: otpResult.otp,
+        agentName: agent.name,
+        type: 'login'
+      });
+      
+      if (emailResult.success) {
+        console.log('✅ Email OTP sent as backup');
+      } else {
+        console.log('❌ Both SMS and Email failed:', emailResult.error);
+      }
+    }
 
     return res.status(200).json({ 
       message: 'OTP sent successfully',
