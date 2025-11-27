@@ -39,7 +39,18 @@ export class ESMSAfricaService {
   }
 
   private formatPhoneNumber(phoneNumber: string): string {
-    // Remove any non-digit characters
+    // Use the PhoneNormalizer utility for consistent formatting
+    const { PhoneNormalizer } = require('../utils/phone-normalizer');
+    
+    const result = PhoneNormalizer.normalize(phoneNumber, 'UG');
+    
+    if (result.isValid && result.normalizedNumber) {
+      console.log(`📱 eSMS Africa formatted: "${phoneNumber}" → "${result.normalizedNumber}"`);
+      return result.normalizedNumber;
+    }
+    
+    // Fallback to original logic if normalization fails
+    console.log(`⚠️ Using fallback formatting for: ${phoneNumber}`);
     let cleaned = phoneNumber.replace(/\D/g, '');
     
     // Handle Ugandan phone numbers
@@ -51,30 +62,44 @@ export class ESMSAfricaService {
       cleaned = '256' + cleaned;
     }
     
-    // Handle other East African numbers
-    if (cleaned.startsWith('0')) {
-      // Remove leading 0 and detect country
-      const withoutZero = cleaned.substring(1);
-      if (withoutZero.length === 9) {
-        // Could be Kenya (254), Tanzania (255), Rwanda (250)
-        // For now, assume Uganda if not specified
-        if (!cleaned.startsWith('25')) {
-          cleaned = '256' + withoutZero;
-        }
-      }
-    }
-
     return '+' + cleaned;
   }
 
   private isAfricanNumber(phoneNumber: string): boolean {
     const formatted = this.formatPhoneNumber(phoneNumber);
     
-    // African country codes supported by eSMS Africa
+    // East Africa and eSMS Africa supported countries
     const africanCodes = [
-      '+256', '+254', '+255', '+250', // East Africa
-      '+233', '+234', '+260', '+263', // West/South Africa  
-      '+265', '+27', '+221', '+225'   // More African countries
+      '+256', // Uganda
+      '+254', // Kenya  
+      '+255', // Tanzania
+      '+250', // Rwanda
+      '+211', // South Sudan 🇸🇸
+      '+257', // Burundi
+      '+251', // Ethiopia
+      '+252', // Somalia
+      '+249', // Sudan
+      '+253', // Djibouti
+      '+234', // Nigeria
+      '+233', // Ghana
+      '+27',  // South Africa
+      '+260', // Zambia
+      '+263', // Zimbabwe
+      '+265', // Malawi
+      '+267', // Botswana
+      '+221', // Senegal
+      '+225', // Ivory Coast
+      '+226', // Burkina Faso
+      '+227', // Niger
+      '+228', // Togo
+      '+229', // Benin
+      '+230', // Mauritius
+      '+231', // Liberia
+      '+232', // Sierra Leone
+      '+235', // Chad
+      '+236', // Central African Republic
+      '+237', // Cameroon
+      '+238', // Cape Verde
     ];
     
     return africanCodes.some(code => formatted.startsWith(code));

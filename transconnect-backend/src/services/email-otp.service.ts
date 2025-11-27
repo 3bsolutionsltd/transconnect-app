@@ -35,7 +35,7 @@ export class EmailOTPService {
         return;
       }
 
-      this.transporter = nodemailer.createTransporter({
+      this.transporter = nodemailer.createTransport({
         host: smtpHost,
         port: smtpPort,
         secure: smtpPort === 465,
@@ -46,7 +46,7 @@ export class EmailOTPService {
       });
 
       // Verify connection
-      await this.transporter.verify();
+      await this.transporter!.verify();
       this.isConfigured = true;
       console.log('✅ Email OTP service initialized successfully');
     } catch (error) {

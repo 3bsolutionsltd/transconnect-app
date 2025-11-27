@@ -5,6 +5,7 @@ import MultiProviderSMSService from '../multi-provider-sms.service';
 import EmailOTPService from '../email-otp.service';
 import WalletService from './agent-wallet.service';
 import ReferralService from './agent-referral.service';
+import { PhoneNormalizer, normalizePhone } from '../../utils/phone-normalizer';
 import jwt from 'jsonwebtoken';
 import { Request, Response } from 'express';
 
@@ -14,13 +15,40 @@ export async function registerAgent(req: Request, res: Response) {
   try {
     const { name, phone, email, referralCode } = req.body;
 
-    const exists = await prisma.agent.findUnique({ where: { phone } });
-    if (exists) return res.status(400).json({ error: 'Phone already registered' });
+    // Normalize phone number
+    const phoneValidation = normalizePhone(phone, 'UG'); // Default to Uganda
+    
+    if (!phoneValidation.isValid) {
+      console.log(`❌ Invalid phone number: ${phone}`);
+      console.log(`   Issues: ${phoneValidation.issues?.join(', ')}`);
+      return res.status(400).json({ 
+        error: 'Invalid phone number format',
+        details: phoneValidation.issues,
+        expected: 'Use formats like: +256700123456, 0700123456, or 700123456'
+      });
+    }
+
+    const normalizedPhone = phoneValidation.normalizedNumber!;
+    console.log(`📱 Phone normalized: "${phone}" → "${normalizedPhone}"`);
+    
+    if (phoneValidation.issues && phoneValidation.issues.length > 0) {
+      console.log(`ℹ️  Normalization notes: ${phoneValidation.issues.join(', ')}`);
+    }
+
+    // Check for existing agent with normalized number
+    const exists = await prisma.agent.findUnique({ where: { phone: normalizedPhone } });
+    if (exists) {
+      return res.status(400).json({ 
+        error: 'Phone number already registered',
+        normalizedPhone,
+        hint: 'This number might be registered in a different format'
+      });
+    }
 
     const agent = await prisma.agent.create({
       data: {
         name,
-        phone,
+        phone: normalizedPhone, // Use normalized phone number
         email,
         referralCode: generateReferralCode(name),
       },
@@ -33,11 +61,11 @@ export async function registerAgent(req: Request, res: Response) {
     await WalletService.createWallet(agent.id);
     await prisma.kYCVerification.create({ data: { agentId: agent.id } });
 
-    const otpResult = await sendOtp(phone);
+    const otpResult = await sendOtp(normalizedPhone);
     
     // Send OTP via intelligent SMS routing (eSMS Africa for African numbers, Twilio for others)
     const smsService = MultiProviderSMSService.getInstance();
-    const smsResult = await smsService.sendOTP(phone, otpResult.otp, 'registration');
+    const smsResult = await smsService.sendOTP(normalizedPhone, otpResult.otp, 'registration');
     
     console.log(`📱 SMS Result: ${smsResult.success ? '✅' : '❌'} via ${smsResult.provider}`);
     if (smsResult.cost) console.log(`💰 Estimated cost: ${smsResult.cost}`);
@@ -72,10 +100,16 @@ export async function verifyOtp(req: Request, res: Response) {
   try {
     const { phone, otp } = req.body;
 
-    const ok = await verifyOtpCode(phone, otp);
-    if (!ok) return res.status(400).json({ error: 'Invalid OTP' });
+    // Normalize phone number for verification
+    const phoneValidation = normalizePhone(phone, 'UG');
+    const normalizedPhone = phoneValidation.isValid ? phoneValidation.normalizedNumber! : phone;
+    
+    console.log(`📱 OTP verification for: "${phone}" → "${normalizedPhone}"`);
 
-    const agent = await prisma.agent.findUnique({ where: { phone } });
+    const ok = await verifyOtpCode(normalizedPhone, otp);
+    if (!ok) return res.status(400).json({ error: 'Invalid or expired OTP' });
+
+    const agent = await prisma.agent.findUnique({ where: { phone: normalizedPhone } });
     if (!agent) return res.status(404).json({ error: 'Agent not found' });
 
     await prisma.agent.update({
@@ -170,18 +204,35 @@ export async function loginAgent(req: Request, res: Response) {
   try {
     const { phone } = req.body;
 
-    // Check if agent exists
-    const agent = await prisma.agent.findUnique({ where: { phone } });
+    // Normalize phone number
+    const phoneValidation = normalizePhone(phone, 'UG');
+    
+    if (!phoneValidation.isValid) {
+      return res.status(400).json({ 
+        error: 'Invalid phone number format',
+        details: phoneValidation.issues,
+        expected: 'Use formats like: +256700123456, 0700123456, or 700123456'
+      });
+    }
+
+    const normalizedPhone = phoneValidation.normalizedNumber!;
+    console.log(`📱 Login phone normalized: "${phone}" → "${normalizedPhone}"`);
+
+    // Check if agent exists with normalized number
+    const agent = await prisma.agent.findUnique({ where: { phone: normalizedPhone } });
     if (!agent) {
-      return res.status(404).json({ error: 'Agent not found. Please register first.' });
+      return res.status(404).json({ 
+        error: 'Agent not found. Please register first.',
+        hint: 'Make sure you use the same phone number format you registered with'
+      });
     }
 
     // Send OTP
-    const otpResult = await sendOtp(phone);
+    const otpResult = await sendOtp(normalizedPhone);
     
     // Send OTP via intelligent SMS routing (eSMS Africa for African numbers, Twilio for others)
     const smsService = MultiProviderSMSService.getInstance();
-    const smsResult = await smsService.sendOTP(phone, otpResult.otp, 'login');
+    const smsResult = await smsService.sendOTP(normalizedPhone, otpResult.otp, 'login');
     
     console.log(`📱 SMS Result: ${smsResult.success ? '✅' : '❌'} via ${smsResult.provider}`);
     if (smsResult.cost) console.log(`💰 Estimated cost: ${smsResult.cost}`);
@@ -219,12 +270,18 @@ export async function verifyLoginOtp(req: Request, res: Response) {
   try {
     const { phone, otp } = req.body;
 
+    // Normalize phone number for verification
+    const phoneValidation = normalizePhone(phone, 'UG');
+    const normalizedPhone = phoneValidation.isValid ? phoneValidation.normalizedNumber! : phone;
+    
+    console.log(`📱 Login OTP verification for: "${phone}" → "${normalizedPhone}"`);
+
     // Verify OTP
-    const ok = await verifyOtpCode(phone, otp);
+    const ok = await verifyOtpCode(normalizedPhone, otp);
     if (!ok) return res.status(400).json({ error: 'Invalid or expired OTP' });
 
     // Find agent
-    const agent = await prisma.agent.findUnique({ where: { phone } });
+    const agent = await prisma.agent.findUnique({ where: { phone: normalizedPhone } });
     if (!agent) return res.status(404).json({ error: 'Agent not found' });
 
     // Update agent status to VERIFIED if not already and mark as online
