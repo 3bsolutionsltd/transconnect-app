@@ -125,18 +125,38 @@ export class ESMSAfricaService {
       };
     }
 
+    // API vs Platform delivery issue - test different formats
+    const testApiFormats = process.env.ESMS_TEST_API_FORMATS === 'true';
+    
+    if (testApiFormats) {
+      console.log('🧪 Testing different API formats for delivery...');
+      
+      // Test multiple formats to find working one
+      const formats = [
+        { name: 'Current Format', payload: { phoneNumber: data.phoneNumber, text: data.message } },
+        { name: 'No Plus Sign', payload: { phoneNumber: data.phoneNumber.replace('+', ''), text: data.message } },
+        { name: 'With Country', payload: { phoneNumber: data.phoneNumber, text: data.message, country: 'UG' } },
+        { name: 'With Route', payload: { phoneNumber: data.phoneNumber, text: data.message, route: 'transactional' } }
+      ];
+      
+      for (const format of formats) {
+        console.log(`🔍 Testing ${format.name}:`, format.payload);
+        // We'll still send with current format but log alternatives
+      }
+    }
+
     // Delivery issues detection - if we get SUCCESS but phones aren't receiving
     const hasDeliveryIssues = process.env.ESMS_DELIVERY_ISSUES === 'true';
     
     if (hasDeliveryIssues) {
-      console.log('⚠️ eSMS Africa delivery issues detected - using email fallback strategy');
+      console.log('⚠️ eSMS Africa API delivery issues detected - using email fallback strategy');
       console.log(`📱 Would send SMS to ${data.phoneNumber}: ${data.message}`);
-      console.log('🎯 Platform shows SUCCESS but phone delivery failing');
-      console.log('💡 Recommendation: Use email OTP or contact eSMS support');
+      console.log('🎯 API shows SUCCESS but phone delivery failing (platform works)');
+      console.log('💡 Need to fix API format/endpoint - platform delivery confirmed working');
       return { 
         success: false, 
-        error: 'eSMS Africa delivery issues - use email fallback',
-        provider: 'eSMS Africa (Delivery Issues)'
+        error: 'eSMS Africa API delivery issues - platform works, API format wrong',
+        provider: 'eSMS Africa (API Format Issue)'
       };
     }
 
@@ -163,19 +183,37 @@ export class ESMSAfricaService {
       
       console.log(`📱 Sending SMS via eSMS Africa to ${formattedPhone}...`);
       
-      // Official eSMS Africa format per documentation
-      const payload: any = {
-        phoneNumber: formattedPhone,
-        text: data.message
-      };
+      // Test different API formats since platform works but API doesn't
+      const testAlternativeFormats = process.env.ESMS_TRY_ALT_FORMATS === 'true';
       
-      // Only add senderId if it's not empty (better delivery rates)
-      const senderId = data.senderId || this.senderId;
-      if (senderId && senderId.trim() !== '') {
-        payload.senderId = senderId;
-        console.log(`📤 Using Sender ID: ${senderId}`);
+      let payload: any;
+      
+      if (testAlternativeFormats) {
+        // Try format that might work better for API
+        console.log('🧪 Trying alternative API format...');
+        payload = {
+          phone: formattedPhone.replace('+', ''), // Remove + sign
+          message: data.message,
+          sender: 'SMS', // Simple sender
+          type: 'text',
+          route: 1 // Route 1 might be transactional
+        };
+        console.log('📤 Using alternative format for delivery test');
       } else {
-        console.log('📤 Using default sender (no custom ID for better delivery)');
+        // Official eSMS Africa format per documentation
+        payload = {
+          phoneNumber: formattedPhone,
+          text: data.message
+        };
+        
+        // Only add senderId if it's not empty (better delivery rates)
+        const senderId = data.senderId || this.senderId;
+        if (senderId && senderId.trim() !== '') {
+          payload.senderId = senderId;
+          console.log(`📤 Using Sender ID: ${senderId}`);
+        } else {
+          console.log('📤 Using default sender (no custom ID for better delivery)');
+        }
       }
 
       console.log(`🔍 eSMS Africa request payload:`, JSON.stringify(payload, null, 2));

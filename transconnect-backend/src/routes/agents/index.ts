@@ -139,13 +139,96 @@ router.post('/diagnose-sms', async (req, res) => {
         totalTests: tests.length,
         successfulSends: tests.filter(t => t.result.success).length,
         recommendation: tests.every(t => t.result.success) 
-          ? 'All API calls successful - delivery issue is with eSMS Africa or carriers'
+          ? 'All API calls successful - issue is API format vs platform delivery difference'
           : 'API issues detected - check credentials and configuration'
       },
       timestamp: new Date().toISOString()
     });
   } catch (error: any) {
     console.error('❌ SMS diagnosis error:', error);
+    res.status(500).json({
+      success: false,
+      error: error.message,
+      timestamp: new Date().toISOString()
+    });
+  }
+});
+
+// Test different API formats for delivery
+router.post('/test-api-formats', async (req, res) => {
+  try {
+    const { phoneNumber } = req.body;
+    
+    if (!phoneNumber) {
+      return res.status(400).json({ success: false, error: 'phoneNumber is required' });
+    }
+
+    const axios = require('axios');
+    const results = [];
+    
+    // Format 1: Current format
+    console.log('🧪 Testing Format 1: Current API format');
+    try {
+      const result1 = await axios.post('https://api.esmsafrica.io/api/sms/send', {
+        phoneNumber: phoneNumber,
+        text: 'API Format Test 1'
+      }, {
+        headers: {
+          'X-Account-ID': process.env.ESMS_AFRICA_ACCOUNT_ID,
+          'X-API-Key': process.env.ESMS_AFRICA_API_KEY,
+          'Content-Type': 'application/json'
+        }
+      });
+      results.push({ format: 'Current Format', success: true, response: result1.data });
+    } catch (err: any) {
+      results.push({ format: 'Current Format', success: false, error: err.message });
+    }
+
+    // Format 2: No plus sign
+    console.log('🧪 Testing Format 2: No plus sign');
+    try {
+      const result2 = await axios.post('https://api.esmsafrica.io/api/sms/send', {
+        phoneNumber: phoneNumber.replace('+', ''),
+        text: 'API Format Test 2'
+      }, {
+        headers: {
+          'X-Account-ID': process.env.ESMS_AFRICA_ACCOUNT_ID,
+          'X-API-Key': process.env.ESMS_AFRICA_API_KEY,
+          'Content-Type': 'application/json'
+        }
+      });
+      results.push({ format: 'No Plus Sign', success: true, response: result2.data });
+    } catch (err: any) {
+      results.push({ format: 'No Plus Sign', success: false, error: err.message });
+    }
+
+    // Format 3: Different field names
+    console.log('🧪 Testing Format 3: Alternative field names');
+    try {
+      const result3 = await axios.post('https://api.esmsafrica.io/api/sms/send', {
+        phone: phoneNumber.replace('+', ''),
+        message: 'API Format Test 3',
+        sender: 'SMS'
+      }, {
+        headers: {
+          'X-Account-ID': process.env.ESMS_AFRICA_ACCOUNT_ID,
+          'X-API-Key': process.env.ESMS_AFRICA_API_KEY,
+          'Content-Type': 'application/json'
+        }
+      });
+      results.push({ format: 'Alternative Fields', success: true, response: result3.data });
+    } catch (err: any) {
+      results.push({ format: 'Alternative Fields', success: false, error: err.message });
+    }
+    
+    res.json({
+      phoneNumber,
+      formatTests: results,
+      recommendation: 'Check which format gets SUCCESS and if any actually deliver to phone',
+      timestamp: new Date().toISOString()
+    });
+  } catch (error: any) {
+    console.error('❌ API format test error:', error);
     res.status(500).json({
       success: false,
       error: error.message,
