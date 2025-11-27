@@ -6,58 +6,76 @@
 - **Frontend**: Vercel (with API proxy to Render)
 - **Project**: Monorepo with all components
 
-### 🎯 **RECOMMENDED APPROACH: Single Vercel Deployment**
+### 🎯 **RECOMMENDED APPROACH: Hybrid Deployment (Perfect Setup!)**
 
-Given your current setup, I recommend deploying ALL frontend components to **one Vercel project** with subdomain routing:
+Given your current setup with separate admin deployment, this is the **optimal architecture**:
 
 #### **Deployment Structure:**
 ```
-transconnect.app (Main Vercel Project)
-├── / → Passenger booking site (existing)
-├── /agents → Agent portal (existing)  
-├── /admin → Admin dashboard (new routing)
-└── /operators → Operators portal (new routing)
+transconnect.app (Main Vercel Project - transconnect-web)
+├── / → Passenger booking site ✅
+└── /agents → Agent portal ✅
+
+admin.transconnect.app (Separate Vercel Project - transconnect-admin)
+└── / → Admin dashboard ✅ (https://transconnect-admin.vercel.app)
+
+operators.transconnect.app (Optional: Separate or route to /operators)
+└── / → Operators portal
 ```
 
 #### **Subdomain Routing:**
 ```
-transconnect.app → Main passenger site
+transconnect.app → Main passenger site (transconnect-web)
 www.transconnect.app → Redirect to main site
-admin.transconnect.app → Routes to /admin pages
-operators.transconnect.app → Routes to /operators pages
+admin.transconnect.app → Separate admin deployment (transconnect-admin)
+operators.transconnect.app → Route to /operators OR separate deployment
 ```
 
 ### 🚀 **STEP-BY-STEP DEPLOYMENT:**
 
-#### **1. Update Your Existing Vercel Project**
+#### **1. Configure Main Site Domain (transconnect-web)**
 
-Your current Vercel project already proxies to your Render backend. Simply:
+In your existing Vercel project for transconnect-web:
 
 ```bash
 cd transconnect-web
-vercel --prod
-# Add custom domain: transconnect.app
+# Your project is already deployed
+# Just add custom domains in Vercel dashboard
 ```
 
-#### **2. Add Custom Domains in Vercel Dashboard**
+#### **2. Configure Admin Site Domain (transconnect-admin)**
 
-In your Vercel project settings → Domains:
+In your existing admin Vercel project (https://transconnect-admin.vercel.app):
+
+```bash
+cd transconnect-admin
+# Your project is already deployed
+# Just add custom domain in Vercel dashboard
+```
+
+#### **3. Add Custom Domains in Vercel Dashboards**
+
+**For transconnect-web project** → Settings → Domains:
 - Add: `transconnect.app` (primary)
-- Add: `www.transconnect.app` 
-- Add: `admin.transconnect.app`
-- Add: `operators.transconnect.app`
+- Add: `www.transconnect.app`
+- Add: `operators.transconnect.app` (if using /operators routing)
 
-#### **3. DNS Configuration**
+**For transconnect-admin project** → Settings → Domains:
+- Add: `admin.transconnect.app`
+
+#### **4. DNS Configuration**
 
 At your domain registrar (where you bought transconnect.app):
 
 ```bash
-# Main domain
+# Main domain (points to transconnect-web Vercel project)
 A record: @ → 76.76.19.61 (Vercel IP)
 CNAME: www → transconnect.app
 
-# Subdomains (all point to same Vercel deployment)
+# Admin subdomain (points to transconnect-admin Vercel project)  
 CNAME: admin → cname.vercel-dns.com
+
+# Operators subdomain (points to transconnect-web or separate project)
 CNAME: operators → cname.vercel-dns.com
 ```
 

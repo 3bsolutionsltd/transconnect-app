@@ -4,17 +4,20 @@ export function middleware(request: NextRequest) {
   const hostname = request.headers.get('host') || ''
   const url = request.nextUrl.clone()
 
-  // Handle admin subdomain
+  // Handle admin subdomain - redirect to separate admin deployment
   if (hostname === 'admin.transconnect.app') {
-    // Rewrite to admin pages
-    if (url.pathname === '/') {
-      url.pathname = '/admin'
-      return NextResponse.rewrite(url)
-    }
-    if (!url.pathname.startsWith('/admin')) {
-      url.pathname = `/admin${url.pathname}`
-      return NextResponse.rewrite(url)
-    }
+    // This shouldn't happen since DNS points to separate admin deployment
+    // But if it does, redirect to proper admin site
+    url.host = 'admin.transconnect.app'
+    return NextResponse.redirect(url, 301)
+  }
+
+  // Handle admin path on main domain - redirect to admin subdomain
+  if (hostname === 'transconnect.app' && url.pathname.startsWith('/admin')) {
+    url.host = 'admin.transconnect.app'
+    url.pathname = url.pathname.replace('/admin', '')
+    if (url.pathname === '') url.pathname = '/'
+    return NextResponse.redirect(url, 301)
   }
 
   // Handle operators subdomain
