@@ -30,6 +30,7 @@ import operatorManagementRoutes from './routes/operator-management';
 import adminOperatorUserRoutes from './routes/admin-operator-users';
 import databaseAdminRoutes from './routes/admin/database';
 import agentRoutes from './routes/agents';
+import { cleanupOfflineAgents } from './middleware/agentActivity';
 
 dotenv.config();
 
@@ -190,6 +191,33 @@ const HOST = process.env.HOST || '0.0.0.0';
 console.log('Starting TransConnect Backend...');
 console.log(`Port: ${PORT}, Host: ${HOST}`);
 
+// Agent cleanup scheduler to handle offline agents
+function startAgentCleanupScheduler() {
+  // Run cleanup every 2 minutes
+  const cleanupInterval = setInterval(async () => {
+    try {
+      const cleanedUp = await cleanupOfflineAgents();
+      if (cleanedUp > 0) {
+        console.log(`📴 Auto-cleanup: ${cleanedUp} agents marked offline`);
+      }
+    } catch (error) {
+      console.error('❌ Agent cleanup scheduler error:', error);
+    }
+  }, 2 * 60 * 1000); // Every 2 minutes
+  
+  console.log('⏰ Agent cleanup scheduler started (runs every 2 minutes)');
+  
+  // Store interval for cleanup on shutdown
+  process.on('SIGTERM', () => {
+    clearInterval(cleanupInterval);
+    console.log('✅ Agent cleanup scheduler stopped');
+  });
+  
+  process.on('SIGINT', () => {
+    clearInterval(cleanupInterval);
+  });
+}
+
 // Deploy database migrations on startup in production
 async function deployMigrations() {
   if (process.env.NODE_ENV === 'production') {
@@ -223,6 +251,9 @@ deployMigrations().then(() => {
     console.log(`🚀 TransConnect Backend server running on ${HOST}:${PORT}`);
     console.log(`📊 Health check: http://${HOST}:${PORT}/health`);
     console.log('🛤️ Route stops system ready');
+    
+    // Start agent cleanup scheduler
+    startAgentCleanupScheduler();
   });
 });
 

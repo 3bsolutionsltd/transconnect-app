@@ -19,6 +19,24 @@ router.post('/login', loginAgent);
 router.post('/login/verify', verifyLoginOtp);
 router.post('/login/resend-otp', resendLoginOtp); // <- New login resend endpoint
 
+// logout
+router.post('/logout/:agentId', async (req, res) => {
+  try {
+    await markAgentOffline(req.params.agentId);
+    res.json({
+      success: true,
+      message: 'Logged out successfully',
+      agentId: req.params.agentId,
+      timestamp: new Date().toISOString(),
+    });
+  } catch (error: any) {
+    res.status(500).json({
+      success: false,
+      error: error.message,
+    });
+  }
+});
+
 // SMS service testing
 router.post('/test-sms', async (req, res) => {
   try {
@@ -327,6 +345,25 @@ router.post('/cleanup-offline', authenticateToken, async (req, res) => {
       success: true,
       message: `Cleaned up ${cleanedUp} offline agents`,
       count: cleanedUp,
+    });
+  } catch (error: any) {
+    res.status(500).json({
+      success: false,
+      error: error.message,
+    });
+  }
+});
+
+// Test endpoint for immediate cleanup (no auth for testing)
+router.post('/test/cleanup-offline', async (req, res) => {
+  try {
+    console.log('🧪 Manual cleanup test triggered');
+    const cleanedUp = await cleanupOfflineAgents();
+    res.json({
+      success: true,
+      message: `Test cleanup completed - ${cleanedUp} agents marked offline`,
+      count: cleanedUp,
+      timestamp: new Date().toISOString(),
     });
   } catch (error: any) {
     res.status(500).json({
