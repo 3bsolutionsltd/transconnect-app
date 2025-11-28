@@ -15,19 +15,13 @@ export function middleware(request: NextRequest) {
     return NextResponse.redirect(redirectUrl, 301)
   }
 
-  // Handle operators subdomain routing
+  // Handle operators subdomain - redirect to admin system
   if (hostname === 'operators.transconnect.app') {
-    // Rewrite to operators pages
-    if (url.pathname === '/') {
-      url.pathname = '/operators'
-      console.log(`[Middleware] Rewriting operators root to: ${url.pathname}`)
-      return NextResponse.rewrite(url)
-    }
-    if (!url.pathname.startsWith('/operators')) {
-      url.pathname = `/operators${url.pathname}`
-      console.log(`[Middleware] Rewriting operators path to: ${url.pathname}`)
-      return NextResponse.rewrite(url)
-    }
+    const redirectUrl = new URL(request.url)
+    redirectUrl.hostname = 'admin.transconnect.app'
+    redirectUrl.pathname = '/operators' + (url.pathname === '/' ? '' : url.pathname)
+    console.log(`[Middleware] Redirecting operators to admin: ${redirectUrl.toString()}`)
+    return NextResponse.redirect(redirectUrl, 301)
   }
 
   // Default behavior - let DNS CNAME handle www redirect
