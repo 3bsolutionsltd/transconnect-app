@@ -25,6 +25,7 @@ import UserManagement from './components/UserManagement';
 import OperatorManagement from './components/OperatorManagement';
 import QRScannerPage from './components/QRScannerPage';
 import AgentManagement from './components/AgentManagement';
+import OperatorLayout from './components/operator/OperatorLayout';
 
 // Dashboard Component
 const Dashboard = () => {
@@ -225,8 +226,8 @@ const Dashboard = () => {
     <div className="space-y-6">
       <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between">
         <div>
-          <h1 className="text-2xl sm:text-3xl font-bold text-gray-900">Dashboard</h1>
-          <p className="text-gray-600">Welcome back, {user?.firstName}! Here's your business overview.</p>
+          <h1 className="text-2xl sm:text-3xl font-bold text-gray-900">Admin Dashboard</h1>
+          <p className="text-gray-600">Welcome back, {user?.firstName}! Here's your system overview.</p>
         </div>
         <div className="text-sm text-gray-500">
           Last updated: {new Date().toLocaleString()} | v2.0 Real Data
@@ -241,7 +242,7 @@ const Dashboard = () => {
               Good {new Date().getHours() < 12 ? 'morning' : new Date().getHours() < 17 ? 'afternoon' : 'evening'}, {user?.firstName}!
             </h2>
             <p className="text-blue-100">
-              You're logged in as {user?.role}. Here's today's business summary.
+              You're logged in as System Administrator. Here's your platform overview.
             </p>
           </div>
           <div className="text-right">
@@ -491,11 +492,25 @@ const Analytics = () => (
 
 // Main App Component with Authentication
 const AuthenticatedApp = () => {
+  const { user } = useAuth();
+
+  // Route based on user role
+  if (user?.role === 'OPERATOR') {
+    return <OperatorLayout />;
+  }
+
+  // Default to admin interface for ADMIN role
+  return <AdminLayout />;
+};
+
+// Admin-specific layout (renamed from AuthenticatedApp)
+const AdminLayout = () => {
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const { user, logout } = useAuth();
   const location = useLocation();
 
-  const navigation = [
+  // Admin-only navigation - operators don't see these
+  const adminNavigation = [
     { name: 'Dashboard', href: '/', icon: Home },
     { name: 'Routes', href: '/routes', icon: MapPin },
     { name: 'Operators', href: '/operators', icon: Building2 },
@@ -525,7 +540,10 @@ const AuthenticatedApp = () => {
         <div className="flex items-center justify-between h-16 px-4 border-b border-gray-200">
           <div className="flex items-center">
             <Bus className="h-8 w-8 text-blue-600" />
-            <span className="ml-2 text-xl font-bold text-gray-900">TransConnect</span>
+            <div className="ml-2">
+              <span className="text-xl font-bold text-gray-900">TransConnect</span>
+              <div className="text-xs text-blue-600">Admin Portal</div>
+            </div>
           </div>
           <button
             onClick={() => setSidebarOpen(false)}
@@ -537,7 +555,7 @@ const AuthenticatedApp = () => {
         
         <nav className="mt-8 px-4">
           <div className="space-y-2">
-            {navigation.map((item) => {
+            {adminNavigation.map((item) => {
               const isActive = location.pathname === item.href;
               return (
                 <Link
@@ -570,7 +588,9 @@ const AuthenticatedApp = () => {
               <p className="text-sm font-medium text-gray-900 truncate">
                 {user?.firstName} {user?.lastName}
               </p>
-              <p className="text-xs text-gray-500 truncate">{user?.role}</p>
+              <p className="text-xs text-gray-500 truncate">
+                System Administrator • {user?.email}
+              </p>
             </div>
           </div>
           <button
@@ -596,9 +616,14 @@ const AuthenticatedApp = () => {
             </button>
             
             <div className="flex items-center space-x-4">
-              <span className="text-sm text-gray-500 hidden sm:block">
-                Welcome back, {user?.firstName}
-              </span>
+              <div className="hidden sm:block text-right">
+                <p className="text-sm font-medium text-gray-900">
+                  Admin Portal
+                </p>
+                <p className="text-xs text-gray-500">
+                  Welcome back, {user?.firstName}
+                </p>
+              </div>
               <button className="p-2 text-gray-400 hover:text-gray-600">
                 <Bell className="h-5 w-5" />
               </button>

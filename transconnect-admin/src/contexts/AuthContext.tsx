@@ -43,6 +43,7 @@ const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => 
         const parsedUser = JSON.parse(userData);
         // Verify user has admin or operator role
         if (parsedUser.role === 'ADMIN' || parsedUser.role === 'OPERATOR') {
+          console.log(`🔍 Validating ${parsedUser.role} token for:`, parsedUser.email);
           // Test token validity by making a quick API call
           fetch(`${API_BASE_URL}/users`, {
             headers: {
@@ -56,7 +57,7 @@ const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => 
               localStorage.removeItem('admin_user');
               setUser(null);
             } else if (response.ok) {
-              console.log('✅ Token valid, setting user');
+              console.log(`✅ ${parsedUser.role} token valid, setting user:`, parsedUser.email);
               setUser(parsedUser);
             }
             setLoading(false);
@@ -103,6 +104,8 @@ const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => 
       if (data.user.role !== 'ADMIN' && data.user.role !== 'OPERATOR') {
         throw new Error('Access denied. Admin or operator privileges required.');
       }
+      
+      console.log(`✅ ${data.user.role} login successful:`, data.user.email);
 
       setUser(data.user);
       localStorage.setItem('admin_token', data.token);
