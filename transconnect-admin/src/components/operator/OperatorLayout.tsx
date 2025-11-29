@@ -10,10 +10,12 @@ import {
   Settings,
   LogOut,
   Bell,
-  Home
+  Home,
+  QrCode
 } from 'lucide-react';
 import { useAuth } from '../../contexts/AuthContext';
 import OperatorDashboard from './OperatorDashboard';
+import OperatorQRScanner from './OperatorQRScanner';
 import OperatorBookings from './OperatorBookings';
 import OperatorBuses from './OperatorBuses';
 import OperatorRoutes from './OperatorRoutes';
@@ -26,6 +28,7 @@ const OperatorLayout = () => {
   // Limited navigation for operators - only what they need
   const operatorNavigation = [
     { name: 'Dashboard', href: '/', icon: Home, description: 'Overview & stats' },
+    { name: 'QR Scanner', href: '/qr-scanner', icon: QrCode, description: 'Validate tickets' },
     { name: 'My Bookings', href: '/bookings', icon: Calendar, description: 'Manage bookings' },
     { name: 'My Buses', href: '/buses', icon: Bus, description: 'Fleet management' },
     { name: 'My Routes', href: '/routes', icon: MapPin, description: 'Route information' },
@@ -165,6 +168,7 @@ const OperatorLayout = () => {
           <div className="p-4 sm:p-6 lg:p-8">
             <Routes>
               <Route path="/" element={<OperatorDashboard />} />
+              <Route path="/qr-scanner" element={<OperatorQRScanner />} />
               <Route path="/bookings" element={<OperatorBookings />} />
               <Route path="/buses" element={<OperatorBuses />} />
               <Route path="/routes" element={<OperatorRoutes />} />

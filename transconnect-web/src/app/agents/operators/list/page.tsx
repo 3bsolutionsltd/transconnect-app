@@ -28,11 +28,11 @@ export default function OperatorListPage() {
   const [error, setError] = useState<string | null>(null);
   const [searchTerm, setSearchTerm] = useState('');
   const [statusFilter, setStatusFilter] = useState<'all' | 'active' | 'pending'>('all');
-  const [demoMode, setDemoMode] = useState(true); // Force demo mode for testing
+  const [demoMode, setDemoMode] = useState(false); // Use real database data
 
   useEffect(() => {
     async function loadOperators() {
-      // Always use demo mode for testing
+      // Use demo mode only when explicitly enabled or missing auth
       if (demoMode || !agentId || !token) {
         // Set demo data for testing
         setOperators([

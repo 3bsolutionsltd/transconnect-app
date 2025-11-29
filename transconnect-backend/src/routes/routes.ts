@@ -369,4 +369,146 @@ router.delete('/:id', authenticateToken, async (req: Request, res: Response) => 
   }
 });
 
+// Get stops for a specific route
+router.get('/:id/stops', async (req: Request, res: Response) => {
+  try {
+    const { id } = req.params;
+
+    const route = await prisma.route.findUnique({
+      where: { id },
+      include: {
+        stops: {
+          orderBy: { order: 'asc' }
+        }
+      }
+    });
+
+    if (!route) {
+      return res.status(404).json({ error: 'Route not found' });
+    }
+
+    res.json(route.stops);
+  } catch (error) {
+    console.error('Error fetching route stops:', error);
+    res.status(500).json({ error: 'Failed to fetch route stops' });
+  }
+});
+
+// Calculate price between two stops
+router.get('/:id/stops/calculate-price', async (req: Request, res: Response) => {
+  try {
+    const { id } = req.params;
+    const { boardingStop, alightingStop } = req.query;
+
+    if (!boardingStop || !alightingStop) {
+      return res.status(400).json({ 
+        error: 'boardingStop and alightingStop parameters are required' 
+      });
+    }
+
+    const route = await prisma.route.findUnique({
+      where: { id },
+      include: {
+        stops: {
+          orderBy: { order: 'asc' }
+        }
+      }
+    });
+
+    if (!route) {
+      return res.status(404).json({ error: 'Route not found' });
+    }
+
+    const boarding = route.stops.find(stop => stop.stopName === boardingStop);
+    const alighting = route.stops.find(stop => stop.stopName === alightingStop);
+
+    if (!boarding || !alighting) {
+      return res.status(400).json({ error: 'Invalid boarding or alighting stop' });
+    }
+
+    if (boarding.order >= alighting.order) {
+      return res.status(400).json({ error: 'Boarding stop must be before alighting stop' });
+    }
+
+    const distance = alighting.distanceFromOrigin - boarding.distanceFromOrigin;
+    const price = alighting.priceFromOrigin - boarding.priceFromOrigin;
+
+    res.json({
+      boardingStop: boarding,
+      alightingStop: alighting,
+      distance,
+      price
+    });
+  } catch (error) {
+    console.error('Error calculating stop price:', error);
+    res.status(500).json({ error: 'Failed to calculate stop price' });
+  }
+});
+
+// Get all available boarding stops (for passenger selection)
+router.get('/:id/boarding-stops', async (req: Request, res: Response) => {
+  try {
+    const { id } = req.params;
+
+    const route = await prisma.route.findUnique({
+      where: { id },
+      include: {
+        stops: {
+          orderBy: { order: 'asc' }
+        }
+      }
+    });
+
+    if (!route) {
+      return res.status(404).json({ error: 'Route not found' });
+    }
+
+    // Return all stops except the last one (can't board at final destination)
+    const boardingStops = route.stops.slice(0, -1);
+
+    res.json(boardingStops);
+  } catch (error) {
+    console.error('Error fetching boarding stops:', error);
+    res.status(500).json({ error: 'Failed to fetch boarding stops' });
+  }
+});
+
+// Get available alighting stops for a given boarding stop
+router.get('/:id/alighting-stops/:boardingStop', async (req: Request, res: Response) => {
+  try {
+    const { id, boardingStop } = req.params;
+
+    const route = await prisma.route.findUnique({
+      where: { id },
+      include: {
+        stops: {
+          orderBy: { order: 'asc' }
+        }
+      }
+    });
+
+    if (!route) {
+      return res.status(404).json({ error: 'Route not found' });
+    }
+
+    const boardingStopData = route.stops.find(stop => 
+      stop.stopName === decodeURIComponent(boardingStop)
+    );
+
+    if (!boardingStopData) {
+      return res.status(400).json({ error: 'Invalid boarding stop' });
+    }
+
+    // Return all stops after the boarding stop
+    const alightingStops = route.stops.filter(stop => 
+      stop.order > boardingStopData.order
+    );
+
+    res.json(alightingStops);
+  } catch (error) {
+    console.error('Error fetching alighting stops:', error);
+    res.status(500).json({ error: 'Failed to fetch alighting stops' });
+  }
+});
+
 export default router;

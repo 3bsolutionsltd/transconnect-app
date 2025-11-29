@@ -13,10 +13,27 @@ import {
   AlertCircle
 } from 'lucide-react';
 
+interface ActiveRoute {
+  origin: string;
+  destination: string;
+  price: number;
+}
+
+interface OperatorStats {
+  myBuses: number;
+  myRoutes: number;
+  todayBookings: number;
+  monthlyRevenue: number;
+  pendingBookings: number;
+  confirmedBookings: number;
+  averageOccupancy: number;
+  myActiveRoutes: ActiveRoute[];
+}
+
 // Operator-specific dashboard with limited scope and different design
 const OperatorDashboard = () => {
   const { user } = useAuth();
-  const [stats, setStats] = useState({
+  const [stats, setStats] = useState<OperatorStats>({
     myBuses: 0,
     myRoutes: 0,
     todayBookings: 0,
@@ -318,7 +335,7 @@ const OperatorDashboard = () => {
           </div>
           <div className="p-6">
             <div className="space-y-4">
-              {stats.myActiveRoutes.map((route: any, index) => (
+              {stats.myActiveRoutes.map((route: ActiveRoute, index) => (
                 <div key={index} className="flex items-center justify-between p-4 bg-green-50 rounded-lg border border-green-200">
                   <div className="flex-1">
                     <div className="font-medium text-gray-900">

@@ -6,11 +6,7 @@ const getBackendPort = () => {
 };
 
 const getApiBaseUrl = () => {
-  if (typeof window !== 'undefined') {
-    // In browser, try to detect backend port
-    const backendPort = getBackendPort();
-    return `http://localhost:${backendPort}/api`;
-  }
+  // Always use the environment variable if available, otherwise construct the URL
   return process.env.NEXT_PUBLIC_API_URL || `http://localhost:${getBackendPort()}/api`;
 };
 
@@ -112,8 +108,10 @@ export async function fetchRoutes(params?: Record<string, any>) {
   console.log('API Base URL:', api.defaults.baseURL);
   try {
     const res = await api.get('/routes', { params });
-    console.log('Routes API response:', res.data?.length || 0, 'routes found');
-    return res.data;
+    // Handle both array response and object response with routes property
+    const routes = Array.isArray(res.data) ? res.data : res.data?.routes || [];
+    console.log('Routes API response:', routes.length || 0, 'routes found');
+    return routes;
   } catch (error) {
     console.error('Error fetching routes:', error);
     throw error;

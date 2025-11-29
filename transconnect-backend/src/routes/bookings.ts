@@ -78,7 +78,7 @@ router.post('/', [
       boardingStop,
       alightingStop 
     } = req.body;
-    const userId = (req as any).user.userId;
+    const userId = (req as any).user.id;
 
     // Validate seat count matches passenger count
     if (seatNumbers.length !== passengers.length) {
@@ -178,7 +178,7 @@ router.post('/', [
 
       const qrCode = await QRCode.toDataURL(JSON.stringify(qrData));
 
-      // Create booking with only existing fields for now
+      // Create booking with all required fields
       const booking = await prisma.booking.create({
         data: {
           userId,
@@ -187,6 +187,9 @@ router.post('/', [
           travelDate: new Date(travelDate),
           qrCode,
           totalAmount: finalPrice,
+          boardingStop: boardingStop || null,
+          alightingStop: alightingStop || null,
+          actualPrice: finalPrice,
           status: 'PENDING'
         }
       });

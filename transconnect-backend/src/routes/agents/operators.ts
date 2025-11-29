@@ -13,12 +13,37 @@ const router = Router();
 // Middleware to validate agent access
 const validateAgentAccess = async (req: Request, res: Response, next: any) => {
   try {
-    const { agentId } = req.params;
+    // Extract agentId from the URL since req.params might not work with sub-routers
+    let agentId = req.params.agentId;
+    
+    // If agentId is not in params, extract from baseUrl
+    if (!agentId && req.baseUrl) {
+      const match = req.baseUrl.match(/\/api\/agents\/([^\/]+)\/operators/);
+      if (match) {
+        agentId = match[1];
+      }
+    }
+    
     const tokenAgentId = (req as any).agent?.agentId;
+
+    console.log('Agent access validation:', {
+      urlAgentId: agentId,
+      tokenAgentId: tokenAgentId,
+      agent: (req as any).agent,
+      allParams: req.params,
+      originalUrl: req.originalUrl,
+      baseUrl: req.baseUrl,
+      path: req.path,
+      extractedFromBaseUrl: agentId
+    });
 
     // Validate that the agent can only access their own operators
     if (agentId !== tokenAgentId) {
-      return res.status(403).json({ error: 'Access denied. You can only manage your own operators.' });
+      console.error('Agent ID mismatch:', { urlAgentId: agentId, tokenAgentId });
+      return res.status(403).json({ 
+        error: 'Access denied. You can only manage your own operators.',
+        debug: { urlAgentId: agentId, tokenAgentId }
+      });
     }
 
     next();
@@ -36,7 +61,6 @@ router.post('/',
   authenticateAgentToken,
   validateAgentAccess,
   [
-    param('agentId').isString().notEmpty().withMessage('Agent ID is required'),
     body('companyName').isString().notEmpty().withMessage('Company name is required'),
     body('license').isString().notEmpty().withMessage('License is required'),
     body('firstName').isString().notEmpty().withMessage('First name is required'),
@@ -49,10 +73,27 @@ router.post('/',
     try {
       const errors = validationResult(req);
       if (!errors.isEmpty()) {
+        console.error('Operator registration validation errors:', {
+          errors: errors.array(),
+          body: req.body,
+          params: req.params
+        });
         return res.status(400).json({ errors: errors.array() });
       }
 
-      const { agentId } = req.params;
+      // Extract agentId from URL since req.params doesn't work with sub-routers
+      let agentId = req.params.agentId;
+      if (!agentId && req.baseUrl) {
+        const match = req.baseUrl.match(/\/api\/agents\/([^\/]+)\/operators/);
+        if (match) {
+          agentId = match[1];
+        }
+      }
+
+      if (!agentId) {
+        return res.status(400).json({ error: 'Agent ID could not be determined' });
+      }
+
       const operatorData = req.body;
 
       const result = await AgentOperatorService.registerOperator(agentId, operatorData);
@@ -74,17 +115,20 @@ router.post('/',
 router.get('/',
   authenticateAgentToken,
   validateAgentAccess,
-  [
-    param('agentId').isString().notEmpty().withMessage('Agent ID is required')
-  ],
   async (req: Request, res: Response) => {
     try {
-      const errors = validationResult(req);
-      if (!errors.isEmpty()) {
-        return res.status(400).json({ errors: errors.array() });
+      // Extract agentId from URL since req.params doesn't work with sub-routers
+      let agentId = req.params.agentId;
+      if (!agentId && req.baseUrl) {
+        const match = req.baseUrl.match(/\/api\/agents\/([^\/]+)\/operators/);
+        if (match) {
+          agentId = match[1];
+        }
       }
 
-      const { agentId } = req.params;
+      if (!agentId) {
+        return res.status(400).json({ error: 'Agent ID could not be determined' });
+      }
       
       const operators = await AgentOperatorService.getAgentOperators(agentId);
       
@@ -109,17 +153,20 @@ router.get('/',
 router.get('/dashboard',
   authenticateAgentToken,
   validateAgentAccess,
-  [
-    param('agentId').isString().notEmpty().withMessage('Agent ID is required')
-  ],
   async (req: Request, res: Response) => {
     try {
-      const errors = validationResult(req);
-      if (!errors.isEmpty()) {
-        return res.status(400).json({ errors: errors.array() });
+      // Extract agentId from URL since req.params doesn't work with sub-routers
+      let agentId = req.params.agentId;
+      if (!agentId && req.baseUrl) {
+        const match = req.baseUrl.match(/\/api\/agents\/([^\/]+)\/operators/);
+        if (match) {
+          agentId = match[1];
+        }
       }
 
-      const { agentId } = req.params;
+      if (!agentId) {
+        return res.status(400).json({ error: 'Agent ID could not be determined' });
+      }
       
       const dashboard = await AgentOperatorService.getAgentOperatorDashboard(agentId);
       
@@ -143,18 +190,26 @@ router.get('/dashboard',
 router.get('/:operatorId',
   authenticateAgentToken,
   validateAgentAccess,
-  [
-    param('agentId').isString().notEmpty().withMessage('Agent ID is required'),
-    param('operatorId').isString().notEmpty().withMessage('Operator ID is required')
-  ],
   async (req: Request, res: Response) => {
     try {
-      const errors = validationResult(req);
-      if (!errors.isEmpty()) {
-        return res.status(400).json({ errors: errors.array() });
+      // Extract agentId from URL since req.params doesn't work with sub-routers
+      let agentId = req.params.agentId;
+      if (!agentId && req.baseUrl) {
+        const match = req.baseUrl.match(/\/api\/agents\/([^\/]+)\/operators/);
+        if (match) {
+          agentId = match[1];
+        }
       }
 
-      const { agentId, operatorId } = req.params;
+      const operatorId = req.params.operatorId;
+
+      if (!agentId) {
+        return res.status(400).json({ error: 'Agent ID could not be determined' });
+      }
+      
+      if (!operatorId) {
+        return res.status(400).json({ error: 'Operator ID is required' });
+      }
       
       const operator = await AgentOperatorService.getOperatorDetails(agentId, operatorId);
       
@@ -179,8 +234,6 @@ router.put('/:operatorId',
   authenticateAgentToken,
   validateAgentAccess,
   [
-    param('agentId').isString().notEmpty().withMessage('Agent ID is required'),
-    param('operatorId').isString().notEmpty().withMessage('Operator ID is required'),
     body('companyName').optional().isString().notEmpty().withMessage('Company name cannot be empty'),
     body('firstName').optional().isString().notEmpty().withMessage('First name cannot be empty'),
     body('lastName').optional().isString().notEmpty().withMessage('Last name cannot be empty'),
@@ -194,7 +247,24 @@ router.put('/:operatorId',
         return res.status(400).json({ errors: errors.array() });
       }
 
-      const { agentId, operatorId } = req.params;
+      // Extract agentId from URL since req.params doesn't work with sub-routers
+      let agentId = req.params.agentId;
+      if (!agentId && req.baseUrl) {
+        const match = req.baseUrl.match(/\/api\/agents\/([^\/]+)\/operators/);
+        if (match) {
+          agentId = match[1];
+        }
+      }
+
+      const operatorId = req.params.operatorId;
+
+      if (!agentId) {
+        return res.status(400).json({ error: 'Agent ID could not be determined' });
+      }
+      
+      if (!operatorId) {
+        return res.status(400).json({ error: 'Operator ID is required' });
+      }
       const updateData = req.body;
 
       const result = await AgentOperatorService.updateOperator(agentId, operatorId, updateData);
@@ -216,18 +286,26 @@ router.put('/:operatorId',
 router.get('/:operatorId/analytics',
   authenticateAgentToken,
   validateAgentAccess,
-  [
-    param('agentId').isString().notEmpty().withMessage('Agent ID is required'),
-    param('operatorId').isString().notEmpty().withMessage('Operator ID is required')
-  ],
   async (req: Request, res: Response) => {
     try {
-      const errors = validationResult(req);
-      if (!errors.isEmpty()) {
-        return res.status(400).json({ errors: errors.array() });
+      // Extract agentId from URL since req.params doesn't work with sub-routers
+      let agentId = req.params.agentId;
+      if (!agentId && req.baseUrl) {
+        const match = req.baseUrl.match(/\/api\/agents\/([^\/]+)\/operators/);
+        if (match) {
+          agentId = match[1];
+        }
       }
 
-      const { operatorId } = req.params;
+      const operatorId = req.params.operatorId;
+
+      if (!agentId) {
+        return res.status(400).json({ error: 'Agent ID could not be determined' });
+      }
+      
+      if (!operatorId) {
+        return res.status(400).json({ error: 'Operator ID is required' });
+      }
       
       const analytics = await AgentOperatorService.getOperatorAnalytics(operatorId);
       
