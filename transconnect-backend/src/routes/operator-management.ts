@@ -8,7 +8,7 @@ const router = Router();
 // Get all bookings for operator's routes
 router.get('/bookings', authenticateToken, async (req: Request, res: Response) => {
   try {
-    const userId = (req as any).user.userId;
+    const userId = (req as any).user.id;
     const userRole = (req as any).user.role;
     const { page = 1, limit = 10, status, date, routeId } = req.query;
 
@@ -146,7 +146,7 @@ router.get('/bookings', authenticateToken, async (req: Request, res: Response) =
 // Get booking analytics for operator
 router.get('/analytics', authenticateToken, async (req: Request, res: Response) => {
   try {
-    const userId = (req as any).user.userId;
+    const userId = (req as any).user.id;
     const userRole = (req as any).user.role;
     const { period = '30' } = req.query; // days
 
@@ -286,7 +286,7 @@ router.get('/analytics', authenticateToken, async (req: Request, res: Response) 
 // Get operator dashboard summary
 router.get('/dashboard', authenticateToken, async (req: Request, res: Response) => {
   try {
-    const userId = (req as any).user.userId;
+    const userId = (req as any).user.id;
     const userRole = (req as any).user.role;
 
     if (userRole !== 'OPERATOR') {
@@ -478,7 +478,7 @@ router.put('/bookings/:bookingId/status', [
 
     const { bookingId } = req.params;
     const { status, reason } = req.body;
-    const userId = (req as any).user.userId;
+    const userId = (req as any).user.id;
     const userRole = (req as any).user.role;
 
     if (userRole !== 'OPERATOR') {

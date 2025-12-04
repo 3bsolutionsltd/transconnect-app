@@ -14,7 +14,7 @@ router.get('/', authenticateToken, async (req: Request, res: Response) => {
     // If operator, only show their own buses
     if (userRole === 'OPERATOR') {
       // Use the operator permissions middleware inline for this check
-      const userId = (req as any).user.userId;
+      const userId = (req as any).user.id;
       const operatorUser = await prisma.operatorUser.findUnique({
         where: { userId }
       });
@@ -60,7 +60,7 @@ router.get('/', authenticateToken, async (req: Request, res: Response) => {
 // Create bus (Operator only - auto-assigns to logged-in operator)
 router.post('/', authenticateToken, async (req: Request, res: Response) => {
   try {
-    const userId = (req as any).user.userId;
+    const userId = (req as any).user.id;
     const userRole = (req as any).user.role;
     const { plateNumber, model, capacity, amenities } = req.body;
 
@@ -195,7 +195,7 @@ router.get('/:id', async (req: Request, res: Response) => {
 // Update bus (Operator only - can only update own buses)
 router.put('/:id', authenticateToken, async (req: Request, res: Response) => {
   try {
-    const userId = (req as any).user.userId;
+    const userId = (req as any).user.id;
     const userRole = (req as any).user.role;
     const { id } = req.params;
     const { plateNumber, model, capacity, amenities } = req.body;
@@ -272,7 +272,7 @@ router.put('/:id', authenticateToken, async (req: Request, res: Response) => {
 // Delete bus (Operator only - can only delete own buses)
 router.delete('/:id', authenticateToken, async (req: Request, res: Response) => {
   try {
-    const userId = (req as any).user.userId;
+    const userId = (req as any).user.id;
     const userRole = (req as any).user.role;
     const { id } = req.params;
 

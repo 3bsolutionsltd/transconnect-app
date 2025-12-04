@@ -11,7 +11,7 @@ const notificationService = NotificationService.getInstance();
 // Get user's bookings
 router.get('/my-bookings', authenticateToken, async (req: Request, res: Response) => {
   try {
-    const userId = (req as any).user.userId;
+    const userId = (req as any).user.id;
     
     const bookings = await prisma.booking.findMany({
       where: { userId },
@@ -312,7 +312,7 @@ router.get('/route/:routeId/seats', async (req: Request, res: Response) => {
 router.put('/:id/cancel', authenticateToken, async (req: Request, res: Response) => {
   try {
     const { id } = req.params;
-    const userId = (req as any).user.userId;
+    const userId = (req as any).user.id;
 
     const booking = await prisma.booking.findUnique({
       where: { id },
@@ -360,7 +360,7 @@ router.put('/:id/cancel', authenticateToken, async (req: Request, res: Response)
 router.get('/:id', authenticateToken, async (req: Request, res: Response) => {
   try {
     const { id } = req.params;
-    const userId = (req as any).user.userId;
+    const userId = (req as any).user.id;
 
     const booking = await prisma.booking.findUnique({
       where: { id },
