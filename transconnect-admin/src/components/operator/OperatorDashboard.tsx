@@ -65,13 +65,25 @@ const OperatorDashboard = () => {
         })
       ]);
 
-      if (busesRes.ok && routesRes.ok) {
-        const busesData = await busesRes.json();
-        const routesData = await routesRes.json();
-        
-        // Calculate operator-specific stats
-        const myBuses = busesData.length || 0;
-        const myRoutes = routesData.routes?.length || routesData.length || 0;
+      // Handle responses even if some fail - use fallback data
+      let busesData = [];
+      let routesData = { routes: [] };
+      
+      if (busesRes.ok) {
+        busesData = await busesRes.json();
+      } else {
+        console.warn('Buses API failed:', await busesRes.text().catch(() => 'Failed to read response'));
+      }
+      
+      if (routesRes.ok) {
+        routesData = await routesRes.json();
+      } else {
+        console.warn('Routes API failed:', await routesRes.text().catch(() => 'Failed to read response'));
+      }
+      
+      // Calculate operator-specific stats
+      const myBuses = busesData.length || 0;
+      const myRoutes = routesData.routes?.length || routesData.length || 0;
         
         let bookingsData = [];
         if (bookingsRes.ok) {
@@ -110,7 +122,6 @@ const OperatorDashboard = () => {
 
         // Set recent bookings (last 5)
         setRecentBookings(bookingsData.slice(0, 5));
-      }
     } catch (error) {
       console.error('Error loading operator data:', error);
       // Set fallback data for operators

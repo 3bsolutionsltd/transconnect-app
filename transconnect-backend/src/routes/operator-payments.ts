@@ -11,7 +11,7 @@ const notificationService = NotificationService.getInstance();
 // Get all pending cash payments for operator
 router.get('/pending-cash', authenticateToken, async (req: Request, res: Response) => {
   try {
-    const userId = (req as any).user.userId;
+    const userId = (req as any).user.id;
     const userRole = (req as any).user.role;
 
     if (userRole !== 'OPERATOR') {
@@ -114,7 +114,7 @@ router.post('/:paymentId/process', [
 
     const { paymentId } = req.params;
     const { action, notes } = req.body;
-    const userId = (req as any).user.userId;
+    const userId = (req as any).user.id;
     const userRole = (req as any).user.role;
 
     if (userRole !== 'OPERATOR') {
@@ -242,7 +242,7 @@ router.post('/:paymentId/process', [
 // Get payment history for operator
 router.get('/history', authenticateToken, async (req: Request, res: Response) => {
   try {
-    const userId = (req as any).user.userId;
+    const userId = (req as any).user.id;
     const userRole = (req as any).user.role;
     const { page = 1, limit = 10, status, method } = req.query;
 
@@ -359,7 +359,7 @@ router.get('/history', authenticateToken, async (req: Request, res: Response) =>
 // Get payment analytics for operator
 router.get('/analytics', authenticateToken, async (req: Request, res: Response) => {
   try {
-    const userId = (req as any).user.userId;
+    const userId = (req as any).user.id;
     const userRole = (req as any).user.role;
     const { period = '30' } = req.query; // days
 

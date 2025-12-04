@@ -108,6 +108,17 @@ export class AgentOperatorService {
         }
       });
 
+      // Create OperatorUser relationship (CRITICAL - this was missing!)
+      await prisma.operatorUser.create({
+        data: {
+          userId: user.id,
+          operatorId: operator.id,
+          role: 'OWNER',
+          permissions: ['manage_all'],
+          active: true
+        }
+      });
+
       // Create agent-operator relationship
       await prisma.agentOperator.create({
         data: {
