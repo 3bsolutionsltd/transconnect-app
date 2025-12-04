@@ -113,7 +113,7 @@ export class AgentOperatorService {
         data: {
           userId: user.id,
           operatorId: operator.id,
-          role: 'OWNER',
+          role: 'MANAGER',
           permissions: ['manage_all'],
           active: true
         }
