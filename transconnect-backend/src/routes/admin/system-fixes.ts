@@ -27,7 +27,7 @@ router.post('/fix-operator-users', authenticateToken, async (req: Request, res: 
       }
     });
 
-    const fixResults = [];
+    const fixResults: any[] = [];
 
     for (const operator of operatorsWithoutOperatorUsers) {
       try {
