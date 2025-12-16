@@ -29,6 +29,8 @@ import operatorPaymentRoutes from './routes/operator-payments';
 import operatorManagementRoutes from './routes/operator-management';
 import adminOperatorUserRoutes from './routes/admin-operator-users';
 import databaseAdminRoutes from './routes/admin/database';
+import systemFixesRoutes from './routes/admin/system-fixes';
+import adminSeedRoutes from './routes/admin-seed';
 import agentRoutes from './routes/agents';
 import { cleanupOfflineAgents } from './middleware/agentActivity';
 
@@ -135,6 +137,8 @@ app.use('/api/operator-payments', operatorPaymentRoutes);
 app.use('/api/operator-management', operatorManagementRoutes);
 app.use('/api/admin/operator-users', adminOperatorUserRoutes);
 app.use('/api/admin/database', databaseAdminRoutes);
+app.use('/api/admin/system-fixes', systemFixesRoutes);
+app.use('/api/admin', adminSeedRoutes);
 app.use('/api/agents', agentRoutes);
 
 // Health check endpoint
