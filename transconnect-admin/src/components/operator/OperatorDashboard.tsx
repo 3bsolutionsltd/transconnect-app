@@ -67,7 +67,7 @@ const OperatorDashboard = () => {
 
       // Handle responses even if some fail - use fallback data
       let busesData = [];
-      let routesData = { routes: [] };
+      let routesData: any = { routes: [] };
       
       if (busesRes.ok) {
         busesData = await busesRes.json();
@@ -76,14 +76,15 @@ const OperatorDashboard = () => {
       }
       
       if (routesRes.ok) {
-        routesData = await routesRes.json();
+        const data = await routesRes.json();
+        routesData = Array.isArray(data) ? { routes: data } : (data || { routes: [] });
       } else {
         console.warn('Routes API failed:', await routesRes.text().catch(() => 'Failed to read response'));
       }
       
       // Calculate operator-specific stats
-      const myBuses = busesData.length || 0;
-      const myRoutes = routesData.routes?.length || routesData.length || 0;
+      const myBuses = Array.isArray(busesData) ? busesData.length : 0;
+      const myRoutes = Array.isArray(routesData.routes) ? routesData.routes.length : (Array.isArray(routesData) ? routesData.length : 0);
         
         let bookingsData = [];
         if (bookingsRes.ok) {
