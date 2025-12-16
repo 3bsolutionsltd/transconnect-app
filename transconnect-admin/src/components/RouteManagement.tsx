@@ -70,10 +70,14 @@ const RouteManagement: React.FC = () => {
         const data = await response.json();
         // Handle paginated response - extract routes array
         const routesArray = Array.isArray(data) ? data : (data.routes || []);
-        setRoutes(routesArray);
+        setRoutes(Array.isArray(routesArray) ? routesArray : []);
+      } else {
+        console.error('Failed to fetch routes:', response.status);
+        setRoutes([]);
       }
     } catch (error) {
       console.error('Error fetching routes:', error);
+      setRoutes([]);
     } finally {
       setLoading(false);
     }
@@ -91,10 +95,13 @@ const RouteManagement: React.FC = () => {
 
       if (response.ok) {
         const data = await response.json();
-        setOperators(data);
+        setOperators(Array.isArray(data) ? data : []);
+      } else {
+        setOperators([]);
       }
     } catch (error) {
       console.error('Error fetching operators:', error);
+      setOperators([]);
     }
   }, [API_BASE_URL]);
 
@@ -110,10 +117,13 @@ const RouteManagement: React.FC = () => {
 
       if (response.ok) {
         const data = await response.json();
-        setBuses(data);
+        setBuses(Array.isArray(data) ? data : []);
+      } else {
+        setBuses([]);
       }
     } catch (error) {
       console.error('Error fetching buses:', error);
+      setBuses([]);
     }
   }, [API_BASE_URL]);
 
