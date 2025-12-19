@@ -6,20 +6,55 @@ import {
   TrendingUp,
   AlertCircle,
   Eye,
-  BarChart3
+  BarChart3,
+  Plus,
+  X
 } from 'lucide-react';
 
 const OperatorRoutes = () => {
   const [routes, setRoutes] = useState<any[]>([]);
+  const [buses, setBuses] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
   const [selectedRoute, setSelectedRoute] = useState<any>(null);
+  const [showAddForm, setShowAddForm] = useState(false);
+  const [submitting, setSubmitting] = useState(false);
+  const [routeForm, setRouteForm] = useState({
+    origin: '',
+    destination: '',
+    via: '',
+    distance: '',
+    duration: '',
+    price: '',
+    departureTime: '',
+    busId: ''
+  });
 
   const API_BASE_URL = process.env.REACT_APP_API_URL || 'http://localhost:5000/api';
+
+  const loadBuses = useCallback(async () => {
+    try {
+      const token = localStorage.getItem('admin_token');
+      const response = await fetch(`${API_BASE_URL}/operator-management/buses`, {
+        headers: {
+          'Authorization': `Bearer ${token}`,
+          'Content-Type': 'application/json'
+        }
+      });
+
+      if (response.ok) {
+        const data = await response.json();
+        setBuses(data || []);
+      }
+    } catch (error) {
+      console.error('Error loading buses:', error);
+    }
+  }, [API_BASE_URL]);
 
   const loadRoutes = useCallback(async () => {
     try {
       const token = localStorage.getItem('admin_token');
-      const response = await fetch(`${API_BASE_URL}/routes`, {
+      // Use operator-specific endpoint to only fetch their routes
+      const response = await fetch(`${API_BASE_URL}/operator-management/routes`, {
         headers: {
           'Authorization': `Bearer ${token}`,
           'Content-Type': 'application/json'
@@ -29,6 +64,8 @@ const OperatorRoutes = () => {
       if (response.ok) {
         const data = await response.json();
         setRoutes(data.routes || data || []);
+      } else {
+        console.warn('Failed to load operator routes, using fallback data');
       }
     } catch (error) {
       console.error('Error loading routes:', error);
@@ -96,7 +133,60 @@ const OperatorRoutes = () => {
 
   useEffect(() => {
     loadRoutes();
-  }, [loadRoutes]);
+    loadBuses();
+  }, [loadRoutes, loadBuses]);
+
+  const handleSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setSubmitting(true);
+
+    try {
+      const token = localStorage.getItem('admin_token');
+      const via = routeForm.via ? routeForm.via.split(',').map(s => s.trim()).filter(s => s) : [];
+
+      const response = await fetch(`${API_BASE_URL}/operator-management/routes`, {
+        method: 'POST',
+        headers: {
+          'Authorization': `Bearer ${token}`,
+          'Content-Type': 'application/json'
+        },
+        body: JSON.stringify({
+          origin: routeForm.origin,
+          destination: routeForm.destination,
+          via,
+          distance: parseFloat(routeForm.distance),
+          duration: parseInt(routeForm.duration),
+          price: parseFloat(routeForm.price),
+          departureTime: routeForm.departureTime,
+          busId: routeForm.busId
+        })
+      });
+
+      if (response.ok) {
+        alert('Route created successfully!');
+        setShowAddForm(false);
+        setRouteForm({
+          origin: '',
+          destination: '',
+          via: '',
+          distance: '',
+          duration: '',
+          price: '',
+          departureTime: '',
+          busId: ''
+        });
+        loadRoutes();
+      } else {
+        const error = await response.json();
+        alert(`Failed to create route: ${error.error || error.message || 'Unknown error'}`);
+      }
+    } catch (error) {
+      console.error('Error creating route:', error);
+      alert('Failed to create route. Please try again.');
+    } finally {
+      setSubmitting(false);
+    }
+  };
 
   const formatCurrency = (amount: number) => `UGX ${amount.toLocaleString()}`;
   const formatDuration = (minutes: number) => {
@@ -143,10 +233,190 @@ const OperatorRoutes = () => {
           <h1 className="text-2xl font-bold text-gray-900">My Routes</h1>
           <p className="text-gray-600">View and monitor your route performance</p>
         </div>
-        <div className="text-sm text-gray-500">
-          {routes.length} active routes
+        <div className="flex items-center space-x-4">
+          <button
+            onClick={() => setShowAddForm(true)}
+            className="inline-flex items-center px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 transition-colors"
+          >
+            <Plus className="h-5 w-5 mr-2" />
+            Add Route
+          </button>
+          <div className="text-sm text-gray-500">
+            {routes.length} active routes
+          </div>
         </div>
       </div>
+
+      {/* Add Route Form Modal */}
+      {showAddForm && (
+        <div className="fixed inset-0 bg-gray-600 bg-opacity-50 overflow-y-auto h-full w-full z-50">
+          <div className="relative top-10 mx-auto p-6 border w-full max-w-2xl shadow-lg rounded-lg bg-white">
+            <div className="flex items-center justify-between mb-6">
+              <h3 className="text-2xl font-semibold text-gray-900">Add New Route</h3>
+              <button 
+                onClick={() => setShowAddForm(false)}
+                className="text-gray-400 hover:text-gray-600 text-2xl"
+              >
+                <X className="h-6 w-6" />
+              </button>
+            </div>
+            
+            <form onSubmit={handleSubmit} className="space-y-4">
+              <div className="grid grid-cols-2 gap-4">
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">
+                    Origin <span className="text-red-500">*</span>
+                  </label>
+                  <input
+                    type="text"
+                    required
+                    value={routeForm.origin}
+                    onChange={(e) => setRouteForm({ ...routeForm, origin: e.target.value })}
+                    className="w-full px-3 py-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-green-500 focus:border-transparent"
+                    placeholder="e.g., Kampala"
+                  />
+                </div>
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">
+                    Destination <span className="text-red-500">*</span>
+                  </label>
+                  <input
+                    type="text"
+                    required
+                    value={routeForm.destination}
+                    onChange={(e) => setRouteForm({ ...routeForm, destination: e.target.value })}
+                    className="w-full px-3 py-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-green-500 focus:border-transparent"
+                    placeholder="e.g., Jinja"
+                  />
+                </div>
+              </div>
+
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">
+                  Via (Optional - comma separated)
+                </label>
+                <input
+                  type="text"
+                  value={routeForm.via}
+                  onChange={(e) => setRouteForm({ ...routeForm, via: e.target.value })}
+                  className="w-full px-3 py-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-green-500 focus:border-transparent"
+                  placeholder="e.g., Mukono, Lugazi"
+                />
+                <p className="text-xs text-gray-500 mt-1">Enter intermediate stops separated by commas</p>
+              </div>
+
+              <div className="grid grid-cols-3 gap-4">
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">
+                    Distance (km) <span className="text-red-500">*</span>
+                  </label>
+                  <input
+                    type="number"
+                    required
+                    step="0.1"
+                    value={routeForm.distance}
+                    onChange={(e) => setRouteForm({ ...routeForm, distance: e.target.value })}
+                    className="w-full px-3 py-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-green-500 focus:border-transparent"
+                    placeholder="87"
+                  />
+                </div>
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">
+                    Duration (min) <span className="text-red-500">*</span>
+                  </label>
+                  <input
+                    type="number"
+                    required
+                    value={routeForm.duration}
+                    onChange={(e) => setRouteForm({ ...routeForm, duration: e.target.value })}
+                    className="w-full px-3 py-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-green-500 focus:border-transparent"
+                    placeholder="90"
+                  />
+                </div>
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">
+                    Price (UGX) <span className="text-red-500">*</span>
+                  </label>
+                  <input
+                    type="number"
+                    required
+                    value={routeForm.price}
+                    onChange={(e) => setRouteForm({ ...routeForm, price: e.target.value })}
+                    className="w-full px-3 py-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-green-500 focus:border-transparent"
+                    placeholder="15000"
+                  />
+                </div>
+              </div>
+
+              <div className="grid grid-cols-2 gap-4">
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">
+                    Departure Time <span className="text-red-500">*</span>
+                  </label>
+                  <input
+                    type="time"
+                    required
+                    value={routeForm.departureTime}
+                    onChange={(e) => setRouteForm({ ...routeForm, departureTime: e.target.value })}
+                    className="w-full px-3 py-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-green-500 focus:border-transparent"
+                  />
+                </div>
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">
+                    Assign Bus <span className="text-red-500">*</span>
+                  </label>
+                  <select
+                    required
+                    value={routeForm.busId}
+                    onChange={(e) => setRouteForm({ ...routeForm, busId: e.target.value })}
+                    className="w-full px-3 py-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-green-500 focus:border-transparent"
+                  >
+                    <option value="">Select a bus</option>
+                    {buses.map((bus) => (
+                      <option key={bus.id} value={bus.id}>
+                        {bus.plateNumber} - {bus.model} ({bus.capacity} seats)
+                      </option>
+                    ))}
+                  </select>
+                  {buses.length === 0 && (
+                    <p className="text-xs text-amber-600 mt-1">
+                      Please add buses first before creating routes
+                    </p>
+                  )}
+                </div>
+              </div>
+
+              <div className="flex justify-end space-x-3 pt-4 border-t">
+                <button
+                  type="button"
+                  onClick={() => setShowAddForm(false)}
+                  className="px-4 py-2 border border-gray-300 text-gray-700 rounded-md hover:bg-gray-50"
+                  disabled={submitting}
+                >
+                  Cancel
+                </button>
+                <button
+                  type="submit"
+                  disabled={submitting || buses.length === 0}
+                  className="px-4 py-2 bg-green-600 text-white rounded-md hover:bg-green-700 disabled:bg-gray-400 disabled:cursor-not-allowed flex items-center"
+                >
+                  {submitting ? (
+                    <>
+                      <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white mr-2"></div>
+                      Creating...
+                    </>
+                  ) : (
+                    <>
+                      <Plus className="h-4 w-4 mr-2" />
+                      Create Route
+                    </>
+                  )}
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
 
       {/* Route Performance Summary */}
       {routes.length > 0 && (

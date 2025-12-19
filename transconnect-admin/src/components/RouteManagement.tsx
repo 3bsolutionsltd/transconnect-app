@@ -95,8 +95,12 @@ const RouteManagement: React.FC = () => {
 
       if (response.ok) {
         const data = await response.json();
-        setOperators(Array.isArray(data) ? data : []);
+        // Handle response structure - backend returns { operators: [...] }
+        const operatorsArray = data.operators || data;
+        setOperators(Array.isArray(operatorsArray) ? operatorsArray : []);
+        console.log('Fetched operators:', operatorsArray.length);
       } else {
+        console.error('Failed to fetch operators:', response.status);
         setOperators([]);
       }
     } catch (error) {

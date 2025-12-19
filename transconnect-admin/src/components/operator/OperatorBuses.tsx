@@ -27,7 +27,8 @@ const OperatorBuses = () => {
   const loadBuses = useCallback(async () => {
     try {
       const token = localStorage.getItem('admin_token');
-      const response = await fetch(`${API_BASE_URL}/buses`, {
+      // Use operator-specific endpoint to only fetch their buses
+      const response = await fetch(`${API_BASE_URL}/operator-management/buses`, {
         headers: {
           'Authorization': `Bearer ${token}`,
           'Content-Type': 'application/json'
@@ -37,6 +38,8 @@ const OperatorBuses = () => {
       if (response.ok) {
         const data = await response.json();
         setBuses(data || []);
+      } else {
+        console.warn('Failed to load operator buses, using fallback data');
       }
     } catch (error) {
       console.error('Error loading buses:', error);

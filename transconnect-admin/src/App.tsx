@@ -660,7 +660,7 @@ function App() {
 }
 
 const AppContent = () => {
-  const { isAuthenticated, loading } = useAuth();
+  const { isAuthenticated, loading, user } = useAuth();
 
   if (loading) {
     return (
@@ -675,6 +675,15 @@ const AppContent = () => {
 
   if (!isAuthenticated) {
     return <LoginPage />;
+  }
+
+  // Route to operator layout if user is an operator
+  if (user?.role === 'OPERATOR') {
+    return (
+      <Routes>
+        <Route path="/*" element={<OperatorLayout />} />
+      </Routes>
+    );
   }
 
   return <AuthenticatedApp />;

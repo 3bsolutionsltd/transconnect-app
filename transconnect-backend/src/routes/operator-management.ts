@@ -538,4 +538,283 @@ router.put('/bookings/:bookingId/status', [
   }
 });
 
+// Get operator's own routes
+router.get('/routes', authenticateToken, async (req: Request, res: Response) => {
+  try {
+    const userId = (req as any).user.id;
+    const userRole = (req as any).user.role;
+
+    if (userRole !== 'OPERATOR') {
+      return res.status(403).json({ error: 'Only operators can access this endpoint' });
+    }
+
+    // Find operator by user ID
+    const operator = await prisma.operator.findUnique({
+      where: { userId },
+      include: {
+        routes: {
+          include: {
+            bus: {
+              select: {
+                id: true,
+                plateNumber: true,
+                model: true,
+                capacity: true,
+                amenities: true
+              }
+            },
+            stops: {
+              orderBy: { order: 'asc' }
+            },
+            operator: {
+              select: {
+                id: true,
+                companyName: true
+              }
+            }
+          },
+          orderBy: [
+            { origin: 'asc' },
+            { destination: 'asc' }
+          ]
+        }
+      }
+    });
+
+    if (!operator) {
+      return res.status(404).json({ error: 'Operator profile not found' });
+    }
+
+    res.json({
+      routes: operator.routes,
+      total: operator.routes.length
+    });
+  } catch (error) {
+    console.error('Error fetching operator routes:', error);
+    res.status(500).json({ error: 'Failed to fetch routes' });
+  }
+});
+
+// Get operator's own buses
+router.get('/buses', authenticateToken, async (req: Request, res: Response) => {
+  try {
+    const userId = (req as any).user.id;
+    const userRole = (req as any).user.role;
+
+    if (userRole !== 'OPERATOR') {
+      return res.status(403).json({ error: 'Only operators can access this endpoint' });
+    }
+
+    // Find operator by user ID
+    const operator = await prisma.operator.findUnique({
+      where: { userId },
+      include: {
+        buses: {
+          orderBy: {
+            createdAt: 'desc'
+          }
+        }
+      }
+    });
+
+    if (!operator) {
+      return res.status(404).json({ error: 'Operator profile not found' });
+    }
+
+    res.json(operator.buses);
+  } catch (error) {
+    console.error('Error fetching operator buses:', error);
+    res.status(500).json({ error: 'Failed to fetch buses' });
+  }
+});
+
+// Create a new route for operator
+router.post('/routes', [
+  authenticateToken,
+  body('origin').isString().notEmpty().withMessage('Origin is required'),
+  body('destination').isString().notEmpty().withMessage('Destination is required'),
+  body('via').optional().isArray().withMessage('Via must be an array'),
+  body('distance').isNumeric().withMessage('Distance must be a number'),
+  body('duration').isNumeric().withMessage('Duration must be a number'),
+  body('price').isNumeric().withMessage('Price must be a number'),
+  body('departureTime').isString().notEmpty().withMessage('Departure time is required'),
+  body('busId').isString().notEmpty().withMessage('Bus ID is required'),
+  body('stops').optional().isArray().withMessage('Stops must be an array')
+], async (req: Request, res: Response) => {
+  try {
+    const errors = validationResult(req);
+    if (!errors.isEmpty()) {
+      return res.status(400).json({ errors: errors.array() });
+    }
+
+    const userId = (req as any).user.id;
+    const userRole = (req as any).user.role;
+
+    if (userRole !== 'OPERATOR') {
+      return res.status(403).json({ error: 'Only operators can create routes' });
+    }
+
+    const { origin, destination, via, distance, duration, price, departureTime, busId, stops } = req.body;
+
+    // Find operator by user ID
+    const operator = await prisma.operator.findUnique({
+      where: { userId }
+    });
+
+    if (!operator) {
+      return res.status(404).json({ error: 'Operator profile not found' });
+    }
+
+    if (!operator.approved) {
+      return res.status(403).json({ error: 'Operator must be approved to create routes' });
+    }
+
+    // Verify bus belongs to operator
+    const bus = await prisma.bus.findUnique({
+      where: { id: busId }
+    });
+
+    if (!bus) {
+      return res.status(404).json({ error: 'Bus not found' });
+    }
+
+    if (bus.operatorId !== operator.id) {
+      return res.status(403).json({ error: 'Bus does not belong to operator' });
+    }
+
+    // Create route
+    const route = await prisma.route.create({
+      data: {
+        origin,
+        destination,
+        via,
+        distance,
+        duration,
+        price,
+        departureTime,
+        operatorId: operator.id,
+        busId,
+        active: true
+      },
+      include: {
+        bus: {
+          select: {
+            id: true,
+            plateNumber: true,
+            model: true,
+            capacity: true
+          }
+        },
+        operator: {
+          select: {
+            id: true,
+            companyName: true
+          }
+        }
+      }
+    });
+
+    // Add stops if provided
+    if (stops && Array.isArray(stops) && stops.length > 0) {
+      await prisma.routeStop.createMany({
+        data: stops.map((stop: any, index: number) => ({
+          routeId: route.id,
+          stopName: stop.stopName,
+          distanceFromOrigin: stop.distanceFromOrigin,
+          priceFromOrigin: stop.priceFromOrigin,
+          estimatedTime: stop.estimatedTime || '00:00',
+          order: index
+        }))
+      });
+
+      // Fetch route with stops
+      const routeWithStops = await prisma.route.findUnique({
+        where: { id: route.id },
+        include: {
+          bus: true,
+          operator: true,
+          stops: {
+            orderBy: { order: 'asc' }
+          }
+        }
+      });
+
+      return res.status(201).json({
+        route: routeWithStops,
+        message: 'Route created successfully'
+      });
+    }
+
+    res.status(201).json({
+      route,
+      message: 'Route created successfully'
+    });
+  } catch (error) {
+    console.error('Error creating route:', error);
+    res.status(500).json({ error: 'Failed to create route' });
+  }
+});
+
+// Add a bus for operator
+router.post('/buses', [
+  authenticateToken,
+  body('plateNumber').isString().notEmpty().withMessage('Plate number is required'),
+  body('model').isString().notEmpty().withMessage('Model is required'),
+  body('capacity').isInt({ min: 1 }).withMessage('Capacity must be a positive integer'),
+  body('amenities').optional().isArray().withMessage('Amenities must be an array')
+], async (req: Request, res: Response) => {
+  try {
+    const errors = validationResult(req);
+    if (!errors.isEmpty()) {
+      return res.status(400).json({ errors: errors.array() });
+    }
+
+    const userId = (req as any).user.id;
+    const userRole = (req as any).user.role;
+
+    if (userRole !== 'OPERATOR') {
+      return res.status(403).json({ error: 'Only operators can add buses' });
+    }
+
+    const { plateNumber, model, capacity, amenities } = req.body;
+
+    // Find operator by user ID
+    const operator = await prisma.operator.findUnique({
+      where: { userId }
+    });
+
+    if (!operator) {
+      return res.status(404).json({ error: 'Operator profile not found' });
+    }
+
+    // Check if plate number already exists
+    const existingBus = await prisma.bus.findFirst({
+      where: { plateNumber }
+    });
+
+    if (existingBus) {
+      return res.status(400).json({ error: 'Bus with this plate number already exists' });
+    }
+
+    // Create bus
+    const bus = await prisma.bus.create({
+      data: {
+        plateNumber,
+        model,
+        capacity,
+        amenities: amenities || [],
+        operatorId: operator.id
+      }
+    });
+
+    res.status(201).json({
+      bus,
+      message: 'Bus added successfully'
+    });
+  } catch (error) {
+    console.error('Error adding bus:', error);
+    res.status(500).json({ error: 'Failed to add bus' });
+  }
+});
+
 export default router;

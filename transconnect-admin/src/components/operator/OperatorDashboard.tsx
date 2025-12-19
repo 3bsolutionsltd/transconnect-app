@@ -54,10 +54,10 @@ const OperatorDashboard = () => {
       
       // Load operator-specific data from the operator-management endpoints
       const [busesRes, routesRes, bookingsRes] = await Promise.all([
-        fetch(`${API_BASE_URL}/buses`, {
+        fetch(`${API_BASE_URL}/operator-management/buses`, {
           headers: { 'Authorization': `Bearer ${token}` }
         }),
-        fetch(`${API_BASE_URL}/routes`, {
+        fetch(`${API_BASE_URL}/operator-management/routes`, {
           headers: { 'Authorization': `Bearer ${token}` }
         }),
         fetch(`${API_BASE_URL}/operator-management/bookings`, {
