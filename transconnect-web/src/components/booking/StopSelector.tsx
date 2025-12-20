@@ -10,6 +10,14 @@ interface RouteStop {
   estimatedTime: string;
 }
 
+interface RouteDetails {
+  origin: string;
+  destination: string;
+  distance: number;
+  price: number;
+  departureTime: string;
+}
+
 interface StopSelectorProps {
   routeId: string;
   onStopsSelected: (boardingStop: string, alightingStop: string, price: number) => void;
@@ -22,42 +30,30 @@ const StopSelector: React.FC<StopSelectorProps> = ({ routeId, onStopsSelected })
   const [selectedAlighting, setSelectedAlighting] = useState<string>('');
   const [calculatedPrice, setCalculatedPrice] = useState<number>(0);
   const [loading, setLoading] = useState<boolean>(false);
+  const [routeDetails, setRouteDetails] = useState<RouteDetails | null>(null);
 
-  // Generate fallback stops based on route information
-  const generateFallbackStops = (routeId: string): RouteStop[] => {
-    // Define route configurations with intermediate stops
-    const routeConfigs: Record<string, {origin: string, destination: string, intermediateStops?: string[], basePrice: number, distance: number}> = {
-      'kampala-jinja-0800': {
-        origin: 'Kampala',
-        destination: 'Jinja',
-        intermediateStops: ['Mukono', 'Lugazi', 'Njeru'],
-        basePrice: 15000,
-        distance: 80.5
-      },
-      'kampala-mbarara-0900': {
-        origin: 'Kampala',
-        destination: 'Mbarara',
-        intermediateStops: ['Mpigi', 'Masaka', 'Lyantonde'],
-        basePrice: 25000,
-        distance: 270
-      },
-      'entebbe-kampala-0730': {
-        origin: 'Entebbe',
-        destination: 'Kampala',
-        basePrice: 8000,
-        distance: 40
-      },
-      'jinja-kampala-1700': {
-        origin: 'Jinja',
-        destination: 'Kampala',
-        basePrice: 15000,
-        distance: 80.5
+  // Fetch route details to get actual origin and destination
+  useEffect(() => {
+    const fetchRouteDetails = async () => {
+      try {
+        const response = await axios.get(
+          `${process.env.NEXT_PUBLIC_API_URL}/api/routes/${routeId}`
+        );
+        setRouteDetails(response.data);
+      } catch (error) {
+        console.error('Error fetching route details:', error);
       }
     };
 
-    const config = routeConfigs[routeId];
-    if (!config) {
-      // Generic fallback - just origin and destination
+    if (routeId) {
+      fetchRouteDetails();
+    }
+  }, [routeId]);
+
+  // Generate fallback stops using actual route data
+  const generateFallbackStops = (): RouteStop[] => {
+    if (!routeDetails) {
+      // Absolute fallback if route details aren't loaded yet
       return [
         { id: '1', stopName: 'Origin', distanceFromOrigin: 0, priceFromOrigin: 0, order: 1, estimatedTime: '08:00' },
         { id: '2', stopName: 'Destination', distanceFromOrigin: 100, priceFromOrigin: 20000, order: 2, estimatedTime: '10:00' }
@@ -65,47 +61,32 @@ const StopSelector: React.FC<StopSelectorProps> = ({ routeId, onStopsSelected })
     }
 
     const stops: RouteStop[] = [];
-    const totalDistance = config.distance;
-    const totalPrice = config.basePrice;
+    const departureTime = routeDetails.departureTime || '08:00';
+    const [hours, minutes] = departureTime.split(':').map(Number);
     
+    // Calculate estimated arrival time (add duration in hours, rough estimate)
+    const durationHours = Math.max(1, Math.round(routeDetails.distance / 60)); // Assume 60km/h average
+    const arrivalHours = (hours + durationHours) % 24;
+    const arrivalTime = `${arrivalHours.toString().padStart(2, '0')}:${minutes.toString().padStart(2, '0')}`;
+
     // Add origin stop
     stops.push({
       id: '1',
-      stopName: `${config.origin} (Origin)`,
+      stopName: routeDetails.origin,
       distanceFromOrigin: 0,
       priceFromOrigin: 0,
       order: 1,
-      estimatedTime: '08:00'
+      estimatedTime: departureTime
     });
-
-    // Add intermediate stops if any
-    if (config.intermediateStops && config.intermediateStops.length > 0) {
-      config.intermediateStops.forEach((stopName, index) => {
-        const progress = (index + 1) / (config.intermediateStops!.length + 1);
-        const distance = Math.round(totalDistance * progress);
-        const price = Math.round(totalPrice * progress);
-        const hours = Math.floor(8 + (progress * 2)); // Spread over 2 hours
-        const minutes = Math.round((progress * 120) % 60);
-        
-        stops.push({
-          id: (index + 2).toString(),
-          stopName,
-          distanceFromOrigin: distance,
-          priceFromOrigin: price,
-          order: index + 2,
-          estimatedTime: `${hours.toString().padStart(2, '0')}:${minutes.toString().padStart(2, '0')}`
-        });
-      });
-    }
 
     // Add destination stop
     stops.push({
-      id: (stops.length + 1).toString(),
-      stopName: `${config.destination} (Destination)`,
-      distanceFromOrigin: totalDistance,
-      priceFromOrigin: totalPrice,
-      order: stops.length + 1,
-      estimatedTime: '10:00'
+      id: '2',
+      stopName: routeDetails.destination,
+      distanceFromOrigin: routeDetails.distance,
+      priceFromOrigin: routeDetails.price,
+      order: 2,
+      estimatedTime: arrivalTime
     });
 
     return stops;
@@ -121,8 +102,8 @@ const StopSelector: React.FC<StopSelectorProps> = ({ routeId, onStopsSelected })
         
         // Check if API returned empty results and use fallback
         if (!response.data || response.data.length === 0) {
-          console.log('API returned empty results, generating stops for route:', routeId);
-          const fallbackStops = generateFallbackStops(routeId);
+          console.log('API returned empty results, generating stops from route data');
+          const fallbackStops = generateFallbackStops();
           setBoardingStops(fallbackStops.slice(0, -1)); // All except last for boarding
         } else {
           setBoardingStops(response.data);
@@ -131,8 +112,8 @@ const StopSelector: React.FC<StopSelectorProps> = ({ routeId, onStopsSelected })
         console.error('Error fetching boarding stops:', error);
         
         // Fallback: Generate stops for any route if API fails
-        console.log('API error, generating fallback stops for route:', routeId);
-        const fallbackStops = generateFallbackStops(routeId);
+        console.log('API error, generating fallback stops from route data');
+        const fallbackStops = generateFallbackStops();
         setBoardingStops(fallbackStops.slice(0, -1)); // All except last for boarding
       }
     };
@@ -159,7 +140,7 @@ const StopSelector: React.FC<StopSelectorProps> = ({ routeId, onStopsSelected })
         // Check if API returned empty results and use fallback
         if (!response.data || response.data.length === 0) {
           console.log('API returned empty alighting stops, using fallback data');
-          const allStops = generateFallbackStops(routeId);
+          const allStops = generateFallbackStops();
           
           // Find boarding stop and return all stops after it
           const boardingIndex = allStops.findIndex(stop => stop.stopName === selectedBoarding);
@@ -176,7 +157,7 @@ const StopSelector: React.FC<StopSelectorProps> = ({ routeId, onStopsSelected })
         
         // Fallback: Generate alighting stops based on boarding selection
         console.log('API error, using fallback alighting stops');
-        const allStops = generateFallbackStops(routeId);
+        const allStops = generateFallbackStops();
         
         // Find boarding stop and return all stops after it
         const boardingIndex = allStops.findIndex(stop => stop.stopName === selectedBoarding);
@@ -220,7 +201,7 @@ const StopSelector: React.FC<StopSelectorProps> = ({ routeId, onStopsSelected })
         console.error('Error calculating price from API, using fallback calculation:', error);
         
         // Fallback price calculation using local stops data
-        const allStops = generateFallbackStops(routeId);
+        const allStops = generateFallbackStops();
         const boardingStop = allStops.find(s => s.stopName === selectedBoarding);
         const alightingStop = allStops.find(s => s.stopName === selectedAlighting);
         
@@ -316,8 +297,8 @@ const StopSelector: React.FC<StopSelectorProps> = ({ routeId, onStopsSelected })
           <h4 className="font-medium text-gray-900 mb-3">Route Map</h4>
           <div className="flex flex-col space-y-2">
             {/* Show all stops (boarding stops + destination) */}
-            {generateFallbackStops(routeId).map((stop, index) => {
-              const allStops = generateFallbackStops(routeId);
+            {generateFallbackStops().map((stop, index) => {
+              const allStops = generateFallbackStops();
               const isBoarding = stop.stopName === selectedBoarding;
               const isAlighting = stop.stopName === selectedAlighting;
               const boardingIndex = allStops.findIndex(s => s.stopName === selectedBoarding);
