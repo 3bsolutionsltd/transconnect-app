@@ -92,9 +92,14 @@ const StopSelector: React.FC<StopSelectorProps> = ({ routeId, onStopsSelected })
     return stops;
   };
 
-  // Load boarding stops when component mounts
+  // Load boarding stops when component mounts or route details change
   useEffect(() => {
     const fetchBoardingStops = async () => {
+      // Wait for route details to load first
+      if (!routeDetails) {
+        return;
+      }
+
       try {
         const response = await axios.get(
           `${process.env.NEXT_PUBLIC_API_URL}/api/routes/${routeId}/boarding-stops`
@@ -118,15 +123,15 @@ const StopSelector: React.FC<StopSelectorProps> = ({ routeId, onStopsSelected })
       }
     };
 
-    if (routeId) {
+    if (routeId && routeDetails) {
       fetchBoardingStops();
     }
-  }, [routeId]);
+  }, [routeId, routeDetails]);
 
   // Load alighting stops when boarding stop is selected
   useEffect(() => {
     const fetchAlightingStops = async () => {
-      if (!selectedBoarding) {
+      if (!selectedBoarding || !routeDetails) {
         setAlightingStops([]);
         return;
       }
@@ -173,7 +178,7 @@ const StopSelector: React.FC<StopSelectorProps> = ({ routeId, onStopsSelected })
 
     fetchAlightingStops();
     setSelectedAlighting(''); // Reset alighting selection
-  }, [routeId, selectedBoarding]);
+  }, [routeId, selectedBoarding, routeDetails]);
 
   // Calculate price when both stops are selected
   useEffect(() => {
