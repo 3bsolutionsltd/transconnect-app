@@ -254,11 +254,14 @@ router.post('/', authenticateToken, async (req: Request, res: Response) => {
       return res.status(403).json({ error: 'Bus does not belong to operator' });
     }
 
+    // Convert via array to string if needed
+    const viaString = Array.isArray(via) ? via.join(', ') : (via || null);
+
     const route = await prisma.route.create({
       data: {
         origin,
         destination,
-        via,
+        via: viaString,
         distance,
         duration,
         price,
@@ -314,6 +317,11 @@ router.put('/:id', authenticateToken, async (req: Request, res: Response) => {
   try {
     const { id } = req.params;
     const updates = req.body;
+
+    // Convert via array to string if needed
+    if (updates.via && Array.isArray(updates.via)) {
+      updates.via = updates.via.join(', ');
+    }
 
     const route = await prisma.route.update({
       where: { id },

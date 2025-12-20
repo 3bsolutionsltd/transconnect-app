@@ -682,12 +682,15 @@ router.post('/routes', [
       return res.status(403).json({ error: 'Bus does not belong to operator' });
     }
 
+    // Convert via array to string if needed
+    const viaString = Array.isArray(via) ? via.join(', ') : (via || null);
+
     // Create route
     const route = await prisma.route.create({
       data: {
         origin,
         destination,
-        via,
+        via: viaString,
         distance,
         duration,
         price,
