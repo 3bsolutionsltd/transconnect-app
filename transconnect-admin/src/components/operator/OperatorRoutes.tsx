@@ -476,10 +476,10 @@ const OperatorRoutes = () => {
                   </div>
                 </div>
                 
-                {route.via && route.via.length > 0 && (
+                {route.via && (
                   <div className="ml-11 mb-3">
                     <p className="text-sm text-gray-500">
-                      Via: {route.via.join(' → ')}
+                      Via: {route.via}
                     </p>
                   </div>
                 )}
@@ -615,10 +615,10 @@ const OperatorRoutes = () => {
                       <p className="font-medium text-green-600">{formatCurrency(selectedRoute.price)}</p>
                     </div>
                   </div>
-                  {selectedRoute.via && selectedRoute.via.length > 0 && (
+                  {selectedRoute.via && (
                     <div className="mt-3">
                       <p className="text-gray-500 text-sm">Stops</p>
-                      <p className="font-medium">{selectedRoute.via.join(' → ')}</p>
+                      <p className="font-medium">{selectedRoute.via}</p>
                     </div>
                   )}
                 </div>
