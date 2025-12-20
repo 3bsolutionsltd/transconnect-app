@@ -89,11 +89,16 @@ const OperatorBookings = () => {
 
   const filteredBookings = bookings.filter(booking => {
     const matchesFilter = filter === 'all' || booking.status.toLowerCase() === filter.toLowerCase();
+    
+    // Handle both old format (user.firstName) and new format (passenger.name)
+    const passengerName = booking.passenger?.name || `${booking.user?.firstName || ''} ${booking.user?.lastName || ''}`.trim();
+    const passengerPhone = booking.passenger?.phone || booking.user?.phone || '';
+    
     const matchesSearch = searchTerm === '' || 
-      booking.user.firstName.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      booking.user.lastName.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      booking.route.origin.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      booking.route.destination.toLowerCase().includes(searchTerm.toLowerCase());
+      passengerName.toLowerCase().includes(searchTerm.toLowerCase()) ||
+      passengerPhone.toLowerCase().includes(searchTerm.toLowerCase()) ||
+      booking.route?.origin?.toLowerCase().includes(searchTerm.toLowerCase()) ||
+      booking.route?.destination?.toLowerCase().includes(searchTerm.toLowerCase());
     
     return matchesFilter && matchesSearch;
   });
@@ -179,24 +184,29 @@ const OperatorBookings = () => {
 
       {/* Bookings List */}
       <div className="space-y-4">
-        {filteredBookings.map((booking) => (
-          <div key={booking.id} className="bg-white p-6 rounded-lg shadow border-l-4 border-green-500">
-            <div className="flex items-center justify-between mb-4">
-              <div className="flex items-center space-x-3">
-                {getStatusIcon(booking.status)}
-                <div>
-                  <h3 className="text-lg font-semibold text-gray-900">
-                    {booking.user.firstName} {booking.user.lastName}
-                  </h3>
-                  <p className="text-sm text-gray-600">{booking.user.phone}</p>
+        {filteredBookings.map((booking) => {
+          // Handle both old format (user) and new format (passenger)
+          const passengerName = booking.passenger?.name || `${booking.user?.firstName || ''} ${booking.user?.lastName || ''}`.trim() || 'Unknown Passenger';
+          const passengerPhone = booking.passenger?.phone || booking.user?.phone || 'N/A';
+          
+          return (
+            <div key={booking.id} className="bg-white p-6 rounded-lg shadow border-l-4 border-green-500">
+              <div className="flex items-center justify-between mb-4">
+                <div className="flex items-center space-x-3">
+                  {getStatusIcon(booking.status)}
+                  <div>
+                    <h3 className="text-lg font-semibold text-gray-900">
+                      {passengerName}
+                    </h3>
+                    <p className="text-sm text-gray-600">{passengerPhone}</p>
+                  </div>
+                </div>
+                <div className="text-right">
+                  <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium border ${getStatusColor(booking.status)}`}>
+                    {booking.status}
+                  </span>
                 </div>
               </div>
-              <div className="text-right">
-                <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium border ${getStatusColor(booking.status)}`}>
-                  {booking.status}
-                </span>
-              </div>
-            </div>
 
             <div className="grid grid-cols-1 md:grid-cols-4 gap-4 mb-4">
               <div>
@@ -250,7 +260,8 @@ const OperatorBookings = () => {
               </div>
             </div>
           </div>
-        ))}
+          );
+        })}
         
         {filteredBookings.length === 0 && (
           <div className="bg-white p-12 rounded-lg shadow text-center">
@@ -283,9 +294,9 @@ const OperatorBookings = () => {
                 <div>
                   <p className="text-sm text-gray-500">Passenger</p>
                   <p className="font-medium">
-                    {selectedBooking.user.firstName} {selectedBooking.user.lastName}
+                    {selectedBooking.passenger?.name || `${selectedBooking.user?.firstName || ''} ${selectedBooking.user?.lastName || ''}`.trim() || 'Unknown Passenger'}
                   </p>
-                  <p className="text-sm text-gray-600">{selectedBooking.user.phone}</p>
+                  <p className="text-sm text-gray-600">{selectedBooking.passenger?.phone || selectedBooking.user?.phone || 'N/A'}</p>
                 </div>
                 <div>
                   <p className="text-sm text-gray-500">Route & Seat</p>
