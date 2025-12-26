@@ -1,9 +1,9 @@
 import axios from 'axios';
+import Constants from 'expo-constants';
 import { secureStorage } from './storage';
 
-const API_BASE_URL = __DEV__ 
-  ? 'https://transconnect-app-44ie.onrender.com/api'
-  : 'https://transconnect-app-44ie.onrender.com/api';
+const API_BASE_URL = Constants.expoConfig?.extra?.apiUrl || 
+  'https://transconnect-app-44ie.onrender.com/api';
 
 export const apiClient = axios.create({
   baseURL: API_BASE_URL,
@@ -53,13 +53,20 @@ export const authApi = {
   
   getCurrentUser: () =>
     apiClient.get('/auth/me'),
+  
+  updateProfile: (profileData: { firstName?: string; lastName?: string; phone?: string }) =>
+    apiClient.put('/auth/profile', profileData),
 };
 
 // Routes API
 export const routesApi = {
   searchRoutes: (params: { from: string; to: string; date?: string }) =>
-    apiClient.get(`/routes/search/${encodeURIComponent(params.from)}/${encodeURIComponent(params.to)}`, { 
-      params: params.date ? { travelDate: params.date } : {} 
+    apiClient.get('/routes', { 
+      params: { 
+        origin: params.from, 
+        destination: params.to,
+        ...(params.date ? { travelDate: params.date } : {})
+      } 
     }),
   
   getRouteDetails: (routeId: string, travelDate?: string) =>
@@ -68,8 +75,12 @@ export const routesApi = {
     }),
   
   getSmartSearch: (origin: string, destination: string, travelDate?: string) =>
-    apiClient.get(`/routes/smart-search/${encodeURIComponent(origin)}/${encodeURIComponent(destination)}`, { 
-      params: travelDate ? { travelDate } : {} 
+    apiClient.get('/routes', { 
+      params: { 
+        origin, 
+        destination,
+        ...(travelDate ? { travelDate } : {})
+      } 
     }),
   
   getAllRoutes: (params?: { origin?: string; destination?: string; travelDate?: string }) =>
@@ -89,6 +100,12 @@ export const bookingsApi = {
   
   cancelBooking: (bookingId: string) =>
     apiClient.delete(`/bookings/${bookingId}`),
+  
+  initiatePayment: (paymentData: any) =>
+    apiClient.post('/payments/initiate', paymentData),
+  
+  verifyPayment: (reference: string) =>
+    apiClient.get(`/payments/verify/${reference}`),
 };
 
 // Payments API
