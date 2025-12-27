@@ -413,6 +413,107 @@ Have a safe journey!`;
   }
 
   /**
+   * Send password reset email
+   */
+  async sendPasswordResetEmail(
+    to: string,
+    resetData: {
+      userName: string;
+      resetLink: string;
+      resetToken: string;
+      expiresIn: string;
+    }
+  ): Promise<{ success: boolean; messageId?: string; error?: string }> {
+    const template = this.getPasswordResetTemplate(resetData);
+    return this.sendEmail(to, template.subject, template.html, template.text);
+  }
+
+  /**
+   * Get password reset email template
+   */
+  private getPasswordResetTemplate(data: {
+    userName: string;
+    resetLink: string;
+    resetToken: string;
+    expiresIn: string;
+  }): EmailTemplate {
+    const subject = 'Reset Your TransConnect Password';
+    
+    const html = `
+      <!DOCTYPE html>
+      <html>
+        <head>
+          <style>
+            body { font-family: Arial, sans-serif; line-height: 1.6; color: #333; margin: 0; padding: 20px; background-color: #f4f4f4; }
+            .container { max-width: 600px; margin: 0 auto; background: white; padding: 30px; border-radius: 10px; }
+            .header { text-align: center; color: #3B82F6; margin-bottom: 30px; }
+            .reset-info { background: #EFF6FF; padding: 20px; border-radius: 8px; margin: 20px 0; border-left: 4px solid #3B82F6; }
+            .button { display: inline-block; padding: 12px 30px; background: #3B82F6; color: white; text-decoration: none; border-radius: 5px; margin: 20px 0; }
+            .warning { background: #FEF3C7; color: #92400E; padding: 15px; border-radius: 5px; margin: 20px 0; }
+            .footer { margin-top: 30px; padding-top: 20px; border-top: 1px solid #E5E7EB; color: #6B7280; font-size: 14px; }
+          </style>
+        </head>
+        <body>
+          <div class="container">
+            <div class="header">
+              <h1>🔒 Password Reset Request</h1>
+            </div>
+            
+            <p>Hello ${data.userName},</p>
+            <p>We received a request to reset your TransConnect account password.</p>
+            
+            <div class="reset-info">
+              <p><strong>Click the button below to reset your password:</strong></p>
+              <a href="${data.resetLink}" class="button">Reset Password</a>
+              <p style="margin-top: 15px;">This link will expire in ${data.expiresIn}.</p>
+            </div>
+            
+            <div class="warning">
+              <p><strong>⚠️ Security Notice:</strong></p>
+              <ul style="margin: 10px 0;">
+                <li>If you didn't request this reset, please ignore this email</li>
+                <li>Your password will remain unchanged</li>
+                <li>Never share this link with anyone</li>
+              </ul>
+            </div>
+            
+            <p>If the button doesn't work, copy and paste this link into your browser:</p>
+            <p style="word-break: break-all; color: #3B82F6; font-size: 12px;">${data.resetLink}</p>
+            
+            <div class="footer">
+              <p>Best regards,<br>The TransConnect Team</p>
+              <p style="margin-top: 15px;">If you have any questions, contact us at support@transconnect.ug</p>
+            </div>
+          </div>
+        </body>
+      </html>
+    `;
+    
+    const text = `Password Reset Request - TransConnect
+
+Hello ${data.userName},
+
+We received a request to reset your TransConnect account password.
+
+Click the link below to reset your password:
+${data.resetLink}
+
+This link will expire in ${data.expiresIn}.
+
+Security Notice:
+- If you didn't request this reset, please ignore this email
+- Your password will remain unchanged
+- Never share this link with anyone
+
+Best regards,
+The TransConnect Team
+
+If you have any questions, contact us at support@transconnect.ug`;
+
+    return { subject, html, text };
+  }
+
+  /**
    * Strip HTML tags from text
    */
   private stripHtml(html: string): string {
