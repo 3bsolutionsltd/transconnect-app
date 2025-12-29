@@ -16,23 +16,47 @@ import { authApi } from '../../services/api';
 import { secureStorage } from '../../services/storage';
 
 export default function EditProfileScreen({ navigation }: any) {
-  const { user } = useAuth();
+  const { user, updateUser } = useAuth();
   
   const [firstName, setFirstName] = useState(user?.firstName || '');
   const [lastName, setLastName] = useState(user?.lastName || '');
   const [email, setEmail] = useState(user?.email || '');
   const [phone, setPhone] = useState(user?.phone || '');
   const [isLoading, setIsLoading] = useState(false);
+  
+  const [errors, setErrors] = useState({
+    firstName: '',
+    lastName: '',
+    phone: '',
+  });
+
+  const validateField = (field: string, value: string) => {
+    let error = '';
+    
+    if (field === 'firstName' && !value.trim()) {
+      error = 'First name is required';
+    } else if (field === 'lastName' && !value.trim()) {
+      error = 'Last name is required';
+    } else if (field === 'phone') {
+      if (!value.trim()) {
+        error = 'Phone number is required';
+      } else if (value.trim().length < 10) {
+        error = 'Phone number must be at least 10 digits';
+      }
+    }
+    
+    setErrors(prev => ({ ...prev, [field]: error }));
+    return error === '';
+  };
 
   const handleSave = async () => {
-    // Validation
-    if (!firstName.trim() || !lastName.trim()) {
-      Alert.alert('Error', 'First name and last name are required');
-      return;
-    }
+    // Validate all fields
+    const isFirstNameValid = validateField('firstName', firstName);
+    const isLastNameValid = validateField('lastName', lastName);
+    const isPhoneValid = validateField('phone', phone);
 
-    if (!phone.trim() || phone.trim().length < 10) {
-      Alert.alert('Error', 'Please enter a valid phone number (at least 10 digits)');
+    if (!isFirstNameValid || !isLastNameValid || !isPhoneValid) {
+      Alert.alert('Validation Error', 'Please fix the errors before saving');
       return;
     }
 
@@ -44,13 +68,9 @@ export default function EditProfileScreen({ navigation }: any) {
         phone: phone.trim(),
       });
 
-      // Update user in auth context
+      // Update user in auth context (this will immediately update the UI)
       const updatedUser = response.data;
-      const storedUser = await secureStorage.getItem('user_data');
-      if (storedUser) {
-        const currentUser = JSON.parse(storedUser);
-        await secureStorage.setItem('user_data', JSON.stringify({ ...currentUser, ...updatedUser }));
-      }
+      await updateUser(updatedUser);
 
       Alert.alert(
         'Success',
@@ -105,23 +125,37 @@ export default function EditProfileScreen({ navigation }: any) {
           <View style={styles.inputGroup}>
             <Text style={styles.label}>First Name *</Text>
             <TextInput
-              style={styles.input}
+              style={[styles.input, errors.firstName && styles.inputError]}
               value={firstName}
-              onChangeText={setFirstName}
+              onChangeText={(text) => {
+                setFirstName(text);
+                if (errors.firstName) validateField('firstName', text);
+              }}
+              onBlur={() => validateField('firstName', firstName)}
               placeholder="Enter first name"
               placeholderTextColor="#9CA3AF"
             />
+            {errors.firstName ? (
+              <Text style={styles.errorText}>{errors.firstName}</Text>
+            ) : null}
           </View>
 
           <View style={styles.inputGroup}>
             <Text style={styles.label}>Last Name *</Text>
             <TextInput
-              style={styles.input}
+              style={[styles.input, errors.lastName && styles.inputError]}
               value={lastName}
-              onChangeText={setLastName}
+              onChangeText={(text) => {
+                setLastName(text);
+                if (errors.lastName) validateField('lastName', text);
+              }}
+              onBlur={() => validateField('lastName', lastName)}
               placeholder="Enter last name"
               placeholderTextColor="#9CA3AF"
             />
+            {errors.lastName ? (
+              <Text style={styles.errorText}>{errors.lastName}</Text>
+            ) : null}
           </View>
 
           <View style={styles.inputGroup}>
@@ -138,15 +172,22 @@ export default function EditProfileScreen({ navigation }: any) {
           </View>
 
           <View style={styles.inputGroup}>
-            <Text style={styles.label}>Phone Number</Text>
+            <Text style={styles.label}>Phone Number *</Text>
             <TextInput
-              style={styles.input}
+              style={[styles.input, errors.phone && styles.inputError]}
               value={phone}
-              onChangeText={setPhone}
+              onChangeText={(text) => {
+                setPhone(text);
+                if (errors.phone) validateField('phone', text);
+              }}
+              onBlur={() => validateField('phone', phone)}
               placeholder="+256 7XX XXX XXX"
               keyboardType="phone-pad"
               placeholderTextColor="#9CA3AF"
             />
+            {errors.phone ? (
+              <Text style={styles.errorText}>{errors.phone}</Text>
+            ) : null}
           </View>
         </View>
 
@@ -248,6 +289,15 @@ const styles = StyleSheet.create({
     paddingVertical: 12,
     fontSize: 16,
     color: '#1F2937',
+  },
+  inputError: {
+    borderColor: '#EF4444',
+    borderWidth: 2,
+  },
+  errorText: {
+    fontSize: 12,
+    color: '#EF4444',
+    marginTop: 4,
   },
   saveButton: {
     backgroundColor: '#3B82F6',

@@ -15,6 +15,7 @@ import { Ionicons } from '@expo/vector-icons';
 import { format, addMinutes, parseISO } from 'date-fns';
 import { useQuery } from '@tanstack/react-query';
 import { routesApi } from '../../services/api';
+import { offlineStorage } from '../../services/offlineStorage';
 
 interface Route {
   id: string;
@@ -67,12 +68,48 @@ export default function SearchScreen({ route, navigation }: any) {
   } = useQuery({
     queryKey: ['routes', from, to, date],
     queryFn: async () => {
-      const response = await routesApi.searchRoutes({
-        from,
-        to,
-        date: format(new Date(date), 'yyyy-MM-dd'),
-      });
-      return response.data;
+      try {
+        const trimmedFrom = from?.trim();
+        const trimmedTo = to?.trim();
+        
+        // Handle date safely
+        const searchDate = date ? (typeof date === 'string' ? date : new Date(date).toISOString().split('T')[0]) : format(new Date(), 'yyyy-MM-dd');
+        
+        console.log('Searching routes:', { from: trimmedFrom, to: trimmedTo, date: searchDate });
+        const response = await routesApi.searchRoutes({
+          from: trimmedFrom,
+          to: trimmedTo,
+          date: searchDate,
+        });
+        const routeData = response.data?.routes || response.data;
+        
+        // Ensure we always have an array
+        const safeRoutes = Array.isArray(routeData) ? routeData : [];
+        console.log('Routes found:', safeRoutes.length);
+        
+        // Cache routes for offline access
+        if (safeRoutes.length > 0) {
+          await offlineStorage.saveRoutes(safeRoutes).catch(err => 
+            console.log('Failed to cache routes:', err)
+          );
+        }
+        
+        return safeRoutes;
+      } catch (err: any) {
+        console.error('Route search error:', err.response?.data || err.message);
+        
+        // Try to load from offline storage if network error
+        if (!err.response && err.message?.toLowerCase().includes('network')) {
+          console.log('Network error detected, trying offline cache...');
+          const offlineRoutes = await offlineStorage.searchRoutesOffline(from, to);
+          if (offlineRoutes.length > 0) {
+            console.log('Loaded', offlineRoutes.length, 'routes from cache');
+            return offlineRoutes;
+          }
+        }
+        
+        throw err;
+      }
     },
     enabled: !!from && !!to && !!date,
   });
@@ -115,7 +152,7 @@ export default function SearchScreen({ route, navigation }: any) {
   };
 
   const getFilteredAndSortedRoutes = () => {
-    if (!routes) return [];
+    if (!routes || !Array.isArray(routes)) return [];
     
     let filtered = routes.filter((route: Route) => {
       if (filterBy === 'all') return true;
@@ -148,15 +185,52 @@ export default function SearchScreen({ route, navigation }: any) {
   }
 
   if (error) {
+    const errorMessage = error instanceof Error ? error.message : 'Unknown error';
+    const isNotFound = errorMessage.includes('404') || errorMessage.includes('not found');
+    const isNetworkError = errorMessage.toLowerCase().includes('network') || errorMessage.toLowerCase().includes('fetch');
+    
     return (
       <SafeAreaView style={styles.container}>
         <View style={styles.errorContainer}>
-          <Ionicons name="alert-circle-outline" size={48} color="#EF4444" />
-          <Text style={styles.errorTitle}>Something went wrong</Text>
-          <Text style={styles.errorText}>Unable to load routes. Please try again.</Text>
-          <TouchableOpacity style={styles.retryButton} onPress={handleRetry}>
-            <Text style={styles.retryButtonText}>Try Again</Text>
-          </TouchableOpacity>
+          <Ionicons 
+            name={isNotFound ? "search-outline" : isNetworkError ? "cloud-offline-outline" : "alert-circle-outline"} 
+            size={64} 
+            color={isNotFound ? "#F59E0B" : isNetworkError ? "#F59E0B" : "#EF4444"} 
+          />
+          <Text style={styles.errorTitle}>
+            {isNotFound ? 'No routes available' : isNetworkError ? 'Connection Issue' : 'Error Occurred'}
+          </Text>
+          <Text style={styles.errorText}>
+            {isNotFound 
+              ? `No buses currently run from ${from} to ${to}.` 
+              : isNetworkError
+              ? 'Unable to connect to the server. Please check your internet connection and try again.'
+              : 'Something went wrong while searching for routes. Please try again.'}
+          </Text>
+          {isNotFound && (
+            <View style={styles.suggestionsBox}>
+              <Text style={styles.suggestionsTitle}>Try these popular routes:</Text>
+              <Text style={styles.suggestionItem}>• Kampala → Jinja</Text>
+              <Text style={styles.suggestionItem}>• Kampala → Mbarara</Text>
+              <Text style={styles.suggestionItem}>• Kampala → Arua</Text>
+              <Text style={styles.suggestionItem}>• Kampala → Lira</Text>
+            </View>
+          )}
+          <View style={styles.errorActions}>
+            <TouchableOpacity 
+              style={styles.retryButton} 
+              onPress={handleRetry}
+            >
+              <Ionicons name="refresh-outline" size={20} color="#FFFFFF" />
+              <Text style={styles.retryButtonText}>Retry Search</Text>
+            </TouchableOpacity>
+            <TouchableOpacity 
+              style={styles.backButton} 
+              onPress={() => navigation.goBack()}
+            >
+              <Text style={styles.backButtonText}>Search Again</Text>
+            </TouchableOpacity>
+          </View>
         </View>
       </SafeAreaView>
     );
@@ -168,7 +242,7 @@ export default function SearchScreen({ route, navigation }: any) {
         <View style={styles.searchInfo}>
           <View style={styles.routeInfo}>
             <Text style={styles.routeText}>{from} → {to}</Text>
-            <Text style={styles.dateText}>{format(new Date(date), 'MMM dd, yyyy')}</Text>
+            <Text style={styles.dateText}>{date ? format(new Date(date), 'MMM dd, yyyy') : 'Date not set'}</Text>
           </View>
           <Text style={styles.passengerText}>{passengers} passenger{passengers > 1 ? 's' : ''}</Text>
         </View>
@@ -191,6 +265,7 @@ export default function SearchScreen({ route, navigation }: any) {
 
       <ScrollView contentContainerStyle={styles.scrollContainer}>
         {routes && routes.length > 0 ? (
+          getFilteredAndSortedRoutes().length > 0 ? (
           <View style={styles.resultsContainer}>
             {getFilteredAndSortedRoutes().map((routeItem: Route) => {
               const arrivalTime = calculateArrivalTime(routeItem.departureTime, routeItem.duration);
@@ -283,7 +358,10 @@ export default function SearchScreen({ route, navigation }: any) {
                       <View style={styles.amenitiesSection}>
                         <Text style={styles.sectionTitle}>Bus Amenities</Text>
                         <View style={styles.amenitiesList}>
-                          {routeItem.bus.amenities.map((amenity, index) => (
+                          {(Array.isArray(routeItem.bus.amenities) 
+                            ? routeItem.bus.amenities 
+                            : JSON.parse(routeItem.bus.amenities || '[]')
+                          ).map((amenity: string, index: number) => (
                             <View key={index} style={styles.amenityItem}>
                               <Ionicons name="checkmark-circle-outline" size={16} color="#10B981" />
                               <Text style={styles.amenityText}>{amenity}</Text>
@@ -323,12 +401,30 @@ export default function SearchScreen({ route, navigation }: any) {
               );
             })}
           </View>
+          ) : (
+            <View style={styles.noResultsContainer}>
+              <Ionicons name="filter-outline" size={64} color="#D1D5DB" />
+              <Text style={styles.noResultsTitle}>No matching routes</Text>
+              <Text style={styles.noResultsText}>
+                No routes match your current filters. Try adjusting your filters or sorting options.
+              </Text>
+              <TouchableOpacity 
+                style={styles.modifySearchButton}
+                onPress={() => {
+                  setFilterBy('all');
+                  setSortBy('price');
+                }}
+              >
+                <Text style={styles.modifySearchButtonText}>Clear Filters</Text>
+              </TouchableOpacity>
+            </View>
+          )
         ) : (
           <View style={styles.noResultsContainer}>
             <Ionicons name="bus-outline" size={64} color="#D1D5DB" />
             <Text style={styles.noResultsTitle}>No routes found</Text>
             <Text style={styles.noResultsText}>
-              No buses available for {from} to {to} on {format(new Date(date), 'MMM dd, yyyy')}.
+              No buses available for {from} to {to} on {date ? format(new Date(date), 'MMM dd, yyyy') : 'selected date'}.
               Try searching for a different date or route.
             </Text>
             <TouchableOpacity 
@@ -538,14 +634,34 @@ const styles = StyleSheet.create({
     marginBottom: 24,
     lineHeight: 22,
   },
+  errorActions: {
+    width: '100%',
+    gap: 12,
+  },
   retryButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
     backgroundColor: '#3B82F6',
     paddingHorizontal: 24,
     paddingVertical: 12,
     borderRadius: 10,
+    gap: 8,
   },
   retryButtonText: {
     color: '#FFFFFF',
+    fontSize: 16,
+    fontWeight: '600',
+  },
+  backButton: {
+    backgroundColor: '#F3F4F6',
+    paddingHorizontal: 24,
+    paddingVertical: 12,
+    borderRadius: 10,
+    alignItems: 'center',
+  },
+  backButtonText: {
+    color: '#1F2937',
     fontSize: 16,
     fontWeight: '600',
   },
@@ -784,6 +900,25 @@ const styles = StyleSheet.create({
     color: '#FFFFFF',
     fontSize: 16,
     fontWeight: '600',
+  },
+  suggestionsBox: {
+    backgroundColor: '#FEF3C7',
+    padding: 16,
+    borderRadius: 12,
+    marginVertical: 16,
+    borderWidth: 1,
+    borderColor: '#FCD34D',
+  },
+  suggestionsTitle: {
+    fontSize: 14,
+    fontWeight: '600',
+    color: '#92400E',
+    marginBottom: 8,
+  },
+  suggestionItem: {
+    fontSize: 14,
+    color: '#78350F',
+    marginVertical: 3,
   },
   // Modal Styles
   modalContainer: {

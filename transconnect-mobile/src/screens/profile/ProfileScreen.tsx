@@ -6,13 +6,60 @@ import {
   StyleSheet,
   ScrollView,
   Alert,
+  ActivityIndicator,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
 import { useAuth } from '../../contexts/AuthContext';
+import { useQuery } from '@tanstack/react-query';
+import { bookingsApi } from '../../services/api';
 
 export default function ProfileScreen({ navigation }: any) {
   const { user, logout } = useAuth();
+
+  // Fetch user's booking statistics
+  const { data: bookings, isLoading } = useQuery({
+    queryKey: ['my-bookings'],
+    queryFn: async () => {
+      const response = await bookingsApi.getMyBookings();
+      return response.data;
+    },
+  });
+
+  const calculateStats = () => {
+    if (!bookings || bookings.length === 0) {
+      return {
+        totalTrips: 0,
+        thisMonth: 0,
+        totalSpent: 0,
+      };
+    }
+
+    const now = new Date();
+    const currentMonth = now.getMonth();
+    const currentYear = now.getFullYear();
+
+    const thisMonthBookings = bookings.filter((booking: any) => {
+      const bookingDate = new Date(booking.travelDate);
+      return (
+        bookingDate.getMonth() === currentMonth &&
+        bookingDate.getFullYear() === currentYear
+      );
+    });
+
+    const totalSpent = bookings.reduce(
+      (sum: number, booking: any) => sum + (booking.totalAmount || 0),
+      0
+    );
+
+    return {
+      totalTrips: bookings.length,
+      thisMonth: thisMonthBookings.length,
+      totalSpent,
+    };
+  };
+
+  const stats = calculateStats();
 
   const handleLogout = () => {
     Alert.alert(
@@ -38,8 +85,7 @@ export default function ProfileScreen({ navigation }: any) {
       title: 'Edit Profile',
       subtitle: 'Update your personal information',
       onPress: () => {
-        // TODO: Navigate to edit profile screen
-        Alert.alert('Coming Soon', 'Edit profile feature is coming soon!');
+        navigation.navigate('EditProfile');
       },
     },
     {
@@ -47,7 +93,7 @@ export default function ProfileScreen({ navigation }: any) {
       title: 'Payment Methods',
       subtitle: 'Manage your payment options',
       onPress: () => {
-        Alert.alert('Coming Soon', 'Payment methods feature is coming soon!');
+        navigation.navigate('PaymentMethods');
       },
     },
     {
@@ -55,7 +101,7 @@ export default function ProfileScreen({ navigation }: any) {
       title: 'Notifications',
       subtitle: 'Configure your notification preferences',
       onPress: () => {
-        Alert.alert('Coming Soon', 'Notification settings coming soon!');
+        navigation.navigate('NotificationSettings');
       },
     },
     {
@@ -63,7 +109,11 @@ export default function ProfileScreen({ navigation }: any) {
       title: 'Help & Support',
       subtitle: 'Get help and contact support',
       onPress: () => {
-        Alert.alert('Coming Soon', 'Help & Support feature is coming soon!');
+        Alert.alert(
+          'Help & Support',
+          'Contact our support team:\n\nPhone: +256 39451710\nEmail: support@transconnect.app\n\nHours: Mon-Fri 8AM-6PM',
+          [{ text: 'OK' }]
+        );
       },
     },
     {
@@ -71,7 +121,11 @@ export default function ProfileScreen({ navigation }: any) {
       title: 'Terms & Privacy',
       subtitle: 'Read our terms and privacy policy',
       onPress: () => {
-        Alert.alert('Coming Soon', 'Terms & Privacy feature is coming soon!');
+        Alert.alert(
+          'Terms & Privacy Policy',
+          'TransConnect Terms of Service\n\nBy using this app, you agree to:\n\n• Provide accurate booking information\n• Pay for services rendered\n• Respect driver and passenger safety\n• Follow local transportation laws\n\nPrivacy: We protect your data and never share it without consent.\n\nFull terms available at: transconnect.app/terms',
+          [{ text: 'Close' }]
+        );
       },
     },
     {
@@ -79,7 +133,7 @@ export default function ProfileScreen({ navigation }: any) {
       title: 'About',
       subtitle: 'App version and information',
       onPress: () => {
-        Alert.alert('TransConnect', 'Version 1.0.0\\nMade with ❤️ for Uganda');
+        Alert.alert('TransConnect', 'Version 1.0.0\nMaking travel easier in Uganda\n\n© 2024 TransConnect. All rights reserved.');
       },
     },
   ];
@@ -98,20 +152,26 @@ export default function ProfileScreen({ navigation }: any) {
         </View>
 
         <View style={styles.statsContainer}>
-          <View style={styles.statItem}>
-            <Text style={styles.statValue}>5</Text>
-            <Text style={styles.statLabel}>Total Trips</Text>
-          </View>
-          <View style={styles.statDivider} />
-          <View style={styles.statItem}>
-            <Text style={styles.statValue}>2</Text>
-            <Text style={styles.statLabel}>This Month</Text>
-          </View>
-          <View style={styles.statDivider} />
-          <View style={styles.statItem}>
-            <Text style={styles.statValue}>UGX 125K</Text>
-            <Text style={styles.statLabel}>Total Spent</Text>
-          </View>
+          {isLoading ? (
+            <ActivityIndicator size="small" color="#3B82F6" />
+          ) : (
+            <>
+              <View style={styles.statItem}>
+                <Text style={styles.statValue}>{stats.totalTrips}</Text>
+                <Text style={styles.statLabel}>Total Trips</Text>
+              </View>
+              <View style={styles.statDivider} />
+              <View style={styles.statItem}>
+                <Text style={styles.statValue}>{stats.thisMonth}</Text>
+                <Text style={styles.statLabel}>This Month</Text>
+              </View>
+              <View style={styles.statDivider} />
+              <View style={styles.statItem}>
+                <Text style={styles.statValue}>UGX {(stats.totalSpent / 1000).toFixed(0)}K</Text>
+                <Text style={styles.statLabel}>Total Spent</Text>
+              </View>
+            </>
+          )}
         </View>
 
         <View style={styles.menuContainer}>

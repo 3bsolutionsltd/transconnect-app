@@ -1,6 +1,15 @@
 # ===============================================
-# TransConnect Mobile (Flutter) - .gitignore
+# TransConnect Mobile (React Native/Expo) - .gitignore
 # ===============================================
+
+# Expo
+.expo/
+dist/
+web-build/
+
+# Environment
+.env
+.env.local
 
 # Miscellaneous
 *.class
@@ -19,78 +28,53 @@
 *.iws
 .idea/
 
-# The .vscode folder contains launch configuration and tasks you configure in
-# VS Code which you may wish to be included in version control, so this line
-# is commented out by default.
+# VS Code
 .vscode/
 
-# Flutter/Dart/Pub related
-**/doc/api/
-**/ios/Flutter/.last_build_id
-.dart_tool/
-.flutter-plugins
-.flutter-plugins-dependencies
-.packages
-.pub-cache/
-.pub/
-/build/
+# Node modules
+node_modules/
 
-# Web related
-lib/generated_plugin_registrant.dart
+# Logs
+npm-debug.*
+yarn-debug.*
+yarn-error.*
 
-# Symbolication related
-app.*.symbols
+# Native
+*.jks
+*.p8
+*.p12
+*.key
+*.mobileprovision
+*.orig.*
 
-# Obfuscation related
-app.*.map.json
+# Metro
+.metro-health-check*
 
-# Android Studio will place build artifacts here
-/android/app/debug
-/android/app/profile
-/android/app/release
+# Temporary files
+*.tmp
+*.temp
 
-# iOS related
-/ios/Flutter/Flutter.framework
-/ios/Flutter/Flutter.podspec
-/ios/Flutter/Generated.xcconfig
-/ios/Flutter/app.flx
-/ios/Flutter/app.zip
-/ios/Flutter/flutter_assets/
-/ios/Flutter/flutter_export_environment.sh
-/ios/ServiceDefinitions.json
-/ios/Runner/GeneratedPluginRegistrant.*
-
-# Exceptions to above rules.
-!/packages/flutter_tools/test/data/dart_dependencies_test/**/.packages
-
-# Firebase
+# Android
+/android/app/build/
+/android/app/release/
+/android/app/debug/
+/android/.gradle/
+/android/local.properties
 /android/app/google-services.json
-/ios/Runner/GoogleService-Info.plist
-/lib/firebase_options.dart
 
-# Environment files
-.env
-.env.local
-.env.development
-.env.production
+# iOS
+/ios/Pods/
+/ios/build/
+/ios/.xcode.env.local
+/ios/GoogleService-Info.plist
 
 # Coverage
 coverage/
-
-# Generated files
-*.g.dart
-*.freezed.dart
-*.gr.dart
-
-# Temporary files
-.tmp/
-tmp/
 
 # Build outputs
 *.aab
 *.apk
 *.ipa
-
 # Fastlane
 fastlane/report.xml
 fastlane/Preview.html

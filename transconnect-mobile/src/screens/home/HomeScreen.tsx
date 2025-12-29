@@ -7,11 +7,18 @@ import {
   StyleSheet,
   ScrollView,
   Alert,
+  Linking,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
 import DateTimePicker from '@react-native-community/datetimepicker';
 import { format } from 'date-fns';
+
+const UGANDA_CITIES = [
+  'Kampala', 'Entebbe', 'Jinja', 'Mbale', 'Gulu', 'Mbarara',
+  'Fort Portal', 'Masaka', 'Kasese', 'Lira', 'Soroti', 'Arua',
+  'Kabale', 'Hoima', 'Tororo', 'Kitgum', 'Moroto', 'Bushenyi'
+];
 
 export default function HomeScreen({ navigation }: any) {
   const [fromLocation, setFromLocation] = useState('');
@@ -19,6 +26,41 @@ export default function HomeScreen({ navigation }: any) {
   const [departureDate, setDepartureDate] = useState(new Date());
   const [showDatePicker, setShowDatePicker] = useState(false);
   const [passengers, setPassengers] = useState(1);
+  const [showFromSuggestions, setShowFromSuggestions] = useState(false);
+  const [showToSuggestions, setShowToSuggestions] = useState(false);
+  const [fromError, setFromError] = useState('');
+  const [toError, setToError] = useState('');
+
+  const getFilteredCities = (query: string, exclude?: string) => {
+    if (!query) return UGANDA_CITIES.filter(city => city !== exclude);
+    return UGANDA_CITIES.filter(
+      city => city.toLowerCase().includes(query.toLowerCase()) && city !== exclude
+    );
+  };
+
+  const handleFromLocationChange = (text: string) => {
+    setFromLocation(text);
+    setFromError('');
+    setShowFromSuggestions(text.length > 0);
+  };
+
+  const handleToLocationChange = (text: string) => {
+    setToLocation(text);
+    setToError('');
+    setShowToSuggestions(text.length > 0);
+  };
+
+  const selectFromCity = (city: string) => {
+    setFromLocation(city);
+    setShowFromSuggestions(false);
+    setFromError('');
+  };
+
+  const selectToCity = (city: string) => {
+    setToLocation(city);
+    setShowToSuggestions(false);
+    setToError('');
+  };
 
   const handleDateChange = (event: any, selectedDate?: Date) => {
     setShowDatePicker(false);
@@ -28,19 +70,31 @@ export default function HomeScreen({ navigation }: any) {
   };
 
   const handleSearchRoutes = () => {
-    if (!fromLocation || !toLocation) {
-      Alert.alert('Error', 'Please select both departure and destination locations');
-      return;
+    const trimmedFrom = fromLocation.trim();
+    const trimmedTo = toLocation.trim();
+    
+    let hasError = false;
+    
+    if (!trimmedFrom) {
+      setFromError('Please enter departure location');
+      hasError = true;
+    }
+    
+    if (!trimmedTo) {
+      setToError('Please enter destination location');
+      hasError = true;
     }
 
-    if (fromLocation.toLowerCase() === toLocation.toLowerCase()) {
-      Alert.alert('Error', 'Departure and destination cannot be the same');
-      return;
+    if (trimmedFrom && trimmedTo && trimmedFrom.toLowerCase() === trimmedTo.toLowerCase()) {
+      setToError('Destination must be different from departure');
+      hasError = true;
     }
+    
+    if (hasError) return;
 
     navigation.navigate('Search', {
-      from: fromLocation,
-      to: toLocation,
+      from: trimmedFrom,
+      to: trimmedTo,
       date: departureDate.toISOString(),
       passengers,
     });
@@ -75,16 +129,35 @@ export default function HomeScreen({ navigation }: any) {
         <View style={styles.searchCard}>
           <View style={styles.locationContainer}>
             <View style={styles.inputGroup}>
-              <View style={styles.locationInput}>
-                <Ionicons name="location-outline" size={20} color="#3B82F6" />
+              <View style={[styles.locationInput, fromError && styles.inputError]}>
+                <Ionicons name="location-outline" size={20} color={fromError ? "#EF4444" : "#3B82F6"} />
                 <TextInput
                   style={styles.input}
                   placeholder="From (e.g., Kampala)"
+                  placeholderTextColor="#9CA3AF"
                   value={fromLocation}
-                  onChangeText={setFromLocation}
+                  onChangeText={handleFromLocationChange}
+                  onFocus={() => setShowFromSuggestions(true)}
                   autoCapitalize="words"
                 />
               </View>
+              {fromError ? (
+                <Text style={styles.errorText}>{fromError}</Text>
+              ) : null}
+              {showFromSuggestions && fromLocation.length > 0 && (
+                <View style={styles.suggestionsContainer}>
+                  {getFilteredCities(fromLocation, toLocation).slice(0, 5).map((city) => (
+                    <TouchableOpacity
+                      key={city}
+                      style={styles.suggestionItem}
+                      onPress={() => selectFromCity(city)}
+                    >
+                      <Ionicons name="location-outline" size={16} color="#6B7280" />
+                      <Text style={styles.suggestionText}>{city}</Text>
+                    </TouchableOpacity>
+                  ))}
+                </View>
+              )}
             </View>
 
             <TouchableOpacity style={styles.swapButton} onPress={swapLocations}>
@@ -92,16 +165,35 @@ export default function HomeScreen({ navigation }: any) {
             </TouchableOpacity>
 
             <View style={styles.inputGroup}>
-              <View style={styles.locationInput}>
-                <Ionicons name="location" size={20} color="#EF4444" />
+              <View style={[styles.locationInput, toError && styles.inputError]}>
+                <Ionicons name="location" size={20} color={toError ? "#EF4444" : "#EF4444"} />
                 <TextInput
                   style={styles.input}
                   placeholder="To (e.g., Mbale)"
+                  placeholderTextColor="#9CA3AF"
                   value={toLocation}
-                  onChangeText={setToLocation}
+                  onChangeText={handleToLocationChange}
+                  onFocus={() => setShowToSuggestions(true)}
                   autoCapitalize="words"
                 />
               </View>
+              {toError ? (
+                <Text style={styles.errorText}>{toError}</Text>
+              ) : null}
+              {showToSuggestions && toLocation.length > 0 && (
+                <View style={styles.suggestionsContainer}>
+                  {getFilteredCities(toLocation, fromLocation).slice(0, 5).map((city) => (
+                    <TouchableOpacity
+                      key={city}
+                      style={styles.suggestionItem}
+                      onPress={() => selectToCity(city)}
+                    >
+                      <Ionicons name="location" size={16} color="#6B7280" />
+                      <Text style={styles.suggestionText}>{city}</Text>
+                    </TouchableOpacity>
+                  ))}
+                </View>
+              )}
             </View>
           </View>
 
@@ -157,17 +249,42 @@ export default function HomeScreen({ navigation }: any) {
               <Text style={styles.actionText}>My Tickets</Text>
             </TouchableOpacity>
 
-            <TouchableOpacity style={styles.actionCard}>
+            <TouchableOpacity 
+              style={styles.actionCard}
+              onPress={() => navigation.navigate('Bookings')}
+            >
               <Ionicons name="time-outline" size={32} color="#10B981" />
               <Text style={styles.actionText}>Recent Trips</Text>
             </TouchableOpacity>
 
-            <TouchableOpacity style={styles.actionCard}>
+            <TouchableOpacity 
+              style={styles.actionCard}
+              onPress={() => {
+                Alert.alert(
+                  'Help & Support',
+                  'Contact our support team:\n\nPhone: +256 39451710\nEmail: support@transconnect.app\n\nHours: Mon-Fri 8AM-6PM EAT',
+                  [
+                    { text: 'Call', onPress: () => Linking.openURL('tel:+25639451710') },
+                    { text: 'Email', onPress: () => Linking.openURL('mailto:support@transconnect.app') },
+                    { text: 'Close', style: 'cancel' }
+                  ]
+                );
+              }}
+            >
               <Ionicons name="help-circle-outline" size={32} color="#F59E0B" />
               <Text style={styles.actionText}>Support</Text>
             </TouchableOpacity>
 
-            <TouchableOpacity style={styles.actionCard}>
+            <TouchableOpacity 
+              style={styles.actionCard}
+              onPress={() => {
+                Alert.alert(
+                  'Special Offers',
+                  '🎉 Coming Soon!\n\nStay tuned for exclusive discounts and promotional offers for TransConnect users.',
+                  [{ text: 'OK' }]
+                );
+              }}
+            >
               <Ionicons name="gift-outline" size={32} color="#EF4444" />
               <Text style={styles.actionText}>Offers</Text>
             </TouchableOpacity>
@@ -324,6 +441,45 @@ const styles = StyleSheet.create({
     fontSize: 18,
     fontWeight: '600',
     marginLeft: 8,
+  },
+  inputError: {
+    borderColor: '#EF4444',
+    borderWidth: 1.5,
+  },
+  errorText: {
+    color: '#EF4444',
+    fontSize: 13,
+    marginTop: 6,
+    marginLeft: 4,
+  },
+  suggestionsContainer: {
+    position: 'absolute',
+    top: '100%',
+    left: 0,
+    right: 0,
+    backgroundColor: '#FFFFFF',
+    borderRadius: 12,
+    marginTop: 4,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.1,
+    shadowRadius: 8,
+    elevation: 5,
+    zIndex: 1000,
+    maxHeight: 200,
+  },
+  suggestionItem: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingVertical: 12,
+    paddingHorizontal: 16,
+    borderBottomWidth: 1,
+    borderBottomColor: '#F3F4F6',
+  },
+  suggestionText: {
+    fontSize: 15,
+    color: '#1F2937',
+    marginLeft: 12,
   },
   quickActions: {
     marginTop: 8,

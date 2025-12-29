@@ -56,6 +56,9 @@ export const authApi = {
   
   updateProfile: (profileData: { firstName?: string; lastName?: string; phone?: string }) =>
     apiClient.put('/auth/profile', profileData),
+  
+  forgotPassword: (email: string) =>
+    apiClient.post('/auth/forgot-password', { email }),
 };
 
 // Routes API

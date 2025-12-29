@@ -9,12 +9,16 @@ import LoadingScreen from '../components/LoadingScreen';
 // Auth Screens
 import LoginScreen from '../screens/auth/LoginScreen';
 import RegisterScreen from '../screens/auth/RegisterScreen';
+import ForgotPasswordScreen from '../screens/auth/ForgotPasswordScreen';
 
 // Main App Screens
 import HomeScreen from '../screens/home/HomeScreen';
 import SearchScreen from '../screens/search/SearchScreen';
 import BookingsScreen from '../screens/bookings/BookingsScreen';
 import ProfileScreen from '../screens/profile/ProfileScreen';
+import EditProfileScreen from '../screens/profile/EditProfileScreen';
+import PaymentMethodsScreen from '../screens/profile/PaymentMethodsScreen';
+import NotificationSettingsScreen from '../screens/profile/NotificationSettingsScreen';
 
 // Booking Flow Screens
 import RouteDetailsScreen from '../screens/booking/RouteDetailsScreen';
@@ -32,6 +36,7 @@ const AuthStack = () => (
   <Stack.Navigator screenOptions={{ headerShown: false }}>
     <Stack.Screen name="Login" component={LoginScreen} />
     <Stack.Screen name="Register" component={RegisterScreen} />
+    <Stack.Screen name="ForgotPassword" component={ForgotPasswordScreen} />
   </Stack.Navigator>
 );
 
@@ -82,12 +87,12 @@ const AppStack = () => (
     <Stack.Screen 
       name="SeatSelection" 
       component={SeatSelectionScreen}
-      options={{ title: 'Select Seats' }}
+      options={{ headerShown: false }}
     />
     <Stack.Screen 
       name="Payment" 
       component={PaymentScreen}
-      options={{ title: 'Payment' }}
+      options={{ headerShown: false }}
     />
     <Stack.Screen 
       name="BookingConfirmation" 
@@ -98,6 +103,21 @@ const AppStack = () => (
       name="TicketDetail" 
       component={TicketDetailScreen}
       options={{ title: 'Your Ticket' }}
+    />
+    <Stack.Screen 
+      name="EditProfile" 
+      component={EditProfileScreen}
+      options={{ headerShown: false }}
+    />
+    <Stack.Screen 
+      name="PaymentMethods" 
+      component={PaymentMethodsScreen}
+      options={{ headerShown: false }}
+    />
+    <Stack.Screen 
+      name="NotificationSettings" 
+      component={NotificationSettingsScreen}
+      options={{ headerShown: false }}
     />
   </Stack.Navigator>
 );

@@ -31,8 +31,18 @@ export default function LoginScreen({ navigation }: any) {
     setIsLoading(true);
     try {
       await login({ email, password });
+      // If we reach here, login was successful (API or demo mode)
     } catch (error: any) {
-      Alert.alert('Login Failed', error.message || 'Please check your credentials');
+      console.error('Login screen error:', error);
+      
+      // If error is thrown, it means even demo mode failed
+      let errorMessage = 'Invalid credentials. Please use one of the test accounts shown below.';
+      
+      if (error.response?.data?.message) {
+        errorMessage = error.response.data.message;
+      }
+      
+      Alert.alert('Login Failed', errorMessage);
     } finally {
       setIsLoading(false);
     }
@@ -96,7 +106,10 @@ export default function LoginScreen({ navigation }: any) {
               </Text>
             </TouchableOpacity>
 
-            <TouchableOpacity style={styles.forgotPassword}>
+            <TouchableOpacity 
+              style={styles.forgotPassword}
+              onPress={() => navigation.navigate('ForgotPassword')}
+            >
               <Text style={styles.forgotPasswordText}>Forgot Password?</Text>
             </TouchableOpacity>
           </View>

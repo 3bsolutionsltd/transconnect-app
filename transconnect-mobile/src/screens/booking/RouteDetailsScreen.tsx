@@ -1,19 +1,138 @@
-import React from 'react';
+import React, { useEffect, useState } from 'react';
 import {
   View,
   Text,
   TouchableOpacity,
   StyleSheet,
   ScrollView,
+  Alert,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
-import { format } from 'date-fns';
+import { format, isSameDay } from 'date-fns';
+import { useQuery } from '@tanstack/react-query';
+import { bookingsApi } from '../../services/api';
+import { offlineStorage } from '../../services/offlineStorage';
 
 export default function RouteDetailsScreen({ route, navigation }: any) {
   const { route: routeData, passengers, searchParams } = route.params;
+  const [hasDuplicateBooking, setHasDuplicateBooking] = useState(false);
+
+  // Fetch user's existing bookings to check for duplicates
+  const { data: userBookings } = useQuery({
+    queryKey: ['my-bookings-check'],
+    queryFn: async () => {
+      try {
+        const response = await bookingsApi.getMyBookings();
+        return response.data;
+      } catch (error) {
+        const offlineData = await offlineStorage.getBookings();
+        return offlineData;
+      }
+    },
+  });
+
+  useEffect(() => {
+    checkForDuplicateBooking();
+  }, [userBookings]);
+
+  const checkForDuplicateBooking = () => {
+    if (!userBookings || userBookings.length === 0) {
+      console.log('No existing bookings found');
+      return;
+    }
+
+    console.log('Checking for duplicates:', {
+      searchFrom: searchParams.from,
+      searchTo: searchParams.to,
+      searchDate: searchParams.date,
+      routeOperatorId: routeData.operator?.id,
+      routeOperatorName: routeData.operator?.companyName || routeData.operatorName,
+      totalBookings: userBookings.length
+    });
+
+    const searchDate = searchParams.date ? new Date(searchParams.date) : new Date();
+    
+    // Check if user has existing booking for same route, operator, and date
+    const duplicate = userBookings.find((booking: any) => {
+      console.log('Checking booking:', {
+        id: booking.id,
+        status: booking.status,
+        origin: booking.route?.origin || booking.boardingStop,
+        destination: booking.route?.destination || booking.alightingStop,
+        operatorId: booking.route?.operator?.id || booking.operatorId,
+        operatorName: booking.route?.operator?.companyName || booking.operatorName,
+        departureDate: booking.departureDate,
+        createdAt: booking.createdAt
+      });
+
+      // Handle date comparison - use departureDate or createdAt
+      let bookingDate;
+      if (booking.departureDate) {
+        bookingDate = new Date(booking.departureDate);
+      } else if (booking.createdAt) {
+        bookingDate = new Date(booking.createdAt);
+      } else {
+        // If no date info, consider it potentially duplicate (err on side of warning user)
+        console.log('⚠️ No date info in booking, treating as potential duplicate');
+        bookingDate = searchDate;
+      }
+      
+      // More flexible route matching (case-insensitive)
+      const bookingOrigin = (booking.route?.origin || booking.boardingStop || '').toLowerCase().trim();
+      const bookingDestination = (booking.route?.destination || booking.alightingStop || '').toLowerCase().trim();
+      const searchFrom = (searchParams.from || '').toLowerCase().trim();
+      const searchTo = (searchParams.to || '').toLowerCase().trim();
+      
+      const isSameRoute = bookingOrigin === searchFrom && bookingDestination === searchTo;
+      
+      // Flexible operator matching
+      const bookingOperatorId = booking.route?.operator?.id || booking.operatorId;
+      const routeOperatorId = routeData.operator?.id || routeData.operatorId;
+      const bookingOperatorName = (booking.route?.operator?.companyName || booking.operatorName || '').toLowerCase();
+      const routeOperatorName = (routeData.operator?.companyName || routeData.operatorName || '').toLowerCase();
+      
+      const isSameOperator = bookingOperatorId === routeOperatorId || 
+                            bookingOperatorName === routeOperatorName;
+      
+      const isSameDate = isSameDay(bookingDate, searchDate);
+      const isActive = booking.status === 'CONFIRMED' || booking.status === 'PENDING';
+
+      const isDuplicate = isSameRoute && isSameDate && isActive;
+      
+      if (isDuplicate) {
+        console.log('⚠️ DUPLICATE FOUND:', {
+          isSameRoute,
+          isSameOperator,
+          isSameDate,
+          isActive
+        });
+      }
+
+      return isDuplicate;
+    });
+
+    console.log('Duplicate check result:', !!duplicate);
+    setHasDuplicateBooking(!!duplicate);
+  };
 
   const handleBookNow = () => {
+    if (hasDuplicateBooking) {
+      Alert.alert(
+        'Existing Booking Found',
+        `You already have a booking for ${searchParams.from} → ${searchParams.to} with ${routeData.operator?.companyName || routeData.operatorName} on ${format(new Date(searchParams.date), 'MMM dd, yyyy')}.\n\nDo you want to proceed with another booking?`,
+        [
+          { text: 'View My Bookings', onPress: () => navigation.navigate('Bookings') },
+          { text: 'Book Anyway', onPress: proceedToSeatSelection },
+          { text: 'Cancel', style: 'cancel' },
+        ]
+      );
+    } else {
+      proceedToSeatSelection();
+    }
+  };
+
+  const proceedToSeatSelection = () => {
     navigation.navigate('SeatSelection', {
       route: routeData,
       passengers,
@@ -26,6 +145,15 @@ export default function RouteDetailsScreen({ route, navigation }: any) {
   return (
     <SafeAreaView style={styles.container}>
       <ScrollView contentContainerStyle={styles.scrollContainer}>
+        {hasDuplicateBooking && (
+          <View style={styles.warningBanner}>
+            <Ionicons name="alert-circle" size={20} color="#F59E0B" />
+            <Text style={styles.warningText}>
+              You already have a booking for this route and date
+            </Text>
+          </View>
+        )}
+        
         <View style={styles.headerCard}>
           <View style={styles.operatorHeader}>
             <Text style={styles.operatorName}>{routeData.operatorName}</Text>
@@ -39,7 +167,7 @@ export default function RouteDetailsScreen({ route, navigation }: any) {
               {searchParams.from} → {searchParams.to}
             </Text>
             <Text style={styles.dateText}>
-              {format(new Date(searchParams.date), 'EEEE, MMM dd, yyyy')}
+              {searchParams.date ? format(new Date(searchParams.date), 'EEEE, MMM dd, yyyy') : 'Date not set'}
             </Text>
           </View>
         </View>
@@ -176,6 +304,24 @@ const styles = StyleSheet.create({
   container: {
     flex: 1,
     backgroundColor: '#F3F4F6',
+  },
+  warningBanner: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: '#FEF3C7',
+    paddingVertical: 12,
+    paddingHorizontal: 16,
+    marginBottom: 8,
+    borderRadius: 8,
+    marginHorizontal: 16,
+    marginTop: 8,
+  },
+  warningText: {
+    flex: 1,
+    fontSize: 14,
+    color: '#92400E',
+    marginLeft: 8,
+    fontWeight: '500',
   },
   scrollContainer: {
     flexGrow: 1,

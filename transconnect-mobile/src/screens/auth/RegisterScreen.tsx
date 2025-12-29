@@ -80,7 +80,30 @@ export default function RegisterScreen({ navigation }: any) {
         role: 'PASSENGER',
       });
     } catch (error: any) {
-      Alert.alert('Registration Failed', error.message || 'Please try again');
+      const errorMessage = error.response?.data?.message || error.message || 'Please try again';
+      
+      // Check if user already exists
+      if (errorMessage.toLowerCase().includes('already exists') || 
+          errorMessage.toLowerCase().includes('already registered') ||
+          errorMessage.toLowerCase().includes('email already') ||
+          errorMessage.toLowerCase().includes('phone already')) {
+        Alert.alert(
+          'Account Already Exists',
+          'An account with this email or phone number already exists. Would you like to login instead?',
+          [
+            {
+              text: 'Cancel',
+              style: 'cancel',
+            },
+            {
+              text: 'Go to Login',
+              onPress: () => navigation.navigate('Login'),
+            },
+          ]
+        );
+      } else {
+        Alert.alert('Registration Failed', errorMessage);
+      }
     } finally {
       setIsLoading(false);
     }
