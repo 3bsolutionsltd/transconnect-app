@@ -92,7 +92,7 @@ export default function BookingsScreen({ navigation }: any) {
     cacheTime: 0,
     queryFn: async () => {
       try {
-        const response = await bookingsApi.getMyBookings();
+        const response = await bookingsApi.getBookings();
         const bookingsData = response.data;
         
         // Ensure we always have an array
