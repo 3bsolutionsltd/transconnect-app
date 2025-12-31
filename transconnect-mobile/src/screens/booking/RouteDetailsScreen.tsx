@@ -23,9 +23,10 @@ export default function RouteDetailsScreen({ route, navigation }: any) {
     queryKey: ['my-bookings-check'],
     queryFn: async () => {
       try {
-        const response = await bookingsApi.getMyBookings();
+        const response = await bookingsApi.getBookings();
         return response.data;
       } catch (error) {
+        console.log('Error fetching bookings:', error);
         const offlineData = await offlineStorage.getBookings();
         return offlineData;
       }

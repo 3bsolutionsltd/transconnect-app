@@ -82,6 +82,16 @@ router.get('/', async (req: Request, res: Response) => {
     const routesWithAvailability = approvedRoutes.map(route => {
       let routeData: any = {
         ...route,
+        // Ensure all time fields are properly formatted as strings
+        departureTime: route.departureTime ? String(route.departureTime) : route.departureTime,
+        createdAt: route.createdAt ? route.createdAt.toISOString() : null,
+        updatedAt: route.updatedAt ? route.updatedAt.toISOString() : null,
+        stops: route.stops.map((stop: any) => ({
+          ...stop,
+          estimatedTime: stop.estimatedTime ? String(stop.estimatedTime) : stop.estimatedTime,
+          createdAt: stop.createdAt ? stop.createdAt.toISOString() : null,
+          updatedAt: stop.updatedAt ? stop.updatedAt.toISOString() : null,
+        })),
         operatorInfo: {
           id: route.operator.id,
           name: route.operator.companyName,
@@ -178,6 +188,16 @@ router.get('/:id', async (req: Request, res: Response) => {
     
     const routeWithInfo = {
       ...route,
+      // Ensure all time fields are properly formatted as strings
+      departureTime: route.departureTime ? String(route.departureTime) : route.departureTime,
+      createdAt: route.createdAt ? route.createdAt.toISOString() : null,
+      updatedAt: route.updatedAt ? route.updatedAt.toISOString() : null,
+      stops: route.stops.map(stop => ({
+        ...stop,
+        estimatedTime: stop.estimatedTime ? String(stop.estimatedTime) : stop.estimatedTime,
+        createdAt: stop.createdAt ? stop.createdAt.toISOString() : null,
+        updatedAt: stop.updatedAt ? stop.updatedAt.toISOString() : null,
+      })),
       operatorInfo: {
         id: route.operator.id,
         name: route.operator.companyName,

@@ -21,7 +21,7 @@ export default function ProfileScreen({ navigation }: any) {
   const { data: bookings, isLoading } = useQuery({
     queryKey: ['my-bookings'],
     queryFn: async () => {
-      const response = await bookingsApi.getMyBookings();
+      const response = await bookingsApi.getBookings();
       return response.data;
     },
   });

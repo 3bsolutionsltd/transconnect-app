@@ -30,6 +30,20 @@ apiClient.interceptors.request.use(async (config) => {
 apiClient.interceptors.response.use(
   (response) => response,
   async (error) => {
+    // Log detailed error information
+    if (error.response) {
+      console.error('API Error Response:', {
+        status: error.response.status,
+        statusText: error.response.statusText,
+        data: error.response.data,
+        headers: error.response.headers,
+      });
+    } else if (error.request) {
+      console.error('API No Response:', error.request);
+    } else {
+      console.error('API Error:', error.message);
+    }
+
     if (error.response?.status === 401) {
       // Token expired or invalid
       try {
@@ -96,7 +110,7 @@ export const bookingsApi = {
     apiClient.post('/bookings', bookingData),
   
   getBookings: () =>
-    apiClient.get('/bookings'),
+    apiClient.get('/bookings/my-bookings'),
   
   getBookingDetails: (bookingId: string) =>
     apiClient.get(`/bookings/${bookingId}`),

@@ -1,0 +1,29 @@
+# Google Play Store Release Notes
+
+## What's New in v1.0.2
+
+🐛 **Bug Fixes & Improvements**
+
+✅ Fixed QR scanner stopping immediately - Now scans tickets reliably within seconds
+
+✅ Real-time booking updates - Payment status now updates automatically when confirmed
+
+✅ Instant notifications - Get notified immediately when your payment is confirmed
+
+⚡ Performance improvements for faster, smoother experience
+
+📱 Better offline support for your tickets
+
+Thank you for using TransConnect! 🚌
+
+---
+
+## Short Version (For Play Console - 500 characters max)
+
+Bug fixes: QR scanner stability improved, real-time booking status updates, instant payment notifications. Performance enhancements for faster experience. Thank you for using TransConnect!
+
+---
+
+## Very Short Version (For Play Console - 80 characters max)
+
+Bug fixes and performance improvements
