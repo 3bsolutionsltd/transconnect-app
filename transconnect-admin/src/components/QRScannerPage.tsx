@@ -61,12 +61,17 @@ export default function QRScannerPage() {
         videoRef.current.srcObject = stream;
         videoRef.current.play();
         
-        // Start continuous QR scanning
-        const interval = setInterval(() => {
-          scanForQRCode();
-        }, 1000); // Scan every second
-        
-        setScanningInterval(interval);
+        // Wait for video to be ready before starting scan
+        videoRef.current.onloadedmetadata = () => {
+          // Start continuous QR scanning after 500ms delay
+          setTimeout(() => {
+            const interval = setInterval(() => {
+              scanForQRCode();
+            }, 300); // Scan more frequently for better detection
+            
+            setScanningInterval(interval);
+          }, 500);
+        };
       }
     } catch (err: any) {
       setError('Camera access denied. Please allow camera access or use image upload.');

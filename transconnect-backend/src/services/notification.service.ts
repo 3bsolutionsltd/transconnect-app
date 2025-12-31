@@ -200,8 +200,8 @@ export class NotificationService {
       userId: paymentData.userId,
       type: 'PAYMENT_SUCCESS',
       channels: ['EMAIL', 'SMS', 'PUSH', 'IN_APP'],
-      title: 'Payment Successful!',
-      body: `Your payment of UGX ${paymentData.amount.toLocaleString()} via ${paymentData.method} was successful.`,
+      title: 'Payment Confirmed!',
+      body: `Your payment of UGX ${paymentData.amount.toLocaleString()} via ${paymentData.method} has been confirmed. Your booking is now active.`,
       subject: `Payment Confirmed - ${paymentData.transactionId}`,
       data: {
         bookingId: paymentData.bookingId,
@@ -209,6 +209,8 @@ export class NotificationService {
         amount: paymentData.amount.toString(),
         method: paymentData.method,
         transactionId: paymentData.transactionId,
+        action: 'REFRESH_BOOKING', // Signal mobile app to refresh booking status
+        bookingStatus: 'CONFIRMED', // Include new status
       },
     });
   }

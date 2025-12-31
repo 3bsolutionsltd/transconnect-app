@@ -206,6 +206,7 @@ router.post('/:paymentId/process', [
           method: 'Cash Payment',
           transactionId: payment.reference || '',
         });
+        console.log(`✓ Payment confirmation notification sent to user ${payment.userId}`);
       } else {
         await notificationService.sendPaymentFailed({
           userId: payment.userId,
@@ -214,6 +215,7 @@ router.post('/:paymentId/process', [
           method: 'Cash Payment',
           reason: notes || 'Payment rejected by operator',
         });
+        console.log(`✓ Payment rejection notification sent to user ${payment.userId}`);
       }
     } catch (notificationError) {
       console.error('Error sending payment notification:', notificationError);

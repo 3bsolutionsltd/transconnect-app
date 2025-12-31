@@ -88,8 +88,11 @@ export default function BookingsScreen({ navigation }: any) {
 
   const { data: bookings, isLoading, error, refetch, isRefreshing } = useQuery({
     queryKey: ['my-bookings'],
-    staleTime: 0,
-    cacheTime: 0,
+    staleTime: 0, // Always consider data stale to enable fresh fetches
+    cacheTime: 5 * 60 * 1000, // Keep in cache for 5 minutes
+    refetchInterval: 30000, // Auto-refresh every 30 seconds when screen is active
+    refetchIntervalInBackground: false,
+    refetchOnMount: 'always', // Always refetch when component mounts
     queryFn: async () => {
       try {
         const response = await bookingsApi.getBookings();

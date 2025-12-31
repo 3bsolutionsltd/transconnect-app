@@ -140,6 +140,13 @@ export default function App() {
     notificationListener.current = notificationService.addNotificationReceivedListener(
       (notification) => {
         console.log('Notification received:', notification);
+        const data = notification.request.content.data;
+        
+        // Handle payment confirmation notifications
+        if (data.action === 'REFRESH_BOOKING' || data.bookingStatus === 'CONFIRMED') {
+          console.log('Payment confirmed - invalidating bookings cache to trigger refresh');
+          queryClient.invalidateQueries({ queryKey: ['my-bookings'] });
+        }
       }
     );
 
@@ -147,8 +154,15 @@ export default function App() {
     responseListener.current = notificationService.addNotificationResponseListener(
       (response) => {
         console.log('Notification response:', response);
-        // TODO: Handle navigation based on notification type
         const data = response.notification.request.content.data;
+        
+        // Refresh bookings when tapping payment confirmation notification
+        if (data.action === 'REFRESH_BOOKING' || data.bookingStatus === 'CONFIRMED') {
+          console.log('Refreshing bookings after payment confirmation');
+          queryClient.invalidateQueries({ queryKey: ['my-bookings'] });
+        }
+        
+        // TODO: Handle navigation based on notification type
         if (data.type === 'booking_confirmation' || data.type === 'trip_reminder') {
           // Navigate to booking details
           console.log('Should navigate to booking:', data.bookingRef);

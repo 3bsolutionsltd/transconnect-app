@@ -61,12 +61,17 @@ const OperatorQRScanner = () => {
         videoRef.current.srcObject = stream;
         videoRef.current.play();
         
-        // Start scanning for QR codes
-        const interval = setInterval(() => {
-          scanForQRCode();
-        }, 500);
-        
-        setScanningInterval(interval);
+        // Wait for video to be ready before starting scan
+        videoRef.current.onloadedmetadata = () => {
+          // Start scanning after camera is ready
+          setTimeout(() => {
+            const interval = setInterval(() => {
+              scanForQRCode();
+            }, 300); // Scan more frequently for better detection
+            
+            setScanningInterval(interval);
+          }, 500);
+        };
       }
     } catch (err) {
       console.error('Camera error:', err);
