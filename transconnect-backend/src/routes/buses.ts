@@ -62,14 +62,14 @@ router.post('/', authenticateToken, async (req: Request, res: Response) => {
   try {
     const userId = (req as any).user.id;
     const userRole = (req as any).user.role;
-    const { plateNumber, model, capacity, amenities } = req.body;
+    const { plateNumber, model, capacity, amenities, operatorId: requestedOperatorId } = req.body;
 
-    console.log('Creating bus with data:', { plateNumber, model, capacity, amenities }); // Debug log
+    console.log('Creating bus with data:', { plateNumber, model, capacity, amenities, operatorId: requestedOperatorId }); // Debug log
     console.log('Amenities type:', typeof amenities, 'value:', amenities); // Debug amenities specifically
 
-    // Only operators can create buses
-    if (userRole !== 'OPERATOR') {
-      return res.status(403).json({ error: 'Only operators can create buses' });
+    // Only operators and admins can create buses
+    if (userRole !== 'OPERATOR' && userRole !== 'ADMIN') {
+      return res.status(403).json({ error: 'Only operators and administrators can create buses' });
     }
 
     if (!plateNumber || !model || !capacity) {
@@ -81,21 +81,27 @@ router.post('/', authenticateToken, async (req: Request, res: Response) => {
     // Find operator ID for this user (either direct operator or operator user)
     let operatorId: string | null = null;
 
-    // First check if user is a direct operator
-    const directOperator = await prisma.operator.findUnique({
-      where: { userId }
-    });
-
-    if (directOperator) {
-      operatorId = directOperator.id;
+    // If ADMIN and operatorId provided in request, use that
+    if (userRole === 'ADMIN' && requestedOperatorId) {
+      operatorId = requestedOperatorId;
     } else {
-      // Check if user is an operator user
-      const operatorUser = await prisma.operatorUser.findUnique({
+      // For operators, find their operator ID automatically
+      // First check if user is a direct operator
+      const directOperator = await prisma.operator.findUnique({
         where: { userId }
       });
-      
-      if (operatorUser) {
-        operatorId = operatorUser.operatorId;
+
+      if (directOperator) {
+        operatorId = directOperator.id;
+      } else {
+        // Check if user is an operator user
+        const operatorUser = await prisma.operatorUser.findUnique({
+          where: { userId }
+        });
+        
+        if (operatorUser) {
+          operatorId = operatorUser.operatorId;
+        }
       }
     }
 
