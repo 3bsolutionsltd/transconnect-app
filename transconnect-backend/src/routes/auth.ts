@@ -59,14 +59,23 @@ router.post('/register', [
       }
     });
 
-    // Generate JWT token
+    // Generate JWT token with 30-day expiry
     const token = jwt.sign(
       { userId: user.id, email: user.email, role: user.role },
       process.env.JWT_SECRET!,
-      { expiresIn: '7d' }
+      { expiresIn: '30d' }
     );
 
-    res.status(201).json({ user, token });
+    // Calculate expiry timestamp
+    const expiresAt = new Date();
+    expiresAt.setDate(expiresAt.getDate() + 30);
+
+    res.status(201).json({ 
+      user, 
+      token,
+      expiresIn: process.env.JWT_EXPIRES_IN || '30d',
+      expiresAt: expiresAt.toISOString()
+    });
   } catch (error) {
     console.error('Registration error:', error);
     res.status(500).json({ error: 'Registration failed' });
@@ -98,12 +107,16 @@ router.post('/login', [
       return res.status(401).json({ error: 'Invalid credentials' });
     }
 
-    // Generate JWT
+    // Generate JWT with 30-day expiry
     const token = jwt.sign(
       { userId: user.id, email: user.email, role: user.role },
       process.env.JWT_SECRET!,
-      { expiresIn: '7d' }
+      { expiresIn: '30d' }
     );
+
+    // Calculate expiry timestamp
+    const expiresAt = new Date();
+    expiresAt.setDate(expiresAt.getDate() + 30);
 
     const userResponse = {
       id: user.id,
@@ -114,10 +127,101 @@ router.post('/login', [
       role: user.role
     };
 
-    res.json({ user: userResponse, token });
+    res.json({ 
+      user: userResponse, 
+      token,
+      expiresIn: process.env.JWT_EXPIRES_IN || '30d',
+      expiresAt: expiresAt.toISOString()
+    });
   } catch (error) {
     console.error('Login error:', error);
     res.status(500).json({ error: 'Login failed' });
+  }
+});
+
+// Refresh token endpoint - allows users to get a new token before expiry
+router.post('/refresh', async (req: Request, res: Response) => {
+  try {
+    const authHeader = req.headers.authorization;
+    if (!authHeader) {
+      return res.status(401).json({ error: 'No token provided' });
+    }
+
+    const token = authHeader.split(' ')[1];
+    
+    // Verify token (even if expired, we can still decode it)
+    let decoded: any;
+    try {
+      decoded = jwt.verify(token, process.env.JWT_SECRET!);
+    } catch (error: any) {
+      // If token is expired but valid, allow refresh
+      if (error.name === 'TokenExpiredError') {
+        decoded = jwt.decode(token);
+        if (!decoded || !decoded.userId) {
+          return res.status(401).json({ 
+            error: 'Invalid token',
+            code: 'INVALID_TOKEN' 
+          });
+        }
+      } else {
+        return res.status(401).json({ 
+          error: 'Invalid token',
+          code: 'INVALID_TOKEN' 
+        });
+      }
+    }
+
+    // Verify user still exists and is active
+    const user = await prisma.user.findUnique({
+      where: { id: decoded.userId },
+      select: {
+        id: true,
+        email: true,
+        firstName: true,
+        lastName: true,
+        phone: true,
+        role: true,
+        verified: true
+      }
+    });
+
+    if (!user || !user.verified) {
+      return res.status(401).json({ 
+        error: 'User not found or not verified',
+        code: 'USER_INVALID'
+      });
+    }
+
+    // Generate new token
+    const newToken = jwt.sign(
+      { userId: user.id, email: user.email, role: user.role },
+      process.env.JWT_SECRET!,
+      { expiresIn: '30d' }
+    );
+
+    // Calculate expiry timestamp
+    const expiresAt = new Date();
+    expiresAt.setDate(expiresAt.getDate() + 30);
+
+    const userResponse = {
+      id: user.id,
+      email: user.email,
+      firstName: user.firstName,
+      lastName: user.lastName,
+      phone: user.phone,
+      role: user.role
+    };
+
+    res.json({ 
+      user: userResponse, 
+      token: newToken,
+      expiresIn: process.env.JWT_EXPIRES_IN || '30d',
+      expiresAt: expiresAt.toISOString(),
+      message: 'Token refreshed successfully'
+    });
+  } catch (error) {
+    console.error('Token refresh error:', error);
+    res.status(500).json({ error: 'Token refresh failed' });
   }
 });
 
