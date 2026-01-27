@@ -76,10 +76,19 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       const response = await authApi.login(credentials);
       console.log('Login response received:', response.data);
       
-      const { user: userData, token: authToken } = response.data;
+      const { user: userData, token: authToken, expiresAt, expiresIn } = response.data;
       
       await secureStorage.setItem('auth_token', authToken);
       await secureStorage.setItem('user_data', JSON.stringify(userData));
+      
+      // Store token expiry information
+      if (expiresAt) {
+        await secureStorage.setItem('token_expires_at', expiresAt);
+        console.log('\u2705 Token expires at:', expiresAt);
+      }
+      if (expiresIn) {
+        console.log('\u2705 Token valid for:', expiresIn);
+      }
       
       setUser(userData);
       setToken(authToken);
@@ -133,10 +142,19 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     try {
       setIsLoading(true);
       const response = await authApi.register(userData);
-      const { user: newUser, token: authToken } = response.data;
+      const { user: newUser, token: authToken, expiresAt, expiresIn } = response.data;
       
       await secureStorage.setItem('auth_token', authToken);
       await secureStorage.setItem('user_data', JSON.stringify(newUser));
+      
+      // Store token expiry information
+      if (expiresAt) {
+        await secureStorage.setItem('token_expires_at', expiresAt);
+        console.log('\u2705 Token expires at:', expiresAt);
+      }
+      if (expiresIn) {
+        console.log('\u2705 Token valid for:', expiresIn);
+      }
       
       setUser(newUser);
       setToken(authToken);
