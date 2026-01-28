@@ -2,7 +2,7 @@
 
 **Date**: January 28, 2026  
 **Purpose**: Set up complete staging environment for testing route segments, migrations, and future features  
-**Estimated Cost**: $30-50/month  
+**Estimated Cost**: $7-14/month (or $7 with FREE backend tier)  
 **Setup Time**: 1-2 days
 
 ---
@@ -30,8 +30,9 @@ The staging environment will mirror production with:
    - Database: `transconnect_staging`
    - User: `transconnect_staging_user`
    - Region: Choose closest to production (e.g., Frankfurt/Singapore)
-   - Plan: **Starter ($7/month)** or **Standard ($15/month)** for better performance
+   - Plan: **Starter ($7/month)** recommended for staging
    - PostgreSQL Version: 14 or higher
+   - Note: Database must be paid tier (no free option available)
 
 3. **Note Connection Details** (save to `.env.staging`):
    ```
@@ -313,6 +314,8 @@ seedStagingData();
 ```
 
 **Install faker and run seed**:
+
+**Option A: Seed Locally** (if network allows):
 ```bash
 npm install --save-dev @faker-js/faker
 
@@ -322,6 +325,23 @@ $env:DATABASE_URL="your_staging_database_url"
 # Run seed script
 node scripts/seed-staging-data.js
 ```
+
+**Option B: Seed via Render SSH** (if using Starter+ backend):
+```bash
+# After deploying backend on Starter tier
+# 1. Go to Render Dashboard → Your Service → Shell
+# 2. Run in Render's terminal:
+node scripts/seed-staging-data.js
+```
+
+**Option C: Upgrade Temporarily** (if using FREE backend):
+1. Deploy backend on FREE tier initially
+2. Once deployed, upgrade to Starter tier ($7/month)
+3. Use Render Shell to run: `node scripts/seed-staging-data.js`
+4. After seeding, downgrade back to FREE tier
+5. Total time on paid tier: ~1 hour, cost: ~$0.01
+
+**Note**: If your local network blocks npm (like currently), use Option B or C
 
 ---
 
@@ -339,7 +359,33 @@ node scripts/seed-staging-data.js
    - Branch: `main` (or create `staging` branch)
    - Build Command: `npm install && npx prisma generate && npm run build`
    - Start Command: `npm start`
-   - Plan: **Starter ($7/month)** or **Standard ($25/month)**
+   - Plan: Choose based on needs (see pricing table below)
+
+**Render Backend Pricing Tiers**:
+
+| Tier | Cost/Month | RAM | CPU | SSH Access | Zero Downtime | Best For |
+|------|------------|-----|-----|------------|---------------|----------|
+| **FREE** | $0 | 512 MB | 0.1 | ❌ No | ❌ No | Basic testing, no scripts |
+| **Starter** | $7 | 512 MB | 0.5 | ✅ Yes | ✅ Yes | Running seed scripts, one-off jobs |
+| **Standard** | $25 | 2 GB | 1 | ✅ Yes | ✅ Yes | Production-like staging |
+| **Pro** | $85 | 4 GB | 2 | ✅ Yes | ✅ Yes | High-traffic staging |
+
+**Recommended for Staging**:
+- **Option 1 (Cheapest)**: FREE backend + Starter database = **$7/month**
+  - ✅ Sufficient for basic API testing
+  - ❌ Cannot run seed scripts via SSH
+  - 📝 Seed data locally or upgrade temporarily to Starter
+
+- **Option 2 (Recommended)**: Starter backend + Starter database = **$14/month**
+  - ✅ Full access to run scripts
+  - ✅ Zero-downtime deployments
+  - ✅ SSH access for debugging
+  - 📝 Best balance of features and cost
+
+- **Option 3 (Production-like)**: Standard backend + Starter database = **$32/month**
+  - ✅ More resources for load testing
+  - ✅ Better performance
+  - 📝 Only if testing high traffic scenarios
 
 4. **Environment Variables**:
    ```
@@ -578,14 +624,49 @@ npx prisma studio
 
 ## Cost Summary
 
+### Budget Options
+
+**Minimum Cost Setup** (FREE backend):
 | Component | Provider | Plan | Cost/Month |
 |-----------|----------|------|------------|
-| PostgreSQL Database | Render | Starter | $7-15 |
-| Backend API | Render | Starter | $7 |
-| Admin Dashboard | Render | Static Site | Free |
-| **Total** | | | **$14-22/month** |
+| PostgreSQL Database | Render | Starter | $7 |
+| Backend API | Render | **FREE** | **$0** |
+| Admin Dashboard | Render | Static Site | $0 |
+| **Total** | | | **$7/month** |
 
-**Note**: Mobile app staging builds are free on EAS
+**Limitations of FREE backend**:
+- ❌ No SSH access (can't run seed scripts directly)
+- ❌ No zero-downtime deployments
+- ❌ Slower CPU (0.1 vs 0.5)
+- ✅ Still works for API testing with manual data entry
+
+**Recommended Setup** (Starter backend):
+| Component | Provider | Plan | Cost/Month |
+|-----------|----------|------|------------|
+| PostgreSQL Database | Render | Starter | $7 |
+| Backend API | Render | **Starter** | **$7** |
+| Admin Dashboard | Render | Static Site | $0 |
+| **Total** | | | **$14/month** |
+
+**Benefits of Starter backend**:
+- ✅ SSH access for running scripts
+- ✅ Zero-downtime deployments
+- ✅ Better performance (5x CPU)
+- ✅ One-off jobs support
+
+**Premium Setup** (Standard backend - if needed):
+| Component | Provider | Plan | Cost/Month |
+|-----------|----------|------|------------|
+| PostgreSQL Database | Render | Starter | $7 |
+| Backend API | Render | Standard | $25 |
+| Admin Dashboard | Render | Static Site | $0 |
+| **Total** | | | **$32/month** |
+
+**Notes**:
+- Mobile app staging builds are free on EAS
+- You can start with FREE and upgrade anytime
+- Only pay for Starter when you need to run scripts
+- Database must be paid tier (no free option)
 
 ---
 

@@ -36,27 +36,61 @@ npx prisma generate
 - [ ] Verify schema with `npx prisma studio`
 
 ### 1.3 Seed Test Data
+
+**Option A: Seed Locally** (if network allows):
 ```bash
 npm install --save-dev @faker-js/faker
 node scripts/seed-staging-data.js
 ```
 - [ ] Script completed without errors
 - [ ] Verify data counts in output
-- [ ] Test credentials noted:
-  - Admin: `admin@transconnect-staging.com` / `password123`
-  - Manager: `manager@transconnect-staging.com` / `password123`
+
+**Option B: Seed via Render SSH** (if using Starter+ backend):
+1. [ ] Deploy backend first (Phase 2)
+2. [ ] Go to Render Dashboard → Your Service → Shell tab
+3. [ ] Run: `node scripts/seed-staging-data.js`
+4. [ ] Wait for completion (~2-3 minutes)
+
+**Option C: Skip for Now**:
+- [ ] Continue without test data
+- [ ] Seed later when network is fixed
+- [ ] Or add data manually through admin UI
+
+**Test Credentials** (after seeding):
+- Admin: `admin@transconnect-staging.com` / `password123`
+- Manager: `manager@transconnect-staging.com` / `password123`
 
 ---
 
 ## Phase 2: Backend Deployment ⏱️ 1-2 hours
 
 ### 2.1 Create Render Web Service
-- [ ] New Web Service from GitHub: `3bsolutionsltd/transconnect-app`
-- [ ] Name: `transconnect-backend-staging`
-- [ ] Root Directory: `transconnect-backend`
-- [ ] Build Command: `npm install && npx prisma generate && npm run build`
-- [ ] Start Command: `npm start`
-- [ ] Plan: Starter ($7/month)
+- [ ] Go to Render Dashboard → "New +" → "Web Service"
+- [ ] Source Code: `3bsolutionsltd/transconnect-app`
+- [ ] Configure the following fields:
+
+**Basic Configuration**:
+- [ ] **Name**: `transconnect-backend-staging` (or `transconnect-app-testing`)
+- [ ] **Project**: My project (optional)
+- [ ] **Environment**: Production
+- [ ] **Language**: Node (NOT Docker)
+- [ ] **Branch**: `main`
+- [ ] **Region**: Oregon (US West) - Keep with existing services
+- [ ] **Root Directory**: `transconnect-backend` ⚠️ IMPORTANT
+
+**Build Settings** (after clicking "Next"):
+- [ ] **Build Command**: `npm install && npx prisma generate && npm run build`
+- [ ] **Start Command**: `npm start`
+
+**Instance Type** (choose one):
+- [ ] **FREE** ($0/month) - Basic testing, no SSH
+- [ ] **Starter** ($7/month) - ⭐ Recommended for seeding scripts
+- [ ] **Standard** ($25/month) - Only if need more resources
+
+**Which Tier to Choose?**
+- [ ] Start with **FREE** if just testing API endpoints
+- [ ] Use **Starter** if you need to run seed script via SSH
+- [ ] Can upgrade/downgrade anytime in Render dashboard
 
 ### 2.2 Configure Environment Variables
 Copy from `.env.staging.example` and set in Render:
@@ -242,12 +276,25 @@ npx prisma migrate deploy
 
 ## Cost Summary
 
+**Budget Option** (FREE Backend):
 | Component | Monthly Cost |
 |-----------|-------------|
-| PostgreSQL Database | $7-15 |
+| PostgreSQL Database | $7 |
+| Backend Web Service | **$0** |
+| Admin Static Site | $0 |
+| **Total** | **$7/month** |
+
+**Recommended Option** (Starter Backend):
+| Component | Monthly Cost |
+|-----------|-------------|
+| PostgreSQL Database | $7 |
 | Backend Web Service | $7 |
-| Admin Static Site | Free |
-| **Total** | **$14-22/month** |
+| Admin Static Site | $0 |
+| **Total** | **$14/month** |
+
+**Limitations**:
+- FREE tier: No SSH (can't run seed scripts directly)
+- Starter tier: Full SSH access, zero-downtime deploys
 
 ---
 
