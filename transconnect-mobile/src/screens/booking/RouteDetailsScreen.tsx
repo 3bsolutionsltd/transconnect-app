@@ -43,8 +43,15 @@ export default function RouteDetailsScreen({ route, navigation }: any) {
       return;
     }
 
-    if (!routeData.departureTime || !routeData.operatorName) {
-      console.error('Invalid route data:', routeData);
+    // Validate critical fields exist
+    const hasOperatorInfo = routeData.operatorName || routeData.operator?.companyName;
+    if (!routeData.departureTime || !hasOperatorInfo) {
+      console.error('Invalid route data - missing critical fields:', {
+        hasDepartureTime: !!routeData.departureTime,
+        hasOperatorName: !!routeData.operatorName,
+        hasOperatorCompanyName: !!routeData.operator?.companyName,
+        routeData
+      });
       Alert.alert(
         'Error',
         'Invalid route data. Please try searching again.',
