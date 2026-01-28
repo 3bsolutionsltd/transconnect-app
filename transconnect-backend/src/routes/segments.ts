@@ -75,7 +75,7 @@ router.post('/route/:routeId', requireRole(['ADMIN', 'OPERATOR']), async (req: R
     // Check operator permission
     if (req.user?.role === 'OPERATOR') {
       const operator = await prisma.operator.findFirst({
-        where: { userId: req.user.userId },
+        where: { userId: req.user.id },
       });
 
       if (!operator || operator.id !== route.operatorId) {
@@ -129,7 +129,7 @@ router.patch('/:segmentId', requireRole(['ADMIN', 'OPERATOR']), async (req: Requ
     // Check operator permission
     if (req.user?.role === 'OPERATOR') {
       const operator = await prisma.operator.findFirst({
-        where: { userId: req.user.userId },
+        where: { userId: req.user.id },
       });
 
       if (!operator || operator.id !== segment.route.operatorId) {
@@ -197,7 +197,7 @@ router.post('/:segmentId/price-variation', requireRole(['ADMIN', 'OPERATOR']), a
     // Check operator permission
     if (req.user?.role === 'OPERATOR') {
       const operator = await prisma.operator.findFirst({
-        where: { userId: req.user.userId },
+        where: { userId: req.user.id },
       });
 
       if (!operator || operator.id !== segment.route.operatorId) {
@@ -259,7 +259,7 @@ router.patch('/variation/:variationId', requireRole(['ADMIN', 'OPERATOR']), asyn
     // Check operator permission
     if (req.user?.role === 'OPERATOR') {
       const operator = await prisma.operator.findFirst({
-        where: { userId: req.user.userId },
+        where: { userId: req.user.id },
       });
 
       if (!operator || operator.id !== variation.segment.route.operatorId) {

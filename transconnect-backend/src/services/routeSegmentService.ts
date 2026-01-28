@@ -276,7 +276,15 @@ export async function createRouteSegments(routeId: string, locations: {
   durationMinutes?: number;
   price: number;
 }[]) {
-  const segments = [];
+  const segments: Array<{
+    routeId: string;
+    segmentOrder: number;
+    fromLocation: string;
+    toLocation: string;
+    distanceKm?: number;
+    durationMinutes?: number;
+    basePrice: number;
+  }> = [];
   
   for (let i = 0; i < locations.length - 1; i++) {
     const from = locations[i];
