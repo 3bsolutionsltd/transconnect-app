@@ -2,7 +2,7 @@
   "expo": {
     "name": "TransConnect",
     "slug": "transconnect-mobile",
-    "version": "1.0.8",
+    "version": "1.0.9",
     "orientation": "portrait",
     "userInterfaceStyle": "automatic",
     "icon": "./assets/images/logo.png",
@@ -18,7 +18,7 @@
     "ios": {
       "supportsTablet": false,
       "bundleIdentifier": "com.transconnect.mobile",
-      "buildNumber": "1.0.8",
+      "buildNumber": "1.0.9",
       "infoPlist": {
         "NSCameraUsageDescription": "This app uses the camera to scan QR codes for ticket verification",
         "NSLocationWhenInUseUsageDescription": "This app uses your location to show nearby bus stops and routes",
@@ -31,7 +31,7 @@
         "backgroundColor": "#1E40AF"
       },
       "package": "com.transconnect.mobile",
-      "versionCode": 9,
+      "versionCode": 10,
       "permissions": [
         "CAMERA",
         "ACCESS_FINE_LOCATION",
