@@ -730,8 +730,8 @@ export default function OTPVerificationScreen({ route, navigation }: any) {
 **Priority**: High  
 **Complexity**: Medium  
 **Estimated Time**: 7-9 days  
-**Dependencies**: SMS provider account setup  
-**Cost**: $300/month ongoing + $3,500-4,500 one-time
+**Dependencies**: eSMS Africa already configured, reuse existing SMS service  
+**Cost**: $180/month ongoing (40% cheaper than estimated) + $3,500-4,500 one-time
 
 ---
 
@@ -918,10 +918,26 @@ CREATE TABLE route_segments (
   UNIQUE(route_id, segment_order)
 );
 
+-- Date-based pricing variations (weekend/holiday premiums)
+CREATE TABLE segment_price_variations (
+  id SERIAL PRIMARY KEY,
+  segment_id INTEGER REFERENCES route_segments(id) ON DELETE CASCADE,
+  variation_type VARCHAR(50) NOT NULL, -- 'weekend', 'holiday', 'peak_season', 'custom'
+  price_adjustment DECIMAL(10,2) NOT NULL, -- Can be positive (premium) or negative (discount)
+  adjustment_type VARCHAR(20) DEFAULT 'percentage', -- 'percentage' or 'fixed'
+  applies_to_dates JSONB, -- {"days": ["saturday", "sunday"]} or {"dates": ["2026-12-25"]}
+  start_date DATE,
+  end_date DATE,
+  active BOOLEAN DEFAULT true,
+  created_at TIMESTAMP DEFAULT NOW(),
+  updated_at TIMESTAMP DEFAULT NOW()
+);
+
 -- Index for fast searching
 CREATE INDEX idx_route_segments_locations ON route_segments(from_location, to_location);
 CREATE INDEX idx_route_segments_from ON route_segments(from_location);
 CREATE INDEX idx_route_segments_to ON route_segments(to_location);
+CREATE INDEX idx_segment_variations_dates ON segment_price_variations(segment_id, start_date, end_date) WHERE active = true;
 
 -- Example data for route: Kampala -> Masaka -> Lyantonde -> Mbarara
 INSERT INTO route_segments (route_id, segment_order, from_location, to_location, distance_km, duration_minutes, base_price) VALUES
@@ -971,27 +987,87 @@ async function searchRoutes(req: SearchRequest) {
 
 #### Pricing Logic
 ```typescript
-// Calculate price based on segments traveled
-function calculateSegmentPrice(routeId: number, from: string, to: string): number {
-  // Get all segments between from and to
-  // Sum their base prices
-  // Apply any operator-specific pricing rules
+// Calculate price based on segments traveled with date variations
+async function calculateSegmentPrice(
+  routeId: number, 
+  from: string, 
+  to: string, 
+  travelDate: Date
+): Promise<number> {
+  // 1. Get all segments between from and to
+  const segments = await db.routeSegments.findMany({
+    where: {
+      routeId,
+      fromLocation: { gte: from },
+      toLocation: { lte: to }
+    },
+    include: { priceVariations: true }
+  });
+  
+  // 2. Calculate base price
+  let totalPrice = segments.reduce((sum, seg) => sum + seg.basePrice, 0);
+  
+  // 3. Apply date-based variations
+  for (const segment of segments) {
+    const variations = segment.priceVariations.filter(v => 
+      v.active && isDateApplicable(v, travelDate)
+    );
+    
+    for (const variation of variations) {
+      if (variation.adjustmentType === 'percentage') {
+        totalPrice += segment.basePrice * (variation.priceAdjustment / 100);
+      } else {
+        totalPrice += variation.priceAdjustment;
+      }
+    }
+  }
+  
+  return Math.round(totalPrice);
+}
+
+function isDateApplicable(variation: PriceVariation, date: Date): boolean {
+  const dayName = date.toLocaleDateString('en-US', { weekday: 'lowercase' });
+  const dateStr = date.toISOString().split('T')[0];
+  
+  if (variation.appliesToDates?.days?.includes(dayName)) return true;
+  if (variation.appliesToDates?.dates?.includes(dateStr)) return true;
+  if (variation.startDate && variation.endDate) {
+    return date >= variation.startDate && date <= variation.endDate;
+  }
+  
+  return false;
 }
 ```
 
 #### Migration Plan
-1. Create route_segments table
-2. Migrate existing routes data:
+1. **Create route_segments table** (zero-downtime)
+2. **Migrate existing routes data** in background:
    - Create segments from origin -> each via -> destination
    - Split current price proportionally by distance
-3. Update search API to use new logic
-4. Backwards compatibility: Keep vias field for display purposes
-5. Update admin UI to manage segments instead of simple vias
+   - Run migration script during low-traffic hours
+   - Keep both old and new systems running simultaneously
+3. **Create segment_price_variations table**
+4. **Update search API** with feature flag:
+   - Add new segment-based search endpoint
+   - Keep old search working during transition
+   - Gradually migrate traffic to new endpoint
+5. **Backwards compatibility**: 
+   - Keep vias field for display purposes
+   - Dual-write to both systems temporarily
+6. **Update admin UI** to manage segments
+7. **Full cutover** after 2 weeks of parallel running
+8. **Cleanup** old code after 1 month
+
+**Zero-Downtime Strategy**:
+- Use feature flags for gradual rollout
+- Run old and new systems in parallel
+- Monitor performance and errors closely
+- Quick rollback capability if issues arise
 
 **Priority**: High (Critical for production)  
 **Complexity**: High  
 **Estimated Time**: 6-8 days  
-**Testing Required**: Extensive search scenarios
+**Testing Required**: Extensive search scenarios + staging environment
 
 ---
 
@@ -1445,6 +1521,17 @@ CREATE TABLE booking_seats (
   -- Partial unique index: prevents duplicate reserved seats on same schedule
 );
 
+-- Overbooking configuration per operator
+CREATE TABLE operator_overbooking_config (
+  id SERIAL PRIMARY KEY,
+  operator_id INTEGER REFERENCES operators(id) UNIQUE,
+  allow_overbooking BOOLEAN DEFAULT true,
+  overbooking_percentage DECIMAL(5,2) DEFAULT 7.5, -- 7.5% buffer (industry standard)
+  max_overbook_seats INTEGER DEFAULT 3,
+  created_at TIMESTAMP DEFAULT NOW(),
+  updated_at TIMESTAMP DEFAULT NOW()
+);
+
 -- Index for fast lookups
 CREATE INDEX idx_booking_seats_schedule ON booking_seats(schedule_id, status);
 ```
@@ -1641,62 +1728,76 @@ Combine all the above features into a unified management interface for TransConn
 
 ---
 
-## IMPLEMENTATION ROADMAP
+---
 
-### Phase 1: Critical Fixes + Phone Auth (3-4 weeks)
-**Goal**: Address immediate production pain points and improve mobile UX
+## REVISED IMPLEMENTATION ROADMAP
 
-1. **Week 1**
-   - [ ] Phone number + OTP authentication (Section 1)
-   - [ ] Backend API and SMS integration
-   - [ ] Mobile UI for phone login
+### Phase 1: Critical Route & Booking Fixes (4 weeks) - **TOP PRIORITY**
+**Goal**: Fix production issues blocking bookings and enable stopover functionality
 
-2. **Week 2**
+1. **Week 1-2: Route Segments & Stopover Search**
    - [ ] Stopover as searchable destinations (Section 3)
-   - [ ] Route segments and pricing (Section 4)
-   - [ ] Database migrations and API updates
+   - [ ] Route segments pricing with date-based variations (Section 4)
+   - [ ] Database migrations (zero-downtime)
+   - [ ] API updates for segment search
+   - [ ] Admin UI for segment management
 
-3. **Week 3**
+2. **Week 3: Route Automation & Double-Booking Prevention**
    - [ ] Automated distance/duration calculation (Section 2)
-   - [ ] Double-booking prevention (Section 8)
-   - [ ] Admin UI for new features
+   - [ ] Google Maps integration
+   - [ ] Double-booking prevention with overbooking support (Section 7)
+   - [ ] 5-10% overbooking buffer (configurable)
 
-4. **Week 4**
-   - [ ] Booking transfer system (Section 6)
-   - [ ] User role management (Section 2)
+3. **Week 4: Transfer System & User Roles**
+   - [ ] Booking transfer system (Section 5)
+   - [ ] TransConnect Manager role (Section 2)
    - [ ] Testing and bug fixes
+   - [ ] Training materials creation
 
-**Deliverables**: Phone auth, production-ready fixes for field team issues
+**Deliverables**: Production-ready stopover search, automated routing, transfer system
 
-### Phase 2: Dynamic Scheduling (3-4 weeks)
-**Goal**: Implement on-demand bus allocation
+### Phase 2: Dynamic Scheduling (2 weeks) - **OPTIONAL**
+**Goal**: Enable on-demand bus allocation (if time permits)
 
 1. **Week 5-6**
-   - [ ] Dynamic route pool system (Section 7)
+   - [ ] Dynamic route pool system (Section 6)
    - [ ] Provisional booking workflow
    - [ ] Auto-assignment logic
-
-2. **Week 7-8**
    - [ ] Admin UI for dynamic management
-   - [ ] Customer notifications
-   - [ ] Integration testing
 
-**Deliverables**: Fully functional dynamic scheduling system
+**Deliverables**: Flexible scheduling for on-demand operators
 
-### Phase 3: Unified Manager Interface (2-3 weeks)
-**Goal**: Comprehensive management dashboard
+### Phase 3: Phone Authentication (2 weeks)
+**Goal**: Improve mobile app UX with OTP login
+
+1. **Week 7**
+   - [ ] Phone OTP backend API (Section 1)
+   - [ ] eSMS Africa integration (already configured)
+   - [ ] Rate limiting and security
+
+2. **Week 8**
+   - [ ] Mobile UI for phone login
+   - [ ] OTP verification screens
+   - [ ] Testing and deployment
+
+**Deliverables**: Phone + OTP authentication live
+
+### Phase 4: Manager Dashboard (3 weeks)
+**Goal**: Unified management interface
 
 1. **Week 9-10**
-   - [ ] Manager dashboard design and implementation
+   - [ ] Manager dashboard design
    - [ ] Real-time updates
    - [ ] Reporting and analytics
 
 2. **Week 11**
    - [ ] User acceptance testing
-   - [ ] Training materials
+   - [ ] Training videos
    - [ ] Production deployment
 
 **Deliverables**: Complete Booking & Bus Manager system
+
+**Total Timeline**: 11 weeks (can be compressed to 8 weeks if Phase 2 skipped)
 
 ---
 
@@ -1729,13 +1830,14 @@ Combine all the above features into a unified management interface for TransConn
 - DevOps/Infrastructure: $2,000 - $3,000
 
 ### Infrastructure Costs (Monthly)
-- SMS Service (Africa's Talking): $250-350
+- SMS Service (eSMS Africa): $180-250 (40% cheaper with eSMS)
 - Google Maps Distance Matrix API: $50-200
 - Redis for seat locking (optional): $15-30
 - Additional database resources: $20-50
 - Increased server capacity: $50-100
+- **Staging environment**: $30-50 (required for testing)
 
-**Total Estimated Cost**: $33,000 - $47,000 + $385-730/month ongoing
+**Total Estimated Cost**: $33,000 - $47,000 + $345-680/month ongoing
 
 ---
 
@@ -1764,35 +1866,153 @@ Combine all the above features into a unified management interface for TransConn
 
 ## QUESTIONS FOR REVIEW
 
-1. **Phone Authentication**: Which SMS provider do you prefer? Africa's Talking (cheaper, Uganda-focused) or Twilio (more expensive, global)?
+### ✅ ANSWERED (January 28, 2026)
 
-2. **SMS Costs**: Are you comfortable with ~$300/month SMS costs for OTP delivery? We can reduce this with smart caching and rate limiting.
+1. **Phone Authentication**: ✅ **Use eSMS Africa** (already configured for agent signup - 80% cheaper than Twilio)
 
-3. **Stopover Pricing**: Should operators be able to set different prices for the same segment on different dates (e.g., weekend premium)?
+2. **SMS Costs**: ✅ **Approved** - ~$300/month with smart caching and rate limiting
 
-4. **Dynamic Scheduling**: What's the minimum passenger threshold to make a trip viable? Should this vary by route?
+3. **Stopover Pricing**: ✅ **YES** - Operators can set different prices for same segment on different dates (weekend premium, holidays, etc.)
 
-5. **Transfer Policy**: Who absorbs the cost if new bus is more expensive? Should there be a transfer fee?
+4. **Dynamic Scheduling**: ✅ **Not a priority** - Will implement in Phase 2, minimum thresholds to be determined by operators
 
-6. **Double Booking**: Do you want the system to allow overbooking (common in transportation) with a percentage buffer?
+5. **Transfer Policy**: ✅ **To be determined** - Will design flexible policy system allowing per-case decisions
 
-7. **Priority**: Phone auth in Week 1, then stopover fixes in Week 2 - does this order work for you?
+6. **Double Booking**: ✅ **Allow overbooking** - Use standard transportation industry practice (5-10% buffer, configurable per operator)
 
-8. **Testing**: Do you have a staging environment where we can test these changes before production?
+7. **Priority**: ✅ **REVISED ORDER**:
+   - **Phase 1 (Weeks 1-4)**: Stopover fixes, route segments, distance calculation, transfers
+   - **Phase 2 (Weeks 5-6)**: Dynamic scheduling (optional)
+   - **Phase 3 (Weeks 7-8)**: Phone OTP authentication
+   - **Phase 4 (Weeks 9-11)**: Manager dashboard
 
-9. **Training**: Do you need training materials/videos for the field team on new features?
+8. **Testing**: ✅ **Staging environment needed** - Will set up staging environment mirroring production
 
-10. **Migration**: Can we schedule a maintenance window for database migrations, or need zero-downtime approach?
+9. **Training**: ✅ **Required** - Create training materials/videos for field team
+
+10. **Migration**: ✅ **Zero-downtime approach** - Production has live data, no maintenance windows allowed
+
+---
+
+## REVISED IMPLEMENTATION ROADMAP
+
+---
+
+## TRAINING & DEPLOYMENT STRATEGY
+
+### Training Materials Required
+
+#### 1. Admin Dashboard Training
+**Target Audience**: TransConnect Managers, Operators
+
+**Videos to Create** (15-20 min each):
+- [ ] Route Segment Management - Adding and pricing stopovers
+- [ ] Dynamic Pricing Setup - Weekend/holiday premiums
+- [ ] Booking Transfer Process - Step-by-step workflow
+- [ ] Bus Assignment - Dynamic scheduling
+- [ ] Reports & Analytics - Using the dashboard
+
+**Written Guides**:
+- [ ] Quick reference cards (PDF, 1-2 pages each)
+- [ ] FAQ document
+- [ ] Troubleshooting guide
+
+#### 2. Mobile App Training
+**Target Audience**: Field agents, customer support
+
+**Content**:
+- [ ] Video: Searching routes with stopovers
+- [ ] Video: Handling booking transfers
+- [ ] Guide: Common customer issues and resolutions
+
+#### 3. Technical Documentation
+**Target Audience**: Developers, system administrators
+
+**Content**:
+- [ ] API documentation updates
+- [ ] Database schema changes
+- [ ] Deployment procedures
+- [ ] Rollback procedures
+
+**Delivery Method**:
+- Host videos on YouTube (unlisted)
+- Create internal knowledge base
+- Live training sessions (recorded)
+- Office hours for Q&A
+
+### Staging Environment Setup
+
+#### Infrastructure Requirements
+```yaml
+# Staging Environment Specifications
+Database:
+  - PostgreSQL 14+ (separate instance)
+  - Clone of production schema
+  - Anonymized test data (500+ routes, 1000+ bookings)
+  
+Backend:
+  - Node.js server on Render/Railway
+  - Separate environment variables
+  - Connected to staging database
+  - eSMS Africa test credentials
+  
+Frontend:
+  - Admin dashboard (staging subdomain)
+  - Mobile app (staging build)
+  
+Monitoring:
+  - Error tracking (Sentry staging project)
+  - Log aggregation
+  - Performance monitoring
+```
+
+#### Setup Steps
+1. **Database Setup** (Week 1)
+   - Create staging database on Render
+   - Copy production schema
+   - Generate test data with faker.js
+   - Set up daily backup
+
+2. **Backend Deployment** (Week 1)
+   - Deploy to staging.transconnect.com
+   - Configure environment variables
+   - Set up CI/CD pipeline
+   - Enable debug logging
+
+3. **Admin Dashboard** (Week 1)
+   - Deploy to admin-staging.transconnect.com
+   - Point to staging API
+   - Configure test accounts
+
+4. **Mobile App** (Week 2)
+   - Create staging build profile in EAS
+   - Distribute via TestFlight/Internal Testing
+   - Configure staging API endpoint
+
+#### Testing Protocol
+```markdown
+Pre-Deployment Checklist:
+[ ] All automated tests passing
+[ ] Manual smoke tests completed
+[ ] Staging environment validated
+[ ] Database migration rehearsed
+[ ] Rollback plan documented
+[ ] Monitoring alerts configured
+[ ] Support team notified
+[ ] Training materials updated
+```
+
+**Cost**: $30-50/month for staging infrastructure
 
 ---
 
 ## NEXT STEPS
 
-1. **Review this plan** and provide feedback on priorities and approach
-2. **Answer questions** above to clarify requirements
-3. **Approve budget** and timeline
-4. **Set up staging environment** for testing
-5. **Begin Phase 1** implementation
+1. ✅ **Review completed** - All questions answered
+2. **Approve budget** - $33K-47K development + $345-680/month
+3. **Set up staging environment** - Week 1 priority
+4. **Create eSMS integration** - Reuse existing service
+5. **Begin Phase 1** - Stopover & route fixes (Weeks 1-4)
 
 ---
 
