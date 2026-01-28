@@ -62,14 +62,680 @@ if (!routeData.departureTime || !hasOperatorInfo) {
 ## Executive Summary
 
 This document outlines solutions for critical operational issues identified by the field team during production deployment. The enhancements focus on:
-1. Enhanced user role management
-2. Intelligent route and pricing management
-3. Dynamic booking and transfer system
-4. Robust seat inventory management
+1. **Simplified mobile authentication** (Phone + OTP login)
+2. Enhanced user role management
+3. Intelligent route and pricing management
+4. Dynamic booking and transfer system
+5. Robust seat inventory management
 
 ---
 
-## 1. USER MANAGEMENT ENHANCEMENT
+## 1. MOBILE APP: PHONE NUMBER + OTP AUTHENTICATION
+
+### Problem
+Current email/password login creates friction for mobile users:
+- Users forget passwords frequently
+- Email verification delays onboarding
+- Poor user experience on mobile
+- Low conversion rate from download to booking
+
+### Proposed Solution
+Implement **Phone Number + OTP (One-Time Password)** authentication as the primary mobile login method.
+
+#### Benefits
+- ✅ Faster onboarding (no password to remember)
+- ✅ Better security (time-limited OTPs)
+- ✅ Reduced support tickets (no "forgot password" issues)
+- ✅ Instant verification (SMS delivery in seconds)
+- ✅ Better mobile UX (native phone input)
+- ✅ Higher conversion rates
+
+#### User Flow
+```
+1. User enters phone number (+256 XXX XXX XXX)
+2. System generates 6-digit OTP
+3. SMS sent to user's phone
+4. User enters OTP within 5 minutes
+5. System validates and logs in user
+6. JWT token issued (30-day expiry)
+```
+
+#### Database Schema Changes
+
+```sql
+-- Add phone authentication fields to users table
+ALTER TABLE users ADD COLUMN phone_number VARCHAR(20) UNIQUE;
+ALTER TABLE users ADD COLUMN phone_verified BOOLEAN DEFAULT false;
+ALTER TABLE users ADD COLUMN phone_verified_at TIMESTAMP;
+ALTER TABLE users ADD COLUMN auth_method VARCHAR(50) DEFAULT 'email'; -- 'email', 'phone', 'both'
+
+-- Create OTP storage table
+CREATE TABLE otp_codes (
+  id SERIAL PRIMARY KEY,
+  phone_number VARCHAR(20) NOT NULL,
+  otp_code VARCHAR(6) NOT NULL,
+  purpose VARCHAR(50) NOT NULL, -- 'login', 'registration', 'verification'
+  expires_at TIMESTAMP NOT NULL,
+  used_at TIMESTAMP,
+  attempts INTEGER DEFAULT 0,
+  ip_address VARCHAR(45),
+  user_agent TEXT,
+  created_at TIMESTAMP DEFAULT NOW(),
+  INDEX idx_phone_otp (phone_number, otp_code, expires_at),
+  INDEX idx_expires_at (expires_at)
+);
+
+-- Create phone login attempts tracking (rate limiting)
+CREATE TABLE phone_auth_attempts (
+  id SERIAL PRIMARY KEY,
+  phone_number VARCHAR(20) NOT NULL,
+  attempt_type VARCHAR(50) NOT NULL, -- 'otp_request', 'otp_verify'
+  success BOOLEAN DEFAULT false,
+  ip_address VARCHAR(45),
+  created_at TIMESTAMP DEFAULT NOW(),
+  INDEX idx_phone_attempts (phone_number, created_at)
+);
+
+-- Make email optional for phone-authenticated users
+ALTER TABLE users ALTER COLUMN email DROP NOT NULL;
+ALTER TABLE users ADD CONSTRAINT check_auth_method 
+  CHECK (
+    (auth_method = 'email' AND email IS NOT NULL) OR
+    (auth_method = 'phone' AND phone_number IS NOT NULL) OR
+    (auth_method = 'both' AND email IS NOT NULL AND phone_number IS NOT NULL)
+  );
+```
+
+#### Backend API Endpoints
+
+**1. Request OTP**
+```typescript
+// POST /api/auth/request-otp
+interface RequestOTPRequest {
+  phoneNumber: string; // Format: +256XXXXXXXXX
+  purpose: 'login' | 'registration';
+}
+
+interface RequestOTPResponse {
+  success: boolean;
+  message: string;
+  expiresIn: number; // seconds
+  retryAfter?: number; // seconds (if rate limited)
+}
+
+async function requestOTP(req: RequestOTPRequest): Promise<RequestOTPResponse> {
+  // 1. Validate phone number format
+  const cleaned = cleanPhoneNumber(req.phoneNumber);
+  if (!isValidUgandaPhoneNumber(cleaned)) {
+    throw new Error('Invalid phone number format');
+  }
+  
+  // 2. Check rate limiting (max 3 OTPs per 10 minutes)
+  const recentAttempts = await db.phoneAuthAttempts.count({
+    where: {
+      phoneNumber: cleaned,
+      attemptType: 'otp_request',
+      createdAt: { gte: new Date(Date.now() - 10 * 60 * 1000) }
+    }
+  });
+  
+  if (recentAttempts >= 3) {
+    return {
+      success: false,
+      message: 'Too many requests. Please try again later.',
+      expiresIn: 0,
+      retryAfter: 600 - Math.floor((Date.now() - lastAttempt) / 1000)
+    };
+  }
+  
+  // 3. Generate 6-digit OTP
+  const otp = generateOTP(); // Random 6-digit number
+  
+  // 4. Store OTP (expires in 5 minutes)
+  await db.otpCodes.create({
+    phoneNumber: cleaned,
+    otpCode: otp,
+    purpose: req.purpose,
+    expiresAt: new Date(Date.now() + 5 * 60 * 1000),
+    ipAddress: req.ip,
+    userAgent: req.userAgent
+  });
+  
+  // 5. Send SMS via provider
+  await smsService.sendOTP(cleaned, otp);
+  
+  // 6. Log attempt
+  await db.phoneAuthAttempts.create({
+    phoneNumber: cleaned,
+    attemptType: 'otp_request',
+    success: true,
+    ipAddress: req.ip
+  });
+  
+  return {
+    success: true,
+    message: 'OTP sent successfully',
+    expiresIn: 300
+  };
+}
+```
+
+**2. Verify OTP & Login**
+```typescript
+// POST /api/auth/verify-otp
+interface VerifyOTPRequest {
+  phoneNumber: string;
+  otpCode: string;
+}
+
+interface VerifyOTPResponse {
+  success: boolean;
+  token?: string;
+  expiresIn?: number;
+  user?: {
+    id: number;
+    phoneNumber: string;
+    name?: string;
+    isNewUser: boolean;
+  };
+  message?: string;
+}
+
+async function verifyOTP(req: VerifyOTPRequest): Promise<VerifyOTPResponse> {
+  const cleaned = cleanPhoneNumber(req.phoneNumber);
+  
+  // 1. Check rate limiting (max 5 verification attempts per 10 minutes)
+  const verifyAttempts = await db.phoneAuthAttempts.count({
+    where: {
+      phoneNumber: cleaned,
+      attemptType: 'otp_verify',
+      createdAt: { gte: new Date(Date.now() - 10 * 60 * 1000) }
+    }
+  });
+  
+  if (verifyAttempts >= 5) {
+    return {
+      success: false,
+      message: 'Too many failed attempts. Please request a new OTP.'
+    };
+  }
+  
+  // 2. Find valid OTP
+  const otpRecord = await db.otpCodes.findFirst({
+    where: {
+      phoneNumber: cleaned,
+      otpCode: req.otpCode,
+      expiresAt: { gte: new Date() },
+      usedAt: null
+    },
+    orderBy: { createdAt: 'desc' }
+  });
+  
+  if (!otpRecord) {
+    await db.phoneAuthAttempts.create({
+      phoneNumber: cleaned,
+      attemptType: 'otp_verify',
+      success: false,
+      ipAddress: req.ip
+    });
+    
+    return {
+      success: false,
+      message: 'Invalid or expired OTP. Please try again.'
+    };
+  }
+  
+  // 3. Mark OTP as used
+  await db.otpCodes.update({
+    where: { id: otpRecord.id },
+    data: { usedAt: new Date() }
+  });
+  
+  // 4. Find or create user
+  let user = await db.users.findUnique({
+    where: { phoneNumber: cleaned }
+  });
+  
+  const isNewUser = !user;
+  
+  if (!user) {
+    // Create new user with phone authentication
+    user = await db.users.create({
+      data: {
+        phoneNumber: cleaned,
+        phoneVerified: true,
+        phoneVerifiedAt: new Date(),
+        authMethod: 'phone',
+        role: 'customer'
+      }
+    });
+  } else {
+    // Update existing user
+    await db.users.update({
+      where: { id: user.id },
+      data: {
+        phoneVerified: true,
+        phoneVerifiedAt: new Date()
+      }
+    });
+  }
+  
+  // 5. Generate JWT token (30-day expiry)
+  const token = jwt.sign(
+    { userId: user.id, phoneNumber: cleaned },
+    process.env.JWT_SECRET!,
+    { expiresIn: '30d' }
+  );
+  
+  // 6. Log successful attempt
+  await db.phoneAuthAttempts.create({
+    phoneNumber: cleaned,
+    attemptType: 'otp_verify',
+    success: true,
+    ipAddress: req.ip
+  });
+  
+  return {
+    success: true,
+    token,
+    expiresIn: 30 * 24 * 60 * 60, // 30 days in seconds
+    user: {
+      id: user.id,
+      phoneNumber: cleaned,
+      name: user.name,
+      isNewUser
+    }
+  };
+}
+```
+
+**3. Helper Functions**
+```typescript
+function cleanPhoneNumber(phone: string): string {
+  // Remove spaces, dashes, parentheses
+  let cleaned = phone.replace(/[\s\-\(\)]/g, '');
+  
+  // Handle Uganda formats
+  if (cleaned.startsWith('0')) {
+    cleaned = '+256' + cleaned.substring(1);
+  } else if (cleaned.startsWith('256')) {
+    cleaned = '+' + cleaned;
+  } else if (!cleaned.startsWith('+')) {
+    cleaned = '+256' + cleaned;
+  }
+  
+  return cleaned;
+}
+
+function isValidUgandaPhoneNumber(phone: string): boolean {
+  // Uganda format: +256 7XX XXX XXX or +256 3XX XXX XXX
+  const regex = /^\+256[73]\d{8}$/;
+  return regex.test(phone);
+}
+
+function generateOTP(): string {
+  return Math.floor(100000 + Math.random() * 900000).toString();
+}
+```
+
+#### SMS Service Integration
+
+**Option 1: Africa's Talking (Recommended for Uganda)**
+```typescript
+// src/services/sms.ts
+import africastalking from 'africastalking';
+
+const client = africastalking({
+  apiKey: process.env.AFRICAS_TALKING_API_KEY!,
+  username: process.env.AFRICAS_TALKING_USERNAME!
+});
+
+const sms = client.SMS;
+
+export const smsService = {
+  async sendOTP(phoneNumber: string, otp: string): Promise<void> {
+    try {
+      const message = `Your TransConnect verification code is: ${otp}. Valid for 5 minutes. Do not share this code.`;
+      
+      const result = await sms.send({
+        to: [phoneNumber],
+        message,
+        from: 'TransConnect' // Sender ID (requires registration)
+      });
+      
+      console.log('SMS sent:', result);
+      
+      if (result.SMSMessageData.Recipients[0].status !== 'Success') {
+        throw new Error('Failed to send SMS');
+      }
+    } catch (error) {
+      console.error('SMS sending failed:', error);
+      throw error;
+    }
+  }
+};
+```
+
+**Cost Estimate**: ~$0.01 per SMS in Uganda
+
+**Alternative Providers**:
+- Twilio (more expensive, ~$0.05 per SMS)
+- Nexmo/Vonage
+- Infobip
+
+#### Mobile App Implementation
+
+**1. Phone Input Screen**
+```typescript
+// src/screens/auth/PhoneLoginScreen.tsx
+import React, { useState } from 'react';
+import { View, Text, TextInput, TouchableOpacity, Alert } from 'react-native';
+import { authApi } from '../../services/api';
+
+export default function PhoneLoginScreen({ navigation }: any) {
+  const [phoneNumber, setPhoneNumber] = useState('');
+  const [loading, setLoading] = useState(false);
+
+  const handleRequestOTP = async () => {
+    if (!phoneNumber || phoneNumber.length < 9) {
+      Alert.alert('Error', 'Please enter a valid phone number');
+      return;
+    }
+
+    setLoading(true);
+    try {
+      const response = await authApi.requestOTP({
+        phoneNumber: phoneNumber.startsWith('0') ? phoneNumber : '0' + phoneNumber,
+        purpose: 'login'
+      });
+
+      if (response.data.success) {
+        navigation.navigate('OTPVerification', { phoneNumber });
+      } else {
+        Alert.alert('Error', response.data.message);
+      }
+    } catch (error: any) {
+      Alert.alert('Error', error.response?.data?.message || 'Failed to send OTP');
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  return (
+    <View style={styles.container}>
+      <Text style={styles.title}>Welcome to TransConnect</Text>
+      <Text style={styles.subtitle}>Enter your phone number to continue</Text>
+      
+      <View style={styles.phoneInputContainer}>
+        <Text style={styles.countryCode}>+256</Text>
+        <TextInput
+          style={styles.phoneInput}
+          placeholder="7XX XXX XXX"
+          keyboardType="phone-pad"
+          maxLength={9}
+          value={phoneNumber}
+          onChangeText={setPhoneNumber}
+          autoFocus
+        />
+      </View>
+      
+      <TouchableOpacity 
+        style={[styles.button, loading && styles.buttonDisabled]}
+        onPress={handleRequestOTP}
+        disabled={loading}
+      >
+        <Text style={styles.buttonText}>
+          {loading ? 'Sending...' : 'Get OTP'}
+        </Text>
+      </TouchableOpacity>
+      
+      <TouchableOpacity onPress={() => navigation.navigate('EmailLogin')}>
+        <Text style={styles.linkText}>Login with email instead</Text>
+      </TouchableOpacity>
+    </View>
+  );
+}
+```
+
+**2. OTP Verification Screen**
+```typescript
+// src/screens/auth/OTPVerificationScreen.tsx
+import React, { useState, useEffect, useRef } from 'react';
+import { View, Text, TextInput, TouchableOpacity, Alert } from 'react-native';
+import { useAuth } from '../../contexts/AuthContext';
+import { authApi } from '../../services/api';
+
+export default function OTPVerificationScreen({ route, navigation }: any) {
+  const { phoneNumber } = route.params;
+  const { login } = useAuth();
+  const [otp, setOtp] = useState(['', '', '', '', '', '']);
+  const [loading, setLoading] = useState(false);
+  const [countdown, setCountdown] = useState(300); // 5 minutes
+  const inputRefs = useRef<Array<TextInput | null>>([]);
+
+  useEffect(() => {
+    const timer = setInterval(() => {
+      setCountdown(prev => (prev > 0 ? prev - 1 : 0));
+    }, 1000);
+    return () => clearInterval(timer);
+  }, []);
+
+  const handleOTPChange = (index: number, value: string) => {
+    if (value.length > 1) return; // Prevent multiple digits
+    
+    const newOtp = [...otp];
+    newOtp[index] = value;
+    setOtp(newOtp);
+
+    // Auto-focus next input
+    if (value && index < 5) {
+      inputRefs.current[index + 1]?.focus();
+    }
+
+    // Auto-submit when all 6 digits entered
+    if (index === 5 && value) {
+      handleVerifyOTP(newOtp.join(''));
+    }
+  };
+
+  const handleKeyPress = (index: number, key: string) => {
+    if (key === 'Backspace' && !otp[index] && index > 0) {
+      inputRefs.current[index - 1]?.focus();
+    }
+  };
+
+  const handleVerifyOTP = async (otpCode?: string) => {
+    const code = otpCode || otp.join('');
+    
+    if (code.length !== 6) {
+      Alert.alert('Error', 'Please enter the 6-digit code');
+      return;
+    }
+
+    setLoading(true);
+    try {
+      const response = await authApi.verifyOTP({
+        phoneNumber,
+        otpCode: code
+      });
+
+      if (response.data.success) {
+        await login(response.data.token, response.data.user);
+        
+        if (response.data.user.isNewUser) {
+          navigation.replace('CompleteProfile');
+        } else {
+          navigation.replace('Main');
+        }
+      } else {
+        Alert.alert('Error', response.data.message);
+        setOtp(['', '', '', '', '', '']);
+        inputRefs.current[0]?.focus();
+      }
+    } catch (error: any) {
+      Alert.alert('Error', error.response?.data?.message || 'Invalid OTP');
+      setOtp(['', '', '', '', '', '']);
+      inputRefs.current[0]?.focus();
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleResendOTP = async () => {
+    try {
+      await authApi.requestOTP({ phoneNumber, purpose: 'login' });
+      setCountdown(300);
+      setOtp(['', '', '', '', '', '']);
+      Alert.alert('Success', 'New OTP sent to your phone');
+    } catch (error) {
+      Alert.alert('Error', 'Failed to resend OTP');
+    }
+  };
+
+  return (
+    <View style={styles.container}>
+      <Text style={styles.title}>Enter Verification Code</Text>
+      <Text style={styles.subtitle}>
+        We sent a code to {phoneNumber}
+      </Text>
+
+      <View style={styles.otpContainer}>
+        {otp.map((digit, index) => (
+          <TextInput
+            key={index}
+            ref={ref => inputRefs.current[index] = ref}
+            style={styles.otpInput}
+            value={digit}
+            onChangeText={value => handleOTPChange(index, value)}
+            onKeyPress={({ nativeEvent }) => handleKeyPress(index, nativeEvent.key)}
+            keyboardType="number-pad"
+            maxLength={1}
+            selectTextOnFocus
+          />
+        ))}
+      </View>
+
+      <Text style={styles.timer}>
+        {Math.floor(countdown / 60)}:{(countdown % 60).toString().padStart(2, '0')}
+      </Text>
+
+      <TouchableOpacity 
+        style={styles.resendButton}
+        onPress={handleResendOTP}
+        disabled={countdown > 0}
+      >
+        <Text style={[styles.resendText, countdown > 0 && styles.resendDisabled]}>
+          Resend OTP
+        </Text>
+      </TouchableOpacity>
+
+      <TouchableOpacity onPress={() => navigation.goBack()}>
+        <Text style={styles.changeNumber}>Change phone number</Text>
+      </TouchableOpacity>
+    </View>
+  );
+}
+```
+
+#### Security Considerations
+
+1. **Rate Limiting**
+   - Max 3 OTP requests per 10 minutes per phone
+   - Max 5 verification attempts per 10 minutes per phone
+   - IP-based rate limiting for additional protection
+
+2. **OTP Expiry**
+   - OTPs expire after 5 minutes
+   - One-time use only (marked as used after verification)
+
+3. **Brute Force Protection**
+   - Lock account after 10 failed attempts in 1 hour
+   - Require longer cooldown period after multiple failures
+
+4. **SMS Delivery Monitoring**
+   - Log all SMS attempts
+   - Alert on high failure rates
+   - Monitor costs and usage
+
+5. **Privacy**
+   - Mask phone numbers in logs (show only last 4 digits)
+   - Don't expose OTP codes in API responses
+   - Secure SMS provider credentials
+
+#### Testing Plan
+
+**Unit Tests**
+- Phone number validation
+- OTP generation
+- Rate limiting logic
+- Token generation
+
+**Integration Tests**
+- OTP request flow
+- OTP verification flow
+- Rate limit enforcement
+- SMS provider integration
+
+**Manual Testing Checklist**
+- [ ] Valid Uganda phone numbers (both formats)
+- [ ] Invalid phone numbers rejected
+- [ ] OTP received via SMS within 30 seconds
+- [ ] Correct OTP allows login
+- [ ] Incorrect OTP rejected
+- [ ] Expired OTP rejected
+- [ ] Rate limiting works after 3 requests
+- [ ] Resend OTP functionality
+- [ ] New user registration flow
+- [ ] Existing user login flow
+
+#### Migration Strategy
+
+**Phase 1: Add Phone Auth Alongside Email**
+- Deploy backend changes
+- Keep email login as default
+- Add "Login with Phone" option
+
+**Phase 2: Make Phone Auth Primary**
+- Update mobile app to show phone login first
+- Email login available as "Other options"
+
+**Phase 3: Migrate Existing Users**
+- Prompt existing email users to add phone number
+- Offer incentive (e.g., first ride discount)
+- Send push notification campaign
+
+**Phase 4: Analytics & Optimization**
+- Track adoption rates
+- Monitor SMS delivery success
+- Optimize based on user feedback
+
+#### Cost Analysis
+
+**SMS Costs (Africa's Talking - Uganda)**
+- Per SMS: ~UGX 38 ($0.01)
+- Expected volume: 1000 logins/day = UGX 38,000/day
+- Monthly: ~UGX 1,140,000 ($300)
+
+**Development Costs**
+- Backend API: 3-4 days
+- Mobile UI: 2-3 days
+- Testing: 2 days
+- Total: ~7-9 days ($3,500 - $4,500)
+
+**ROI**
+- Reduced support tickets: -50% password-related issues
+- Faster onboarding: +30% conversion rate
+- Better user experience: +20% retention
+
+**Priority**: High  
+**Complexity**: Medium  
+**Estimated Time**: 7-9 days  
+**Dependencies**: SMS provider account setup  
+**Cost**: $300/month ongoing + $3,500-4,500 one-time
+
+---
+
+## 2. USER MANAGEMENT ENHANCEMENT
 
 ### Problem
 Admin role is being used for both system administrators and TransConnect operational managers, creating security and permission concerns.
@@ -977,35 +1643,40 @@ Combine all the above features into a unified management interface for TransConn
 
 ## IMPLEMENTATION ROADMAP
 
-### Phase 1: Critical Fixes (2-3 weeks)
-**Goal**: Address immediate production pain points
+### Phase 1: Critical Fixes + Phone Auth (3-4 weeks)
+**Goal**: Address immediate production pain points and improve mobile UX
 
 1. **Week 1**
+   - [ ] Phone number + OTP authentication (Section 1)
+   - [ ] Backend API and SMS integration
+   - [ ] Mobile UI for phone login
+
+2. **Week 2**
    - [ ] Stopover as searchable destinations (Section 3)
    - [ ] Route segments and pricing (Section 4)
    - [ ] Database migrations and API updates
 
-2. **Week 2**
+3. **Week 3**
    - [ ] Automated distance/duration calculation (Section 2)
-   - [ ] Double-booking prevention (Section 7)
+   - [ ] Double-booking prevention (Section 8)
    - [ ] Admin UI for new features
 
-3. **Week 3**
-   - [ ] Booking transfer system (Section 5)
-   - [ ] User role management (Section 1)
+4. **Week 4**
+   - [ ] Booking transfer system (Section 6)
+   - [ ] User role management (Section 2)
    - [ ] Testing and bug fixes
 
-**Deliverables**: Production-ready fixes for field team issues
+**Deliverables**: Phone auth, production-ready fixes for field team issues
 
 ### Phase 2: Dynamic Scheduling (3-4 weeks)
 **Goal**: Implement on-demand bus allocation
 
-1. **Week 4-5**
-   - [ ] Dynamic route pool system (Section 6)
+1. **Week 5-6**
+   - [ ] Dynamic route pool system (Section 7)
    - [ ] Provisional booking workflow
    - [ ] Auto-assignment logic
 
-2. **Week 6-7**
+2. **Week 7-8**
    - [ ] Admin UI for dynamic management
    - [ ] Customer notifications
    - [ ] Integration testing
@@ -1015,12 +1686,12 @@ Combine all the above features into a unified management interface for TransConn
 ### Phase 3: Unified Manager Interface (2-3 weeks)
 **Goal**: Comprehensive management dashboard
 
-1. **Week 8-9**
+1. **Week 9-10**
    - [ ] Manager dashboard design and implementation
    - [ ] Real-time updates
    - [ ] Reporting and analytics
 
-2. **Week 10**
+2. **Week 11**
    - [ ] User acceptance testing
    - [ ] Training materials
    - [ ] Production deployment
@@ -1053,17 +1724,18 @@ Combine all the above features into a unified management interface for TransConn
 ## COST ESTIMATES
 
 ### Development Costs
-- Senior Developer (8-10 weeks): ~$20,000 - $30,000
-- QA Testing (2-3 weeks): ~$5,000 - $8,000
-- DevOps/Infrastructure: ~$2,000 - $3,000
+- Senior Developer (11-12 weeks): $25,000 - $35,000
+- QA Testing (3 weeks): $6,000 - $9,000
+- DevOps/Infrastructure: $2,000 - $3,000
 
 ### Infrastructure Costs (Monthly)
-- Google Maps Distance Matrix API: ~$50-200 (depends on usage)
-- Redis for seat locking (optional): ~$15-30
-- Additional database resources: ~$20-50
-- Increased server capacity: ~$50-100
+- SMS Service (Africa's Talking): $250-350
+- Google Maps Distance Matrix API: $50-200
+- Redis for seat locking (optional): $15-30
+- Additional database resources: $20-50
+- Increased server capacity: $50-100
 
-**Total Estimated Cost**: $27,000 - $41,000 + $135-380/month ongoing
+**Total Estimated Cost**: $33,000 - $47,000 + $385-730/month ongoing
 
 ---
 
@@ -1092,21 +1764,25 @@ Combine all the above features into a unified management interface for TransConn
 
 ## QUESTIONS FOR REVIEW
 
-1. **Stopover Pricing**: Should operators be able to set different prices for the same segment on different dates (e.g., weekend premium)?
+1. **Phone Authentication**: Which SMS provider do you prefer? Africa's Talking (cheaper, Uganda-focused) or Twilio (more expensive, global)?
 
-2. **Dynamic Scheduling**: What's the minimum passenger threshold to make a trip viable? Should this vary by route?
+2. **SMS Costs**: Are you comfortable with ~$300/month SMS costs for OTP delivery? We can reduce this with smart caching and rate limiting.
 
-3. **Transfer Policy**: Who absorbs the cost if new bus is more expensive? Should there be a transfer fee?
+3. **Stopover Pricing**: Should operators be able to set different prices for the same segment on different dates (e.g., weekend premium)?
 
-4. **Double Booking**: Do you want the system to allow overbooking (common in transportation) with a percentage buffer?
+4. **Dynamic Scheduling**: What's the minimum passenger threshold to make a trip viable? Should this vary by route?
 
-5. **Priority**: Should we tackle these in the order presented, or would you like to prioritize differently based on field urgency?
+5. **Transfer Policy**: Who absorbs the cost if new bus is more expensive? Should there be a transfer fee?
 
-6. **Testing**: Do you have a staging environment where we can test these changes before production?
+6. **Double Booking**: Do you want the system to allow overbooking (common in transportation) with a percentage buffer?
 
-7. **Training**: Do you need training materials/videos for the field team on new features?
+7. **Priority**: Phone auth in Week 1, then stopover fixes in Week 2 - does this order work for you?
 
-8. **Migration**: Can we schedule a maintenance window for database migrations, or need zero-downtime approach?
+8. **Testing**: Do you have a staging environment where we can test these changes before production?
+
+9. **Training**: Do you need training materials/videos for the field team on new features?
+
+10. **Migration**: Can we schedule a maintenance window for database migrations, or need zero-downtime approach?
 
 ---
 
