@@ -62,21 +62,21 @@ export async function searchRoutesWithSegments(
         r.id as route_id,
         r.origin,
         r.destination,
-        r.departure_time,
-        r.operator_id,
-        r.bus_id,
-        rs1.from_location as pickup,
-        rs2.to_location as dropoff,
-        rs1.segment_order as start_order,
-        rs2.segment_order as end_order
+        r."departureTime",
+        r."operatorId",
+        r."busId",
+        rs1."fromLocation" as pickup,
+        rs2."toLocation" as dropoff,
+        rs1."segmentOrder" as start_order,
+        rs2."segmentOrder" as end_order
       FROM routes r
-      JOIN route_segments rs1 ON rs1.route_id = r.id
-      JOIN route_segments rs2 ON rs2.route_id = r.id
+      JOIN route_segments rs1 ON rs1."routeId" = r.id
+      JOIN route_segments rs2 ON rs2."routeId" = r.id
       WHERE r.active = true
-        AND r.segment_enabled = true
-        AND rs1.from_location ILIKE ${`%${origin}%`}
-        AND rs2.to_location ILIKE ${`%${destination}%`}
-        AND rs1.segment_order <= rs2.segment_order
+        AND r."segmentEnabled" = true
+        AND rs1."fromLocation" ILIKE ${`%${origin}%`}
+        AND rs2."toLocation" ILIKE ${`%${destination}%`}
+        AND rs1."segmentOrder" <= rs2."segmentOrder"
     )
     SELECT * FROM route_connections
     ORDER BY route_id;
