@@ -1,10 +1,46 @@
 import { Router, Request, Response } from 'express';
 import { prisma } from '../index';
 import { authenticateToken } from '../middleware/auth';
+import { searchRoutesWithSegments } from '../services/routeSegmentService';
 
 const router = Router();
 
-// Get all routes with optional filtering
+// NEW: Segment-based route search (supports stopovers as origin/destination)
+router.get('/search-segments', async (req: Request, res: Response) => {
+  try {
+    const { origin, destination, date } = req.query;
+
+    if (!origin || !destination) {
+      return res.status(400).json({
+        error: 'Origin and destination are required',
+      });
+    }
+
+    console.log('Segment search:', { origin, destination, date });
+
+    const travelDate = date ? new Date(date as string) : undefined;
+    const results = await searchRoutesWithSegments({
+      origin: origin as string,
+      destination: destination as string,
+      date: travelDate,
+    });
+
+    return res.json({
+      success: true,
+      count: results.length,
+      results,
+      searchParams: { origin, destination, date },
+    });
+  } catch (error: any) {
+    console.error('Segment search error:', error);
+    return res.status(500).json({
+      error: 'Failed to search routes',
+      message: error.message,
+    });
+  }
+});
+
+// Get all routes with optional filtering (legacy endpoint - kept for backward compatibility)
 router.get('/', async (req: Request, res: Response) => {
   try {
     const { origin, destination, travelDate } = req.query;
