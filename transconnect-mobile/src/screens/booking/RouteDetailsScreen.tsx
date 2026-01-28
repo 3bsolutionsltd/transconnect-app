@@ -70,8 +70,6 @@ export default function RouteDetailsScreen({ route, navigation }: any) {
     );
   }
 
-  const [hasDuplicateBooking, setHasDuplicateBooking] = useState(false);
-
   // Fetch user's existing bookings to check for duplicates
   const { data: userBookings } = useQuery({
     queryKey: ['my-bookings-check'],
