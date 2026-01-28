@@ -19,6 +19,20 @@
         "buildType": "apk"
       }
     },
+    "staging": {
+      "extends": "production",
+      "distribution": "internal",
+      "env": {
+        "APP_ENV": "staging",
+        "API_URL": "https://transconnect-backend-staging.onrender.com/api"
+      },
+      "android": {
+        "buildType": "apk"
+      },
+      "ios": {
+        "simulator": false
+      }
+    },
     "production": {
       "android": {
         "buildType": "app-bundle"
