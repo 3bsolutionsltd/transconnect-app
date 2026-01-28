@@ -15,7 +15,61 @@ import { bookingsApi } from '../../services/api';
 import { offlineStorage } from '../../services/offlineStorage';
 
 export default function RouteDetailsScreen({ route, navigation }: any) {
-  const { route: routeData, passengers, searchParams } = route.params;
+  const { route: routeData, passengers, searchParams } = route.params || {};
+  const [hasDuplicateBooking, setHasDuplicateBooking] = useState(false);
+
+  // Validate required data
+  useEffect(() => {
+    console.log('RouteDetailsScreen mounted with params:', {
+      hasRouteData: !!routeData,
+      hasPassengers: !!passengers,
+      hasSearchParams: !!searchParams,
+      routeData: routeData ? {
+        id: routeData.id,
+        origin: routeData.origin,
+        destination: routeData.destination,
+        operatorName: routeData.operatorName,
+        departureTime: routeData.departureTime
+      } : null
+    });
+
+    if (!routeData || !passengers || !searchParams) {
+      console.error('Missing required params:', { routeData: !!routeData, passengers, searchParams });
+      Alert.alert(
+        'Error',
+        'Missing route information. Please try searching again.',
+        [{ text: 'OK', onPress: () => navigation.goBack() }]
+      );
+      return;
+    }
+
+    if (!routeData.departureTime || !routeData.operatorName) {
+      console.error('Invalid route data:', routeData);
+      Alert.alert(
+        'Error',
+        'Invalid route data. Please try searching again.',
+        [{ text: 'OK', onPress: () => navigation.goBack() }]
+      );
+      return;
+    }
+  }, []);
+
+  // Return early if data is invalid to prevent crashes
+  if (!routeData || !passengers || !searchParams) {
+    return (
+      <SafeAreaView style={styles.container}>
+        <View style={styles.errorContainer}>
+          <Ionicons name="alert-circle-outline" size={64} color="#EF4444" />
+          <Text style={styles.errorTitle}>Something went wrong</Text>
+          <Text style={styles.errorText}>Unable to load route details</Text>
+          <TouchableOpacity style={styles.backButton} onPress={() => navigation.goBack()}>
+            <Text style={styles.backButtonText}>Go Back</Text>
+          </TouchableOpacity>
+        </View>
+      </SafeAreaView>
+    );
+  }
+
   const [hasDuplicateBooking, setHasDuplicateBooking] = useState(false);
 
   // Fetch user's existing bookings to check for duplicates
@@ -141,7 +195,15 @@ export default function RouteDetailsScreen({ route, navigation }: any) {
     });
   };
 
-  const totalPrice = routeData.price * passengers;
+  const totalPrice = (routeData.price || 0) * passengers;
+  
+  // Safe accessors with fallbacks
+  const operatorName = routeData.operatorName || routeData.operator?.companyName || 'Unknown Operator';
+  const busType = routeData.busType || routeData.bus?.model || 'Standard Bus';
+  const departureTime = routeData.departureTime || 'TBD';
+  const arrivalTime = routeData.arrivalTime || 'TBD';
+  const duration = routeData.duration || 'N/A';
+  const availableSeats = routeData.availableSeats ?? routeData.bus?.capacity ?? 0;
 
   return (
     <SafeAreaView style={styles.container}>
@@ -157,9 +219,9 @@ export default function RouteDetailsScreen({ route, navigation }: any) {
         
         <View style={styles.headerCard}>
           <View style={styles.operatorHeader}>
-            <Text style={styles.operatorName}>{routeData.operatorName}</Text>
+            <Text style={styles.operatorName}>{operatorName}</Text>
             <View style={styles.busTypeContainer}>
-              <Text style={styles.busType}>{routeData.busType}</Text>
+              <Text style={styles.busType}>{busType}</Text>
             </View>
           </View>
 
@@ -181,7 +243,7 @@ export default function RouteDetailsScreen({ route, navigation }: any) {
               <View style={styles.timePoint}>
                 <Ionicons name="radio-button-on" size={16} color="#10B981" />
                 <View style={styles.timeInfo}>
-                  <Text style={styles.journeyTime}>{routeData.departureTime}</Text>
+                  <Text style={styles.journeyTime}>{departureTime}</Text>
                   <Text style={styles.journeyLocation}>{searchParams.from}</Text>
                 </View>
               </View>
@@ -189,14 +251,14 @@ export default function RouteDetailsScreen({ route, navigation }: any) {
 
             <View style={styles.journeyLine}>
               <View style={styles.verticalLine} />
-              <Text style={styles.durationText}>{routeData.duration}</Text>
+              <Text style={styles.durationText}>{duration}</Text>
             </View>
 
             <View style={styles.journeyPoint}>
               <View style={styles.timePoint}>
                 <Ionicons name="location" size={16} color="#EF4444" />
                 <View style={styles.timeInfo}>
-                  <Text style={styles.journeyTime}>{routeData.arrivalTime}</Text>
+                  <Text style={styles.journeyTime}>{arrivalTime}</Text>
                   <Text style={styles.journeyLocation}>{searchParams.to}</Text>
                 </View>
               </View>
@@ -499,6 +561,39 @@ const styles = StyleSheet.create({
   divider: {
     height: 1,
     backgroundColor: '#E5E7EB',
+    marginVertical: 12,
+  },
+  errorContainer: {
+    flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
+    padding: 24,
+  },
+  errorTitle: {
+    fontSize: 20,
+    fontWeight: '700',
+    color: '#1F2937',
+    marginTop: 16,
+    marginBottom: 8,
+  },
+  errorText: {
+    fontSize: 16,
+    color: '#6B7280',
+    textAlign: 'center',
+    marginBottom: 24,
+  },
+  backButton: {
+    backgroundColor: '#1E40AF',
+    paddingHorizontal: 32,
+    paddingVertical: 12,
+    borderRadius: 8,
+  },
+  backButtonText: {
+    color: '#FFFFFF',
+    fontSize: 16,
+    fontWeight: '600',
+  },
+});
     marginVertical: 12,
   },
   totalRow: {
