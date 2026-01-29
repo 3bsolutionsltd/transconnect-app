@@ -12,7 +12,7 @@ services:
       - key: NODE_ENV
         value: production
       - key: NEXT_PUBLIC_API_URL
-        value: https://transconnect-app-testing.onrender.com
+        value: https://transconnect-app-testing.onrender.com/api
       - key: NEXT_PUBLIC_ENVIRONMENT
         value: staging
       - key: NEXT_PUBLIC_APP_URL
