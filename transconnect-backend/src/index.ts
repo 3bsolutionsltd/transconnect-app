@@ -91,7 +91,8 @@ app.use(cors({
       "https://admin.transconnect.app", 
       "https://operators.transconnect.app",
       "https://transconnect-admin-staging.onrender.com",
-      "https://transconnect-web-staging.onrender.com"
+      "https://transconnect-web-staging.onrender.com",
+      "https://staging.transconnect.app"
     ];
     
     if (allowedOrigins.includes(origin)) {
