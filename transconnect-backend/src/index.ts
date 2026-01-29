@@ -70,6 +70,9 @@ if (process.env.NODE_ENV === 'production' || process.env.ENABLE_PRODUCTION_FEATU
   console.log('⚠️  Production database services disabled (development mode)');
 }
 
+// Trust proxy for Render deployment (fixes X-Forwarded-For header warning)
+app.set('trust proxy', 1);
+
 // Rate limiting
 const limiter = rateLimit({
   windowMs: 15 * 60 * 1000, // 15 minutes
