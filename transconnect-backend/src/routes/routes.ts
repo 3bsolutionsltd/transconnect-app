@@ -575,4 +575,541 @@ router.get('/:id/alighting-stops/:boardingStop', async (req: Request, res: Respo
   }
 });
 
+// ============================================================================
+// ROUTE SEGMENT MANAGEMENT ENDPOINTS
+// ============================================================================
+
+// Get segments for a specific route
+router.get('/:routeId/segments', async (req: Request, res: Response) => {
+  try {
+    const { routeId } = req.params;
+
+    const segments = await prisma.routeSegment.findMany({
+      where: { routeId },
+      include: {
+        priceVariations: {
+          where: { active: true },
+          orderBy: { createdAt: 'desc' }
+        }
+      },
+      orderBy: { segmentOrder: 'asc' }
+    });
+
+    res.json({
+      success: true,
+      count: segments.length,
+      segments
+    });
+  } catch (error: any) {
+    console.error('Error fetching route segments:', error);
+    res.status(500).json({
+      error: 'Failed to fetch route segments',
+      message: error.message
+    });
+  }
+});
+
+// Create segments for a route
+router.post('/:routeId/segments', authenticateToken, async (req: Request, res: Response) => {
+  try {
+    const { routeId } = req.params;
+    const { segments } = req.body;
+
+    // Validate route exists
+    const route = await prisma.route.findUnique({
+      where: { id: routeId },
+      include: { operator: true }
+    });
+
+    if (!route) {
+      return res.status(404).json({ error: 'Route not found' });
+    }
+
+    // Authorization check: Only ADMIN or route operator can add segments
+    const userRole = (req as any).user.role;
+    const userId = (req as any).user.userId;
+
+    if (userRole !== 'ADMIN') {
+      // Check if user is the operator for this route
+      const operator = await prisma.operator.findFirst({
+        where: {
+          userId: userId,
+          id: route.operatorId
+        }
+      });
+
+      if (!operator) {
+        return res.status(403).json({ 
+          error: 'Unauthorized - Only route operator or admin can manage segments' 
+        });
+      }
+    }
+
+    // Validate segments array
+    if (!Array.isArray(segments) || segments.length === 0) {
+      return res.status(400).json({ 
+        error: 'Segments array is required and must not be empty' 
+      });
+    }
+
+    // Create segments in transaction
+    const createdSegments = await prisma.$transaction(
+      segments.map((seg: any, index: number) => 
+        prisma.routeSegment.create({
+          data: {
+            routeId,
+            segmentOrder: seg.segmentOrder || index + 1,
+            fromLocation: seg.fromLocation,
+            toLocation: seg.toLocation,
+            distanceKm: seg.distanceKm,
+            durationMinutes: seg.durationMinutes,
+            basePrice: seg.basePrice
+          }
+        })
+      )
+    );
+
+    // Update route to enable segments
+    await prisma.route.update({
+      where: { id: routeId },
+      data: { segmentEnabled: true }
+    });
+
+    res.status(201).json({
+      success: true,
+      message: `Created ${createdSegments.length} segments`,
+      segments: createdSegments
+    });
+  } catch (error: any) {
+    console.error('Error creating route segments:', error);
+    res.status(500).json({
+      error: 'Failed to create route segments',
+      message: error.message
+    });
+  }
+});
+
+// Update a specific segment
+router.put('/segments/:segmentId', authenticateToken, async (req: Request, res: Response) => {
+  try {
+    const { segmentId } = req.params;
+    const { fromLocation, toLocation, distanceKm, durationMinutes, basePrice } = req.body;
+
+    // Get segment and route for authorization
+    const segment = await prisma.routeSegment.findUnique({
+      where: { id: segmentId },
+      include: {
+        route: {
+          include: { operator: true }
+        }
+      }
+    });
+
+    if (!segment) {
+      return res.status(404).json({ error: 'Segment not found' });
+    }
+
+    // Authorization check
+    const userRole = (req as any).user.role;
+    const userId = (req as any).user.userId;
+
+    if (userRole !== 'ADMIN') {
+      const operator = await prisma.operator.findFirst({
+        where: {
+          userId: userId,
+          id: segment.route.operatorId
+        }
+      });
+
+      if (!operator) {
+        return res.status(403).json({ 
+          error: 'Unauthorized - Only route operator or admin can update segments' 
+        });
+      }
+    }
+
+    // Update segment
+    const updatedSegment = await prisma.routeSegment.update({
+      where: { id: segmentId },
+      data: {
+        ...(fromLocation && { fromLocation }),
+        ...(toLocation && { toLocation }),
+        ...(distanceKm && { distanceKm }),
+        ...(durationMinutes && { durationMinutes }),
+        ...(basePrice && { basePrice })
+      }
+    });
+
+    res.json({
+      success: true,
+      message: 'Segment updated successfully',
+      segment: updatedSegment
+    });
+  } catch (error: any) {
+    console.error('Error updating segment:', error);
+    res.status(500).json({
+      error: 'Failed to update segment',
+      message: error.message
+    });
+  }
+});
+
+// Delete a segment
+router.delete('/segments/:segmentId', authenticateToken, async (req: Request, res: Response) => {
+  try {
+    const { segmentId } = req.params;
+
+    // Get segment and route for authorization
+    const segment = await prisma.routeSegment.findUnique({
+      where: { id: segmentId },
+      include: {
+        route: {
+          include: { operator: true }
+        }
+      }
+    });
+
+    if (!segment) {
+      return res.status(404).json({ error: 'Segment not found' });
+    }
+
+    // Authorization check
+    const userRole = (req as any).user.role;
+    const userId = (req as any).user.userId;
+
+    if (userRole !== 'ADMIN') {
+      const operator = await prisma.operator.findFirst({
+        where: {
+          userId: userId,
+          id: segment.route.operatorId
+        }
+      });
+
+      if (!operator) {
+        return res.status(403).json({ 
+          error: 'Unauthorized - Only route operator or admin can delete segments' 
+        });
+      }
+    }
+
+    await prisma.routeSegment.delete({
+      where: { id: segmentId }
+    });
+
+    res.json({
+      success: true,
+      message: 'Segment deleted successfully'
+    });
+  } catch (error: any) {
+    console.error('Error deleting segment:', error);
+    res.status(500).json({
+      error: 'Failed to delete segment',
+      message: error.message
+    });
+  }
+});
+
+// ============================================================================
+// PRICE VARIATION MANAGEMENT ENDPOINTS
+// ============================================================================
+
+// Get price variations for a segment
+router.get('/segments/:segmentId/variations', async (req: Request, res: Response) => {
+  try {
+    const { segmentId } = req.params;
+
+    const variations = await prisma.segmentPriceVariation.findMany({
+      where: { segmentId },
+      orderBy: { createdAt: 'desc' }
+    });
+
+    res.json({
+      success: true,
+      count: variations.length,
+      variations
+    });
+  } catch (error: any) {
+    console.error('Error fetching price variations:', error);
+    res.status(500).json({
+      error: 'Failed to fetch price variations',
+      message: error.message
+    });
+  }
+});
+
+// Create a price variation
+router.post('/segments/:segmentId/variations', authenticateToken, async (req: Request, res: Response) => {
+  try {
+    const { segmentId } = req.params;
+    const { 
+      variationType, 
+      priceAdjustment, 
+      adjustmentType, 
+      appliesToDates, 
+      startDate, 
+      endDate 
+    } = req.body;
+
+    // Get segment and route for authorization
+    const segment = await prisma.routeSegment.findUnique({
+      where: { id: segmentId },
+      include: {
+        route: {
+          include: { operator: true }
+        }
+      }
+    });
+
+    if (!segment) {
+      return res.status(404).json({ error: 'Segment not found' });
+    }
+
+    // Authorization check
+    const userRole = (req as any).user.role;
+    const userId = (req as any).user.userId;
+
+    if (userRole !== 'ADMIN') {
+      const operator = await prisma.operator.findFirst({
+        where: {
+          userId: userId,
+          id: segment.route.operatorId
+        }
+      });
+
+      if (!operator) {
+        return res.status(403).json({ 
+          error: 'Unauthorized - Only route operator or admin can create price variations' 
+        });
+      }
+    }
+
+    // Validate variation type
+    const validTypes = ['weekend', 'holiday', 'peak_season', 'custom'];
+    if (!validTypes.includes(variationType)) {
+      return res.status(400).json({ 
+        error: `Invalid variation type. Must be one of: ${validTypes.join(', ')}` 
+      });
+    }
+
+    // Validate adjustment type
+    const validAdjustmentTypes = ['percentage', 'fixed'];
+    if (!validAdjustmentTypes.includes(adjustmentType)) {
+      return res.status(400).json({ 
+        error: `Invalid adjustment type. Must be one of: ${validAdjustmentTypes.join(', ')}` 
+      });
+    }
+
+    const variation = await prisma.segmentPriceVariation.create({
+      data: {
+        segmentId,
+        variationType,
+        priceAdjustment,
+        adjustmentType: adjustmentType || 'percentage',
+        appliesToDates,
+        startDate: startDate ? new Date(startDate) : null,
+        endDate: endDate ? new Date(endDate) : null,
+        active: true
+      }
+    });
+
+    res.status(201).json({
+      success: true,
+      message: 'Price variation created successfully',
+      variation
+    });
+  } catch (error: any) {
+    console.error('Error creating price variation:', error);
+    res.status(500).json({
+      error: 'Failed to create price variation',
+      message: error.message
+    });
+  }
+});
+
+// Update a price variation
+router.put('/variations/:variationId', authenticateToken, async (req: Request, res: Response) => {
+  try {
+    const { variationId } = req.params;
+    const updates = req.body;
+
+    // Get variation, segment, and route for authorization
+    const variation = await prisma.segmentPriceVariation.findUnique({
+      where: { id: variationId },
+      include: {
+        segment: {
+          include: {
+            route: {
+              include: { operator: true }
+            }
+          }
+        }
+      }
+    });
+
+    if (!variation) {
+      return res.status(404).json({ error: 'Price variation not found' });
+    }
+
+    // Authorization check
+    const userRole = (req as any).user.role;
+    const userId = (req as any).user.userId;
+
+    if (userRole !== 'ADMIN') {
+      const operator = await prisma.operator.findFirst({
+        where: {
+          userId: userId,
+          id: variation.segment.route.operatorId
+        }
+      });
+
+      if (!operator) {
+        return res.status(403).json({ 
+          error: 'Unauthorized - Only route operator or admin can update price variations' 
+        });
+      }
+    }
+
+    // Process date updates
+    if (updates.startDate) updates.startDate = new Date(updates.startDate);
+    if (updates.endDate) updates.endDate = new Date(updates.endDate);
+
+    const updatedVariation = await prisma.segmentPriceVariation.update({
+      where: { id: variationId },
+      data: updates
+    });
+
+    res.json({
+      success: true,
+      message: 'Price variation updated successfully',
+      variation: updatedVariation
+    });
+  } catch (error: any) {
+    console.error('Error updating price variation:', error);
+    res.status(500).json({
+      error: 'Failed to update price variation',
+      message: error.message
+    });
+  }
+});
+
+// Delete a price variation
+router.delete('/variations/:variationId', authenticateToken, async (req: Request, res: Response) => {
+  try {
+    const { variationId } = req.params;
+
+    // Get variation, segment, and route for authorization
+    const variation = await prisma.segmentPriceVariation.findUnique({
+      where: { id: variationId },
+      include: {
+        segment: {
+          include: {
+            route: {
+              include: { operator: true }
+            }
+          }
+        }
+      }
+    });
+
+    if (!variation) {
+      return res.status(404).json({ error: 'Price variation not found' });
+    }
+
+    // Authorization check
+    const userRole = (req as any).user.role;
+    const userId = (req as any).user.userId;
+
+    if (userRole !== 'ADMIN') {
+      const operator = await prisma.operator.findFirst({
+        where: {
+          userId: userId,
+          id: variation.segment.route.operatorId
+        }
+      });
+
+      if (!operator) {
+        return res.status(403).json({ 
+          error: 'Unauthorized - Only route operator or admin can delete price variations' 
+        });
+      }
+    }
+
+    await prisma.segmentPriceVariation.delete({
+      where: { id: variationId }
+    });
+
+    res.json({
+      success: true,
+      message: 'Price variation deleted successfully'
+    });
+  } catch (error: any) {
+    console.error('Error deleting price variation:', error);
+    res.status(500).json({
+      error: 'Failed to delete price variation',
+      message: error.message
+    });
+  }
+});
+
+// Toggle price variation active status
+router.patch('/variations/:variationId/toggle', authenticateToken, async (req: Request, res: Response) => {
+  try {
+    const { variationId } = req.params;
+
+    // Get variation, segment, and route for authorization
+    const variation = await prisma.segmentPriceVariation.findUnique({
+      where: { id: variationId },
+      include: {
+        segment: {
+          include: {
+            route: {
+              include: { operator: true }
+            }
+          }
+        }
+      }
+    });
+
+    if (!variation) {
+      return res.status(404).json({ error: 'Price variation not found' });
+    }
+
+    // Authorization check
+    const userRole = (req as any).user.role;
+    const userId = (req as any).user.userId;
+
+    if (userRole !== 'ADMIN') {
+      const operator = await prisma.operator.findFirst({
+        where: {
+          userId: userId,
+          id: variation.segment.route.operatorId
+        }
+      });
+
+      if (!operator) {
+        return res.status(403).json({ 
+          error: 'Unauthorized - Only route operator or admin can toggle price variations' 
+        });
+      }
+    }
+
+    const updatedVariation = await prisma.segmentPriceVariation.update({
+      where: { id: variationId },
+      data: { active: !variation.active }
+    });
+
+    res.json({
+      success: true,
+      message: `Price variation ${updatedVariation.active ? 'activated' : 'deactivated'} successfully`,
+      variation: updatedVariation
+    });
+  } catch (error: any) {
+    console.error('Error toggling price variation:', error);
+    res.status(500).json({
+      error: 'Failed to toggle price variation',
+      message: error.message
+    });
+  }
+});
+
 export default router;

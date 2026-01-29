@@ -27,6 +27,7 @@ async function seedStagingData() {
           companyName: operatorNames[i],
           email: `${operatorNames[i].toLowerCase().replace(/\s/g, '')}@staging.com`,
           phoneNumber: `+2567${faker.string.numeric(8)}`,
+          license: `LIC${faker.string.numeric(6)}`,
           licenseNumber: `LIC${faker.string.numeric(6)}`,
           status: faker.helpers.arrayElement(['active', 'active', 'active', 'pending']), // 75% active
           address: faker.location.streetAddress(),

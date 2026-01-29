@@ -55,13 +55,10 @@ export async function searchRoutesWithSegments(
 ): Promise<RouteSearchResult[]> {
   const { origin, destination, date } = params;
 
-  // TODO: Fix SQL query - for now return empty since no segments exist yet
-  // Will work once we add test data with segments
   console.log(`Segment search called: ${origin} → ${destination}`);
-  return [];
 
-  /* Commented out until we have segment test data
   // SQL query to find all routes where origin and destination match any segment
+  // Note: Using camelCase for columns as per Prisma schema
   const query = Prisma.sql`
     WITH route_connections AS (
       SELECT DISTINCT 
@@ -71,24 +68,26 @@ export async function searchRoutesWithSegments(
         r."departureTime",
         r."operatorId",
         r."busId",
-        rs1."fromLocation" as pickup,
-        rs2."toLocation" as dropoff,
-        rs1."segmentOrder" as start_order,
-        rs2."segmentOrder" as end_order
+        rs1.from_location as pickup,
+        rs2.to_location as dropoff,
+        rs1.segment_order as start_order,
+        rs2.segment_order as end_order
       FROM routes r
-      JOIN route_segments rs1 ON rs1."routeId" = r.id
-      JOIN route_segments rs2 ON rs2."routeId" = r.id
+      JOIN route_segments rs1 ON rs1.route_id = r.id
+      JOIN route_segments rs2 ON rs2.route_id = r.id
       WHERE r.active = true
-        AND r."segmentEnabled" = true
-        AND rs1."fromLocation" ILIKE ${`%${origin}%`}
-        AND rs2."toLocation" ILIKE ${`%${destination}%`}
-        AND rs1."segmentOrder" <= rs2."segmentOrder"
+        AND r.segment_enabled = true
+        AND rs1.from_location ILIKE ${`%${origin}%`}
+        AND rs2.to_location ILIKE ${`%${destination}%`}
+        AND rs1.segment_order <= rs2.segment_order
     )
     SELECT * FROM route_connections
     ORDER BY route_id;
   `;
 
   const rawResults = await prisma.$queryRaw<any[]>(query);
+
+  console.log(`Found ${rawResults.length} route connections`);
 
   // Process each matching route
   const results: RouteSearchResult[] = [];
@@ -174,7 +173,6 @@ export async function searchRoutesWithSegments(
 
   // Sort by final price
   return results.sort((a, b) => a.finalPrice - b.finalPrice);
-  */
 }
 
 /**

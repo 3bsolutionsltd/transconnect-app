@@ -104,22 +104,22 @@ model Bus {
 }
 
 model Route {
-  id             String   @id @default(cuid())
-  origin         String
-  destination    String
-  via            String? // Optional intermediate stops/towns (kept for backward compatibility)
-  distance       Float // in kilometers
-  duration       Int // in minutes
-  price          Float
-  departureTime  String // Time format: "HH:MM"
-  operatorId     String
-  busId          String
-  active         Boolean  @default(true)
-  segmentEnabled Boolean  @default(true) // NEW: Whether route uses segment-based pricing
-  autoCalculated Boolean  @default(false) // NEW: Distance/duration auto-calculated via Google Maps
-  calculationData Json?   // NEW: Cached Google Maps calculation data
-  createdAt      DateTime @default(now())
-  updatedAt      DateTime @updatedAt
+  id              String   @id @default(cuid())
+  origin          String
+  destination     String
+  via             String? // Optional intermediate stops/towns (kept for backward compatibility)
+  distance        Float // in kilometers
+  duration        Int // in minutes
+  price           Float
+  departureTime   String // Time format: "HH:MM"
+  operatorId      String
+  busId           String
+  active          Boolean  @default(true)
+  segmentEnabled  Boolean  @default(true) @map("segment_enabled") // NEW: Whether route uses segment-based pricing
+  autoCalculated  Boolean  @default(false) @map("auto_calculated") // NEW: Distance/duration auto-calculated via Google Maps
+  calculationData Json?    @map("calculation_data") // NEW: Cached Google Maps calculation data
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
 
   // Relations
   operator Operator       @relation(fields: [operatorId], references: [id], onDelete: Cascade)
@@ -134,41 +134,45 @@ model Route {
 // NEW: Route segments for stopover-based pricing
 model RouteSegment {
   id              String   @id @default(cuid())
-  routeId         String
-  segmentOrder    Int
-  fromLocation    String
-  toLocation      String
-  distanceKm      Decimal? @db.Decimal(10, 2)
-  durationMinutes Int?
-  basePrice       Decimal  @db.Decimal(10, 2)
-  createdAt       DateTime @default(now())
-  updatedAt       DateTime @updatedAt
+  routeId         String   @map("route_id")
+  segmentOrder    Int      @map("segment_order")
+  fromLocation    String   @map("from_location")
+  toLocation      String   @map("to_location")
+  distanceKm      Decimal? @map("distance_km") @db.Decimal(10, 2)
+  durationMinutes Int?     @map("duration_minutes")
+  basePrice       Decimal  @map("base_price") @db.Decimal(10, 2)
+  createdAt       DateTime @default(now()) @map("created_at")
+  updatedAt       DateTime @updatedAt @map("updated_at")
 
   // Relations
-  route            Route                   @relation(fields: [routeId], references: [id], onDelete: Cascade)
-  priceVariations  SegmentPriceVariation[]
+  route           Route                   @relation(fields: [routeId], references: [id], onDelete: Cascade)
+  priceVariations SegmentPriceVariation[]
 
   @@unique([routeId, segmentOrder])
+  @@index([fromLocation, toLocation])
+  @@index([fromLocation])
+  @@index([toLocation])
   @@map("route_segments")
 }
 
 // NEW: Date-based pricing variations (weekend/holiday premiums)
 model SegmentPriceVariation {
   id              String    @id @default(cuid())
-  segmentId       String
-  variationType   String // 'weekend', 'holiday', 'peak_season', 'custom'
-  priceAdjustment Decimal   @db.Decimal(10, 2) // Can be positive or negative
-  adjustmentType  String    @default("percentage") // 'percentage' or 'fixed'
-  appliesToDates  Json? // {"days": ["saturday", "sunday"]} or {"dates": ["2026-12-25"]}
-  startDate       DateTime?
-  endDate         DateTime?
+  segmentId       String    @map("segment_id")
+  variationType   String    @map("variation_type") // 'weekend', 'holiday', 'peak_season', 'custom'
+  priceAdjustment Decimal   @map("price_adjustment") @db.Decimal(10, 2) // Can be positive or negative
+  adjustmentType  String    @default("percentage") @map("adjustment_type") // 'percentage' or 'fixed'
+  appliesToDates  Json?     @map("applies_to_dates") // {"days": ["saturday", "sunday"]} or {"dates": ["2026-12-25"]}
+  startDate       DateTime? @map("start_date")
+  endDate         DateTime? @map("end_date")
   active          Boolean   @default(true)
-  createdAt       DateTime  @default(now())
-  updatedAt       DateTime  @updatedAt
+  createdAt       DateTime  @default(now()) @map("created_at")
+  updatedAt       DateTime  @updatedAt @map("updated_at")
 
   // Relations
   segment RouteSegment @relation(fields: [segmentId], references: [id], onDelete: Cascade)
 
+  @@index([segmentId, startDate, endDate])
   @@map("segment_price_variations")
 }
 
