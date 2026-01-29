@@ -72,6 +72,7 @@ router.get('/', async (req: Request, res: Response) => {
         segmentEnabled: true
       }));
 
+      console.log('Transformed routes:', transformedRoutes.map(r => ({ id: r.id, origin: r.origin, destination: r.destination })));
       return res.json(transformedRoutes);
     }
 
