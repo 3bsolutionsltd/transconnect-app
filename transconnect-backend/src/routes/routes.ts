@@ -40,12 +40,32 @@ router.get('/search-segments', async (req: Request, res: Response) => {
   }
 });
 
-// Get all routes with optional filtering (legacy endpoint - kept for backward compatibility)
+// Get all routes with optional filtering (legacy endpoint - now uses segment search!)
 router.get('/', async (req: Request, res: Response) => {
   try {
     const { origin, destination, travelDate } = req.query;
     console.log('Routes API called with params:', { origin, destination, travelDate });
 
+    // If both origin and destination provided, use segment-based search (supports stopovers!)
+    if (origin && destination) {
+      console.log('Using segment-based search for stopover support');
+      const travelDate_parsed = travelDate ? new Date(travelDate as string) : undefined;
+      const results = await searchRoutesWithSegments({
+        origin: origin as string,
+        destination: destination as string,
+        date: travelDate_parsed,
+      });
+
+      // Transform to legacy format for backward compatibility
+      return res.json({
+        success: true,
+        routes: results,
+        count: results.length,
+        searchType: 'segment-based'
+      });
+    }
+
+    // Otherwise, use legacy query for listing all routes
     // Build where clause for filtering
     let whereClause: any = {
       active: true,
