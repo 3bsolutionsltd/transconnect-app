@@ -57,12 +57,22 @@ router.get('/', async (req: Request, res: Response) => {
       });
 
       // Transform to legacy format for backward compatibility
-      return res.json({
-        success: true,
-        routes: results,
-        count: results.length,
-        searchType: 'segment-based'
-      });
+      const transformedRoutes = results.map(result => ({
+        id: result.routeId,
+        origin: result.pickupLocation,
+        destination: result.dropoffLocation,
+        price: result.finalPrice,
+        distance: result.totalDistance,
+        duration: result.totalDuration,
+        departureTime: result.departureTime,
+        bus: result.busInfo,
+        operator: result.operatorInfo,
+        segments: result.segments, // Include segment details
+        active: true,
+        segmentEnabled: true
+      }));
+
+      return res.json(transformedRoutes);
     }
 
     // Otherwise, use legacy query for listing all routes
