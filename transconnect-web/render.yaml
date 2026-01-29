@@ -1,0 +1,23 @@
+services:
+  - type: web
+    name: transconnect-web-staging
+    env: node
+    region: oregon
+    plan: starter
+    branch: staging
+    rootDir: transconnect-web
+    buildCommand: npm install && npm run build
+    startCommand: npm start
+    envVars:
+      - key: NODE_ENV
+        value: production
+      - key: NEXT_PUBLIC_API_URL
+        value: https://transconnect-app-testing.onrender.com
+      - key: NEXT_PUBLIC_ENVIRONMENT
+        value: staging
+      - key: NEXT_PUBLIC_APP_URL
+        value: https://staging.transconnect.app
+      - key: NEXT_PUBLIC_ENABLE_ANALYTICS
+        value: false
+      - key: PORT
+        value: 3000
