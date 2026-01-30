@@ -33,6 +33,7 @@ import systemFixesRoutes from './routes/admin/system-fixes';
 import adminSeedRoutes from './routes/admin-seed';
 import agentRoutes from './routes/agents';
 import segmentRoutes from './routes/segments'; // NEW: Route segments management
+import distanceRoutes from './routes/distance'; // NEW: Google Maps distance calculation
 import { cleanupOfflineAgents } from './middleware/agentActivity';
 
 dotenv.config();
@@ -139,6 +140,7 @@ app.use('/api/auth', authRoutes);
 app.use('/api/users', userRoutes);
 app.use('/api/routes', routeRoutes);
 app.use('/api/segments', segmentRoutes); // NEW: Route segments management
+app.use('/api/distance', distanceRoutes); // NEW: Google Maps distance calculation
 app.use('/api/bookings', bookingRoutes);
 app.use('/api/payments', paymentRoutes);
 app.use('/api/qr', qrRoutes);

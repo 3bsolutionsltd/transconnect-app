@@ -2,6 +2,7 @@ import { Router, Request, Response } from 'express';
 import { prisma } from '../index';
 import { authenticateToken } from '../middleware/auth';
 import { searchRoutesWithSegments } from '../services/routeSegmentService';
+import { googleMapsService } from '../services/googleMaps.service';
 
 const router = Router();
 
@@ -344,13 +345,37 @@ router.post('/', authenticateToken, async (req: Request, res: Response) => {
     // Convert via array to string if needed
     const viaString = Array.isArray(via) ? via.join(', ') : (via || null);
 
+    // Auto-calculate distance and duration if not provided and Google Maps is enabled
+    let finalDistance = distance;
+    let finalDuration = duration;
+
+    if ((!distance || !duration) && googleMapsService.isEnabled()) {
+      console.log(`Auto-calculating distance for ${origin} → ${destination}`);
+      const calculation = await googleMapsService.calculateDistance(origin, destination);
+      
+      if (calculation.success) {
+        finalDistance = finalDistance || calculation.distanceKm;
+        finalDuration = finalDuration || calculation.durationMinutes;
+        console.log(`✓ Calculated: ${finalDistance}km, ${finalDuration}min`);
+      } else {
+        console.warn(`⚠ Distance calculation failed: ${calculation.error}`);
+        // If no distance/duration provided and calculation failed, return error
+        if (!distance || !duration) {
+          return res.status(400).json({
+            error: 'Distance and duration are required (auto-calculation failed)',
+            calculationError: calculation.error,
+          });
+        }
+      }
+    }
+
     const route = await prisma.route.create({
       data: {
         origin,
         destination,
         via: viaString,
-        distance,
-        duration,
+        distance: finalDistance,
+        duration: finalDuration,
         price,
         departureTime,
         operatorId,
