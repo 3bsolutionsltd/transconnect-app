@@ -3,7 +3,7 @@ import React, { useState, useEffect } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
-import { CreditCard, Smartphone, CheckCircle, Clock, AlertCircle } from 'lucide-react';
+import { CreditCard, Smartphone, CheckCircle, Clock, AlertCircle, Banknote } from 'lucide-react';
 import { useAuth } from '@/contexts/AuthContext';
 import { useNotificationService } from '@/lib/notificationService';
 import { paymentApi } from '@/lib/api';
@@ -15,7 +15,7 @@ export default function PaymentPage() {
   const notificationService = useNotificationService();
   
   const [bookingData, setBookingData] = useState<any>(null);
-  const [selectedMethod, setSelectedMethod] = useState('MTN_MOBILE_MONEY');
+  const [selectedMethod, setSelectedMethod] = useState('CASH');
   const [phoneNumber, setPhoneNumber] = useState('');
   const [processing, setProcessing] = useState(false);
   const [paymentStatus, setPaymentStatus] = useState<'pending' | 'processing' | 'success' | 'failed'>('pending');
@@ -49,6 +49,7 @@ export default function PaymentPage() {
     { id: 'MTN_MOBILE_MONEY', name: 'MTN Mobile Money', icon: Smartphone, color: 'text-yellow-600' },
     { id: 'AIRTEL_MONEY', name: 'Airtel Money', icon: Smartphone, color: 'text-red-600' },
     { id: 'FLUTTERWAVE', name: 'Card Payment', icon: CreditCard, color: 'text-blue-600' },
+    { id: 'CASH', name: 'Cash Payment (Over the Counter)', icon: Banknote, color: 'text-green-600', description: 'Pay at operator office or at boarding' },
   ];
 
   const handlePayment = async () => {
@@ -58,7 +59,7 @@ export default function PaymentPage() {
       return;
     }
 
-    if (!phoneNumber && selectedMethod !== 'FLUTTERWAVE') {
+    if (!phoneNumber && selectedMethod !== 'FLUTTERWAVE' && selectedMethod !== 'CASH') {
       notificationService.showWarning('Phone Number Required', 'Please enter your phone number to proceed with payment');
       return;
     }
@@ -67,7 +68,30 @@ export default function PaymentPage() {
     setPaymentStatus('processing');
 
     try {
-      // Call actual payment API
+      // Handle cash payments differently - no payment API call needed
+      if (selectedMethod === 'CASH') {
+        setPaymentStatus('success');
+        
+        // Show success notification
+        notificationService.showSuccess('Booking Confirmed', 'Please pay at the operator office or boarding point');
+        
+        // Wait a moment to show success, then redirect
+        setTimeout(() => {
+          const successData = encodeURIComponent(JSON.stringify({
+            ...bookingData,
+            paymentStatus: 'PENDING',
+            paymentMethod: 'CASH',
+            isCashPayment: true,
+            paymentRef: 'CASH-' + bookingData.id,
+            qrCode: bookingData.qrCode
+          }));
+          router.push(`/booking-success?booking=${successData}`);
+        }, 1500);
+        setProcessing(false);
+        return;
+      }
+      
+      // Call actual payment API for online methods (MTN, Airtel, Card)
       const paymentRequest = {
         bookingId: bookingData.id,
         method: selectedMethod,
@@ -271,7 +295,39 @@ export default function PaymentPage() {
                 <CardTitle>Payment Details</CardTitle>
               </CardHeader>
               <CardContent>
-                {selectedMethod === 'FLUTTERWAVE' ? (
+                {selectedMethod === 'CASH' ? (
+                  <div className="space-y-3">
+                    <div className="bg-green-50 border border-green-200 rounded-lg p-4">
+                      <h4 className="font-semibold text-green-900 mb-3 flex items-center">
+                        <Banknote className="h-5 w-5 mr-2" />
+                        Cash Payment Instructions
+                      </h4>
+                      <ul className="text-sm text-green-800 space-y-2">
+                        <li className="flex items-start">
+                          <span className="mr-2">✓</span>
+                          <span>Visit the bus operator office before departure</span>
+                        </li>
+                        <li className="flex items-start">
+                          <span className="mr-2">✓</span>
+                          <span>Show your booking reference to the cashier</span>
+                        </li>
+                        <li className="flex items-start">
+                          <span className="mr-2">✓</span>
+                          <span>Complete payment and receive your ticket</span>
+                        </li>
+                        <li className="flex items-start">
+                          <span className="mr-2">✓</span>
+                          <span>You can also pay at the boarding point</span>
+                        </li>
+                      </ul>
+                    </div>
+                    <div className="bg-blue-50 border border-blue-200 rounded-lg p-3">
+                      <p className="text-sm text-blue-800">
+                        <strong>Note:</strong> Your booking is confirmed. Payment will be completed at the operator office or when you board the bus.
+                      </p>
+                    </div>
+                  </div>
+                ) : selectedMethod === 'FLUTTERWAVE' ? (
                   <div className="space-y-4">
                     <div>
                       <label className="block text-sm font-medium text-gray-700 mb-1">
