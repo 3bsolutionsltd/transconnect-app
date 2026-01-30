@@ -309,7 +309,7 @@ model NotificationTemplate {
 model Notification {
   id           String              @id @default(cuid())
   userId       String
-  templateId   String
+  templateId   String?
   type         NotificationType
   channel      NotificationChannel
   recipient    String // Phone number, email, or FCM token
@@ -327,8 +327,8 @@ model Notification {
   updatedAt    DateTime            @updatedAt
 
   // Relations
-  user     User                 @relation(fields: [userId], references: [id], onDelete: Cascade)
-  template NotificationTemplate @relation(fields: [templateId], references: [id])
+  user     User                  @relation(fields: [userId], references: [id], onDelete: Cascade)
+  template NotificationTemplate? @relation(fields: [templateId], references: [id])
 
   @@map("notifications")
 }

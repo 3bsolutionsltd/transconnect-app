@@ -429,7 +429,7 @@ export class NotificationService {
       const notification = await prisma.notification.create({
         data: {
           userId: data.userId,
-          templateId: 'default', // You can create actual templates
+          templateId: null, // Template system not yet implemented
           type: data.type,
           channel: 'IN_APP',
           recipient: data.recipient || '',
@@ -467,7 +467,7 @@ export class NotificationService {
       await prisma.notification.create({
         data: {
           userId,
-          templateId: 'default',
+          templateId: null, // Template system not yet implemented
           type: data.type,
           channel,
           recipient: data.recipient || '',
