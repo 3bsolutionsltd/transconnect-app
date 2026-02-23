@@ -7,10 +7,9 @@ import { Router, Request, Response } from 'express';
 import { prisma } from '../index';
 import { authenticateToken, requireRole } from '../middleware/auth';
 import { createRouteSegments } from '../services/routeSegmentService';
-import { GoogleMapsService } from '../services/googleMaps.service';
+import { osrmService } from '../services/osrm.service';
 
 const router = Router();
-const googleMapsService = GoogleMapsService.getInstance();
 
 // All segment endpoints require authentication
 router.use(authenticateToken);
@@ -95,11 +94,11 @@ router.post('/route/:routeId', requireRole(['ADMIN', 'OPERATOR']), async (req: R
       
       // Check if distance or duration is missing
       if (!currentLocation.distanceKm || !currentLocation.durationMinutes) {
-        if (googleMapsService.isEnabled()) {
+        if (osrmService.isEnabled()) {
           try {
             console.log(`🗺️ Auto-calculating distance: ${previousLocation.name} → ${currentLocation.name}`);
             
-            const calculation = await googleMapsService.calculateDistance(
+            const calculation = await osrmService.calculateDistance(
               previousLocation.name,
               currentLocation.name
             );
@@ -149,11 +148,11 @@ router.post('/route/:routeId', requireRole(['ADMIN', 'OPERATOR']), async (req: R
             }
           }
         } else {
-          // Google Maps not enabled - require manual values
+          // OSRM not enabled - require manual values
           if (!currentLocation.distanceKm || !currentLocation.durationMinutes) {
             return res.status(400).json({
               error: 'Distance and duration are required for all segments',
-              message: 'Google Maps auto-calculation is not enabled. Please provide manual values.',
+              message: 'OSRM auto-calculation is not available. Please provide manual values.',
               segment: {
                 index: i,
                 from: previousLocation.name,
@@ -183,7 +182,7 @@ router.post('/route/:routeId', requireRole(['ADMIN', 'OPERATOR']), async (req: R
       message: 'Segments created successfully',
       count: segments.length,
       segments,
-      autoCalculated: googleMapsService.isEnabled(),
+      autoCalculated: osrmService.isEnabled(),
     };
 
     // Include calculation warnings if any

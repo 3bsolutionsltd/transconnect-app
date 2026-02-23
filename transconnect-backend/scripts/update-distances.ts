@@ -2,24 +2,23 @@
  * Batch Update Route and Segment Distances
  * 
  * This script updates all existing routes and segments with accurate
- * distances and durations calculated via Google Maps Distance Matrix API.
+ * distances and durations calculated via OSRM (OpenStreetMap).
  * 
  * Usage:
  *   npm run update-distances
  * 
  * Requirements:
- *   - GOOGLE_MAPS_API_KEY must be set in .env
+ *   - No API key needed (OSRM is free!)
  *   - Database must be accessible
  */
 
 import { PrismaClient } from '@prisma/client';
-import { GoogleMapsService } from '../src/services/googleMaps.service';
+import { osrmService } from '../src/services/osrm.service';
 import dotenv from 'dotenv';
 
 dotenv.config();
 
 const prisma = new PrismaClient();
-const googleMapsService = GoogleMapsService.getInstance();
 
 interface UpdateStats {
   routesProcessed: number;
@@ -60,7 +59,7 @@ async function updateRouteDistances(stats: UpdateStats) {
     try {
       console.log(`   Calculating distance...`);
       
-      const calculation = await googleMapsService.calculateDistance(
+      const calculation = await osrmService.calculateDistance(
         route.origin,
         route.destination
       );
@@ -152,7 +151,7 @@ async function updateSegmentDistances(stats: UpdateStats) {
     try {
       console.log(`     Calculating distance...`);
       
-      const calculation = await googleMapsService.calculateDistance(
+      const calculation = await osrmService.calculateDistance(
         segment.fromLocation,
         segment.toLocation
       );
@@ -193,14 +192,14 @@ async function main() {
   console.log('='.repeat(60));
   console.log(`Started at: ${new Date().toLocaleString()}\n`);
 
-  // Check if Google Maps service is enabled
-  if (!googleMapsService.isEnabled()) {
-    console.error('❌ Google Maps service is not enabled');
-    console.error('Please set GOOGLE_MAPS_API_KEY in your .env file');
+  // Check if OSRM service is enabled
+  if (!osrmService.isEnabled()) {
+    console.error('❌ OSRM service is not available');
+    console.error('This should not happen - OSRM is always enabled');
     process.exit(1);
   }
 
-  console.log('✅ Google Maps service is enabled');
+  console.log('✅ OSRM service is enabled (OpenStreetMap - FREE)');
   console.log('✅ Database connection established');
 
   const stats: UpdateStats = {

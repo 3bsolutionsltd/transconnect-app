@@ -1,5 +1,5 @@
 import { Request, Response, Router } from 'express';
-import { googleMapsService } from '../services/googleMaps.service';
+import { osrmService } from '../services/osrm.service';
 import { prisma } from '../index';
 import { authenticateToken } from '../middleware/auth';
 
@@ -19,14 +19,14 @@ router.get('/calculate', async (req: Request, res: Response) => {
       });
     }
 
-    if (!googleMapsService.isEnabled()) {
+    if (!osrmService.isEnabled()) {
       return res.status(503).json({
-        error: 'Google Maps service not configured',
-        message: 'Please set GOOGLE_MAPS_API_KEY in environment variables',
+        error: 'OSRM service not available',
+        message: 'Distance calculation service is unavailable',
       });
     }
 
-    const result = await googleMapsService.calculateDistance(
+    const result = await osrmService.calculateDistance(
       origin as string,
       destination as string,
       (mode as any) || 'driving'
@@ -66,14 +66,14 @@ router.post('/calculate-batch', authenticateToken, async (req: Request, res: Res
       });
     }
 
-    if (!googleMapsService.isEnabled()) {
+    if (!osrmService.isEnabled()) {
       return res.status(503).json({
-        error: 'Google Maps service not configured',
-        message: 'Please set GOOGLE_MAPS_API_KEY in environment variables',
+        error: 'OSRM service not available',
+        message: 'Distance calculation service is unavailable',
       });
     }
 
-    const results = await googleMapsService.calculateDistanceBatch(pairs);
+    const results = await osrmService.calculateDistanceBatch(pairs);
 
     return res.json({
       success: true,
@@ -104,10 +104,10 @@ router.post('/update-routes', authenticateToken, async (req: Request, res: Respo
       });
     }
 
-    if (!googleMapsService.isEnabled()) {
+    if (!osrmService.isEnabled()) {
       return res.status(503).json({
-        error: 'Google Maps service not configured',
-        message: 'Please set GOOGLE_MAPS_API_KEY in environment variables',
+        error: 'OSRM service not available',
+        message: 'Distance calculation service is unavailable',
       });
     }
 
@@ -138,7 +138,7 @@ router.post('/update-routes', authenticateToken, async (req: Request, res: Respo
     // Update routes in batches
     for (const route of routes) {
       try {
-        const calculation = await googleMapsService.calculateDistance(
+        const calculation = await osrmService.calculateDistance(
           route.origin,
           route.destination
         );
@@ -219,13 +219,13 @@ router.get('/geocode', async (req: Request, res: Response) => {
       });
     }
 
-    if (!googleMapsService.isEnabled()) {
+    if (!osrmService.isEnabled()) {
       return res.status(503).json({
-        error: 'Google Maps service not configured',
+        error: 'OSRM service not available',
       });
     }
 
-    const coordinates = await googleMapsService.geocode(address as string);
+    const coordinates = await osrmService.geocode(address as string);
 
     if (!coordinates) {
       return res.status(404).json({
@@ -262,13 +262,13 @@ router.get('/validate', async (req: Request, res: Response) => {
       });
     }
 
-    if (!googleMapsService.isEnabled()) {
+    if (!osrmService.isEnabled()) {
       return res.status(503).json({
-        error: 'Google Maps service not configured',
+        error: 'OSRM service not available',
       });
     }
 
-    const isValid = await googleMapsService.validateLocation(location as string);
+    const isValid = await osrmService.validateLocation(location as string);
 
     return res.json({
       success: true,

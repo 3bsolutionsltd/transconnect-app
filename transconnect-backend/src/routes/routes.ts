@@ -2,7 +2,7 @@ import { Router, Request, Response } from 'express';
 import { prisma } from '../index';
 import { authenticateToken } from '../middleware/auth';
 import { searchRoutesWithSegments } from '../services/routeSegmentService';
-import { googleMapsService } from '../services/googleMaps.service';
+import { osrmService } from '../services/osrm.service';
 
 const router = Router();
 
@@ -345,13 +345,13 @@ router.post('/', authenticateToken, async (req: Request, res: Response) => {
     // Convert via array to string if needed
     const viaString = Array.isArray(via) ? via.join(', ') : (via || null);
 
-    // Auto-calculate distance and duration if not provided and Google Maps is enabled
+    // Auto-calculate distance and duration if not provided and OSRM is enabled
     let finalDistance = distance;
     let finalDuration = duration;
 
-    if ((!distance || !duration) && googleMapsService.isEnabled()) {
+    if ((!distance || !duration) && osrmService.isEnabled()) {
       console.log(`Auto-calculating distance for ${origin} → ${destination}`);
-      const calculation = await googleMapsService.calculateDistance(origin, destination);
+      const calculation = await osrmService.calculateDistance(origin, destination);
       
       if (calculation.success) {
         finalDistance = finalDistance || calculation.distanceKm;
