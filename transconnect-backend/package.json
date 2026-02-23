@@ -23,6 +23,7 @@
     "db:test-connection": "ts-node scripts/test-db-connection.ts",
     "db:backup": "node scripts/backup.js",
     "db:optimize": "ts-node scripts/optimize-db.ts",
+    "update-distances": "ts-node scripts/update-distances.ts",
     "test": "jest --passWithNoTests",
     "test:watch": "jest --watch --passWithNoTests",
     "test:coverage": "jest --coverage --passWithNoTests",

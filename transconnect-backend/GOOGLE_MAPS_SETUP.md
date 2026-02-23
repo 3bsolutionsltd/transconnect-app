@@ -344,7 +344,137 @@ Backend automatically calculates and fills in distance/duration! ✨
 
 ---
 
-## 📝 Summary Checklist
+## � Batch Update Existing Routes and Segments
+
+After setting up your Google Maps API key, you'll want to populate distance data for all existing routes and segments in your database.
+
+### Running the Batch Update Script
+
+**Purpose**: Automatically calculate and update distances for all existing routes and segments that are missing this data.
+
+**Command**:
+```bash
+npm run update-distances
+```
+
+**What it does:**
+1. Fetches all active routes without distance/duration
+2. Calculates distances using Google Maps Distance Matrix API
+3. Updates routes in the database
+4. Fetches all route segments without distance/duration
+5. Calculates segment distances (e.g., Kampala → Masaka → Mbarara)
+6. Updates segments in the database
+7. Provides detailed progress logs and summary
+
+**Expected Output:**
+```
+🗺️  Batch Distance Update Script
+============================================================
+Started at: 2/23/2026, 10:30:00 AM
+
+✅ Google Maps service is enabled
+✅ Database connection established
+
+📍 Updating Route Distances
+============================================================
+Found 5 active routes
+
+🔄 Route 1/5: Kampala → Jinja
+   Calculating distance...
+   ✅ Updated: 80.5km, 95min
+
+✓ Route 2/5: Kampala → Mbarara
+   Already has distance: 265km, 240min
+
+[... continues for all routes and segments ...]
+
+============================================================
+📊 FINAL SUMMARY
+============================================================
+
+Routes:
+  Total Processed: 5
+  ✅ Updated: 3
+  ❌ Failed: 0
+  ⏭️  Skipped: 2
+
+Segments:
+  Total Processed: 12
+  ✅ Updated: 8
+  ❌ Failed: 1
+  ⏭️  Skipped: 3
+
+⏱️  Total Time: 15.43s
+
+✅ Batch update completed at: 2/23/2026, 10:30:15 AM
+```
+
+### When to Run This Script
+
+**Recommended Times:**
+1. **First Time Setup**: Immediately after adding your Google Maps API key
+2. **After Data Migration**: When importing routes from another system
+3. **After Manual Route Creation**: If routes were created without distances
+4. **Periodic Maintenance**: Monthly to catch any missing data
+
+### Rate Limiting
+
+The script includes automatic rate limiting:
+- **200ms delay** between API calls
+- Prevents hitting Google Maps API rate limits
+- For 100 routes: ~20 seconds total
+- For 500 routes: ~100 seconds (1.5 minutes)
+
+### Cost Estimation
+
+**Example Scenarios:**
+- 50 routes + 100 segments = 150 API calls = **$0.75** (or FREE with free tier)
+- 100 routes + 250 segments = 350 API calls = **$1.75** (or FREE with free tier)
+- 500 routes + 1000 segments = 1500 API calls = **$7.50** (likely FREE with monthly quota)
+
+**Note**: This is a one-time cost. Future route/segment creation will auto-calculate without needing batch updates.
+
+### Monitoring Progress
+
+The script provides real-time feedback:
+- **🔄** = Currently calculating
+- **✅** = Successfully updated
+- **❌** = Failed to calculate (manual entry needed)
+- **✓** = Already has distance data (skipped)
+
+### Handling Failures
+
+If some calculations fail:
+1. **Review the logs** - error details are shown for each failure
+2. **Common causes**:
+   - Invalid location names (typos, locations not in Google Maps)
+   - Network connectivity issues
+   - API quota exceeded
+3. **Solutions**:
+   - Fix location names in database
+   - Re-run the script (it skips already-updated items)
+   - Manually update failed items via API or admin dashboard
+
+### Re-running the Script
+
+**Safe to re-run multiple times:**
+- ✅ Script only updates items missing distance/duration
+- ✅ Won't overwrite existing data
+- ✅ Won't duplicate API calls for items already processed
+- ✅ Can be run anytime without side effects
+
+**Example Re-run After Fixing Data:**
+```bash
+# After fixing typo in location name from "Masak" to "Masaka"
+npm run update-distances
+
+# Script will only process the previously failed item
+# Everything else will be skipped
+```
+
+---
+
+## �📝 Summary Checklist
 
 - [ ] Created Google Cloud Project
 - [ ] Enabled Distance Matrix API
@@ -354,8 +484,7 @@ Backend automatically calculates and fills in distance/duration! ✨
 - [ ] Added key to local `.env` file
 - [ ] Added key to Render environment variables
 - [ ] Tested with `test-google-maps.ts` script
-- [ ] Verified API call works via curl/Postman
-- [ ] Set up budget alerts ($10/month recommended)
+- [ ] Verified API call works via curl/Postman- [ ] **Ran batch update script** (`npm run update-distances`)- [ ] Set up budget alerts ($10/month recommended)
 - [ ] Documented key in secure location
 
 ---
