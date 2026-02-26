@@ -14,6 +14,7 @@ datasource db {
 enum UserRole {
   PASSENGER
   OPERATOR
+  MANAGER // NEW: Can manage bookings across operators
   ADMIN
 }
 
@@ -38,6 +39,22 @@ enum PaymentMethod {
   CASH
 }
 
+enum TransferStatus {
+  PENDING // Transfer requested, awaiting approval
+  APPROVED // Approved by manager/admin
+  REJECTED // Rejected by manager/admin
+  COMPLETED // Transfer executed, seat reassigned
+  CANCELLED // Customer cancelled the transfer request
+}
+
+enum TransferReason {
+  SCHEDULE_CONFLICT
+  EMERGENCY
+  MISSED_BUS
+  PERSONAL_REASONS
+  OTHER
+}
+
 model User {
   id        String   @id @default(cuid())
   email     String   @unique
@@ -59,6 +76,9 @@ model User {
   notifications           Notification[]
   notificationPreferences UserNotificationPreference?
   deviceTokens            DeviceToken[]
+  transferRequests        BookingTransfer[]           @relation("TransferRequests")
+  transferReviews         BookingTransfer[]           @relation("TransferReviews")
+  seatChanges             BookingSeatHistory[]        @relation("SeatChanges")
 
   @@map("users")
 }
@@ -69,14 +89,14 @@ model Operator {
   license        String   @unique
   approved       Boolean  @default(false)
   userId         String   @unique
-  agentId        String?  // NEW: Managing agent
+  agentId        String? // NEW: Managing agent
   managedByAgent Boolean  @default(false) // NEW: Agent vs Admin managed
   createdAt      DateTime @default(now())
   updatedAt      DateTime @updatedAt
 
   // Relations
-  user             User           @relation(fields: [userId], references: [id], onDelete: Cascade)
-  managingAgent    Agent?         @relation("ManagedOperators", fields: [agentId], references: [id])
+  user             User            @relation(fields: [userId], references: [id], onDelete: Cascade)
+  managingAgent    Agent?          @relation("ManagedOperators", fields: [agentId], references: [id])
   buses            Bus[]
   routes           Route[]
   operatorUsers    OperatorUser[]
@@ -122,11 +142,15 @@ model Route {
   updatedAt       DateTime @updatedAt
 
   // Relations
-  operator Operator       @relation(fields: [operatorId], references: [id], onDelete: Cascade)
-  bus      Bus            @relation(fields: [busId], references: [id], onDelete: Cascade)
-  bookings Booking[]
-  stops    RouteStop[]
-  segments RouteSegment[] // NEW: Segment-based pricing
+  operator       Operator             @relation(fields: [operatorId], references: [id], onDelete: Cascade)
+  bus            Bus                  @relation(fields: [busId], references: [id], onDelete: Cascade)
+  bookings       Booking[]
+  stops          RouteStop[]
+  segments       RouteSegment[] // NEW: Segment-based pricing
+  transfersFrom  BookingTransfer[]    @relation("TransferFromRoute")
+  transfersTo    BookingTransfer[]    @relation("TransferToRoute")
+  seatHistoryOld BookingSeatHistory[] @relation("HistoryOldRoute")
+  seatHistoryNew BookingSeatHistory[] @relation("HistoryNewRoute")
 
   @@map("routes")
 }
@@ -210,10 +234,12 @@ model Booking {
   updatedAt     DateTime      @updatedAt
 
   // Relations
-  user         User          @relation(fields: [userId], references: [id], onDelete: Cascade)
-  route        Route         @relation(fields: [routeId], references: [id], onDelete: Cascade)
+  user         User                 @relation(fields: [userId], references: [id], onDelete: Cascade)
+  route        Route                @relation(fields: [routeId], references: [id], onDelete: Cascade)
   payment      Payment?
   verification Verification?
+  transfers    BookingTransfer[]    @relation("OriginalBooking")
+  seatHistory  BookingSeatHistory[]
 
   @@map("bookings")
 }
@@ -237,6 +263,91 @@ model Payment {
   webhookLogs WebhookLog[]
 
   @@map("payments")
+}
+
+// NEW: Booking transfer requests (Week 4 - Booking Transfer System)
+model BookingTransfer {
+  id        String @id @default(cuid())
+  bookingId String // Original booking being transferred
+  userId    String // Customer requesting transfer
+
+  // Transfer details
+  fromRouteId    String // Original route
+  toRouteId      String // Target route (can be same route, different date)
+  fromTravelDate DateTime // Original travel date
+  toTravelDate   DateTime // Requested travel date
+  fromSeatNumber String // Original seat
+  toSeatNumber   String? // Requested/assigned seat (null until approved)
+
+  // Pricing adjustments
+  originalAmount  Float // Original booking amount
+  newAmount       Float // New booking amount (if route/date changes)
+  priceDifference Float // Difference (positive = customer pays more, negative = refund)
+
+  // Request details
+  reason     TransferReason @default(OTHER)
+  reasonText String? // Additional explanation
+  status     TransferStatus @default(PENDING)
+
+  // Approval workflow
+  requestedAt   DateTime  @default(now())
+  reviewedAt    DateTime? // When manager/admin reviewed
+  reviewedBy    String? // User ID of manager/admin
+  reviewerNotes String? // Internal notes from reviewer
+
+  // Transfer execution
+  completedAt DateTime? // When transfer was executed
+  metadata    Json? // Additional data (payment refs, etc.)
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  // Relations
+  booking     Booking              @relation("OriginalBooking", fields: [bookingId], references: [id], onDelete: Cascade)
+  customer    User                 @relation("TransferRequests", fields: [userId], references: [id])
+  fromRoute   Route                @relation("TransferFromRoute", fields: [fromRouteId], references: [id])
+  toRoute     Route                @relation("TransferToRoute", fields: [toRouteId], references: [id])
+  reviewer    User?                @relation("TransferReviews", fields: [reviewedBy], references: [id])
+  seatHistory BookingSeatHistory[]
+
+  @@index([bookingId])
+  @@index([userId])
+  @@index([status])
+  @@index([toTravelDate])
+  @@map("booking_transfers")
+}
+
+// NEW: Audit trail for booking seat changes (Week 4 - Booking Transfer System)
+model BookingSeatHistory {
+  id         String  @id @default(cuid())
+  bookingId  String // Booking that changed
+  transferId String? // Related transfer request (if applicable)
+
+  // Seat change details
+  oldSeatNumber String // Previous seat
+  newSeatNumber String // New seat assigned
+  oldRouteId    String // Previous route
+  newRouteId    String // New route
+  oldTravelDate DateTime // Previous travel date
+  newTravelDate DateTime // New travel date
+
+  // Change metadata
+  changeReason String // 'TRANSFER', 'ADMIN_OVERRIDE', 'SYSTEM_ADJUSTMENT'
+  changedBy    String // User ID who made the change
+  notes        String? // Optional notes
+
+  createdAt DateTime @default(now())
+
+  // Relations
+  booking       Booking          @relation(fields: [bookingId], references: [id], onDelete: Cascade)
+  transfer      BookingTransfer? @relation(fields: [transferId], references: [id])
+  changedByUser User             @relation("SeatChanges", fields: [changedBy], references: [id])
+  oldRoute      Route            @relation("HistoryOldRoute", fields: [oldRouteId], references: [id])
+  newRoute      Route            @relation("HistoryNewRoute", fields: [newRouteId], references: [id])
+
+  @@index([bookingId])
+  @@index([transferId])
+  @@map("booking_seat_history")
 }
 
 model WebhookLog {
@@ -639,7 +750,7 @@ model AgentOperator {
   agentId     String
   operatorId  String
   role        String   @default("MANAGER") // MANAGER, SUPPORTER, etc.
-  permissions Json?    // Array of permission strings
+  permissions Json? // Array of permission strings
   isActive    Boolean  @default(true)
   createdAt   DateTime @default(now())
   updatedAt   DateTime @updatedAt

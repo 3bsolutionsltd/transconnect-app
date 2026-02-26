@@ -34,6 +34,8 @@ import adminSeedRoutes from './routes/admin-seed';
 import agentRoutes from './routes/agents';
 import segmentRoutes from './routes/segments'; // NEW: Route segments management
 import distanceRoutes from './routes/distance'; // NEW: Google Maps distance calculation
+import bookingTransferRoutes from './routes/booking-transfers'; // NEW: Week 4 - Booking Transfer System
+import managerTransferRoutes from './routes/manager-transfers'; // NEW: Week 4 - Manager Transfer Operations
 import { cleanupOfflineAgents } from './middleware/agentActivity';
 
 dotenv.config();
@@ -142,6 +144,8 @@ app.use('/api/routes', routeRoutes);
 app.use('/api/segments', segmentRoutes); // NEW: Route segments management
 app.use('/api/distance', distanceRoutes); // NEW: Google Maps distance calculation
 app.use('/api/bookings', bookingRoutes);
+app.use('/api/bookings', bookingTransferRoutes); // NEW: Week 4 - Customer transfer requests
+app.use('/api/manager/transfers', managerTransferRoutes); // NEW: Week 4 - Manager transfer operations
 app.use('/api/payments', paymentRoutes);
 app.use('/api/qr', qrRoutes);
 app.use('/api/operators', operatorRoutes);
