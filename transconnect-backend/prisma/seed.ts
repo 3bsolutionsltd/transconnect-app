@@ -143,10 +143,29 @@ async function main() {
       create: {
         ...routeData,
         operatorId: operator.id,
-        active: true
+        active: true,
+        segmentEnabled: true, // Enable segments for searchability
       }
     });
     createdRoutes.push(route);
+
+    // Create a simple segment for each route (single segment from origin to destination)
+    await prisma.routeSegment.upsert({
+      where: {
+        id: `segment-${route.id}`
+      },
+      update: {},
+      create: {
+        id: `segment-${route.id}`,
+        routeId: route.id,
+        segmentOrder: 1,
+        fromLocation: routeData.origin,
+        toLocation: routeData.destination,
+        distanceKm: routeData.distance,
+        durationMinutes: routeData.duration,
+        basePrice: routeData.price,
+      }
+    });
   }
 
   // Create some test bookings
