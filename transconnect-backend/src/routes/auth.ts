@@ -4,6 +4,7 @@ import jwt from 'jsonwebtoken';
 import { prisma } from '../index';
 import { body, validationResult } from 'express-validator';
 import { EmailService } from '../services/email.service';
+import { authenticateToken } from '../middleware/auth';
 
 const router = Router();
 
@@ -397,6 +398,55 @@ router.post('/reset-password', [
       return res.status(400).json({ error: 'Invalid or expired reset token' });
     }
     res.status(500).json({ error: 'Failed to reset password' });
+  }
+});
+
+// Delete user account
+router.delete('/delete-account', authenticateToken, async (req: Request, res: Response) => {
+  try {
+    const userId = (req as any).user.id;
+
+    // Check if user exists
+    const user = await prisma.user.findUnique({
+      where: { id: userId },
+      include: {
+        bookings: true,
+        payments: true
+      }
+    });
+
+    if (!user) {
+      return res.status(404).json({ error: 'User not found' });
+    }
+
+    // Delete associated data (cascade delete should handle most, but let's be explicit)
+    // Delete payments first (they reference bookings)
+    await prisma.payment.deleteMany({
+      where: { userId: userId }
+    });
+
+    // Delete bookings
+    await prisma.booking.deleteMany({
+      where: { userId: userId }
+    });
+
+    // Delete notifications
+    await prisma.notification.deleteMany({
+      where: { userId: userId }
+    });
+
+    // Finally, delete the user account
+    await prisma.user.delete({
+      where: { id: userId }
+    });
+
+    res.json({ 
+      message: 'Account deleted successfully',
+      deletedAt: new Date().toISOString()
+    });
+  } catch (error) {
+    console.error('Delete account error:', error);
+    res.status(500).json({ error: 'Failed to delete account' });
   }
 });
 
