@@ -125,9 +125,13 @@ const AppStack = () => (
 export default function AppNavigator() {
   const { isAuthenticated, isLoading } = useAuth();
 
+  console.log('🧭 AppNavigator - isLoading:', isLoading, 'isAuthenticated:', isAuthenticated);
+
   if (isLoading) {
+    console.log('⏳ Showing loading screen...');
     return <LoadingScreen />;
   }
 
+  console.log('🚦 Showing', isAuthenticated ? 'AppStack' : 'AuthStack');
   return isAuthenticated ? <AppStack /> : <AuthStack />;
 }

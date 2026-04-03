@@ -50,8 +50,21 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const checkAuthState = async () => {
     try {
       console.log('🔐 Checking auth state...');
-      const storedToken = await secureStorage.getItem('auth_token');
-      const storedUser = await secureStorage.getItem('user_data');
+      
+      // Add timeout to prevent hanging
+      const authCheckPromise = Promise.all([
+        secureStorage.getItem('auth_token'),
+        secureStorage.getItem('user_data')
+      ]);
+      
+      const timeoutPromise = new Promise((_, reject) => 
+        setTimeout(() => reject(new Error('Auth check timeout')), 3000)
+      );
+      
+      const [storedToken, storedUser] = await Promise.race([
+        authCheckPromise,
+        timeoutPromise
+      ]) as [string | null, string | null];
       
       if (storedToken && storedUser) {
         setToken(storedToken);
@@ -62,6 +75,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       }
     } catch (error) {
       console.error('❌ Error checking auth state:', error);
+      // Continue anyway - user can login normally
     } finally {
       console.log('✅ Auth check complete');
       setIsLoading(false);

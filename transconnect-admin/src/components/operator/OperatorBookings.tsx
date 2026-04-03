@@ -7,8 +7,10 @@ import {
   AlertCircle,
   Filter,
   Search,
-  Eye
+  Eye,
+  ArrowRightLeft
 } from 'lucide-react';
+import TransferBookingModal from '../TransferBookingModal';
 
 const OperatorBookings = () => {
   const [bookings, setBookings] = useState<any[]>([]);
@@ -16,22 +18,46 @@ const OperatorBookings = () => {
   const [filter, setFilter] = useState('all');
   const [searchTerm, setSearchTerm] = useState('');
   const [selectedBooking, setSelectedBooking] = useState<any>(null);
+  const [transferBooking, setTransferBooking] = useState<any>(null); // For transfer modal
+  const [bookingTransfers, setBookingTransfers] = useState<{[key: string]: any}>({}); // Transfer status by booking ID
 
   const API_BASE_URL = process.env.REACT_APP_API_URL || 'http://localhost:5000/api';
 
   const loadBookings = useCallback(async () => {
     try {
       const token = localStorage.getItem('admin_token');
-      const response = await fetch(`${API_BASE_URL}/operator-management/bookings`, {
-        headers: {
-          'Authorization': `Bearer ${token}`,
-          'Content-Type': 'application/json'
-        }
-      });
+      const [bookingsResponse, transfersResponse] = await Promise.all([
+        fetch(`${API_BASE_URL}/operator-management/bookings`, {
+          headers: {
+            'Authorization': `Bearer ${token}`,
+            'Content-Type': 'application/json'
+          }
+        }),
+        fetch(`${API_BASE_URL}/manager/transfers/pending`, {
+          headers: {
+            'Authorization': `Bearer ${token}`,
+            'Content-Type': 'application/json'
+          }
+        })
+      ]);
 
-      if (response.ok) {
-        const data = await response.json();
+      if (bookingsResponse.ok) {
+        const data = await bookingsResponse.json();
         setBookings(data.bookings || []);
+      }
+
+      // Load transfer status for each booking
+      if (transfersResponse.ok) {
+        const transfersData = await transfersResponse.json();
+        const transferMap: {[key: string]: any} = {};
+        // API returns { success: true, data: { transfers: [...] } }
+        const transfers = transfersData.data?.transfers || transfersData.transfers || [];
+        if (transfers.length > 0) {
+          transfers.forEach((transfer: any) => {
+            transferMap[transfer.bookingId] = transfer;
+          });
+        }
+        setBookingTransfers(transferMap);
       }
     } catch (error) {
       console.error('Error loading bookings:', error);
@@ -201,10 +227,15 @@ const OperatorBookings = () => {
                     <p className="text-sm text-gray-600">{passengerPhone}</p>
                   </div>
                 </div>
-                <div className="text-right">
+                <div className="text-right flex flex-col items-end gap-2">
                   <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium border ${getStatusColor(booking.status)}`}>
                     {booking.status}
                   </span>
+                  {bookingTransfers[booking.id] && (
+                    <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium border bg-blue-100 text-blue-800 border-blue-200">
+                      🔄 Transfer {bookingTransfers[booking.id].status}
+                    </span>
+                  )}
                 </div>
               </div>
 
@@ -239,6 +270,26 @@ const OperatorBookings = () => {
                   <Eye className="h-4 w-4 mr-1" />
                   View Details
                 </button>
+                {/* Transfer Button - Show for confirmed/pending bookings without a pending transfer */}
+                {(booking.status === 'CONFIRMED' || booking.status === 'PENDING') && !bookingTransfers[booking.id] && (
+                  <button 
+                    onClick={() => setTransferBooking(booking)}
+                    className="inline-flex items-center px-3 py-1 border border-blue-300 text-sm text-blue-700 rounded-md hover:bg-blue-50 transition-colors"
+                  >
+                    <ArrowRightLeft className="h-4 w-4 mr-1" />
+                    Transfer
+                  </button>
+                )}
+                {/* Show transfer info if exists */}
+                {bookingTransfers[booking.id] && (
+                  <button 
+                    onClick={() => alert(`Transfer Status: ${bookingTransfers[booking.id].status}\nFrom: ${bookingTransfers[booking.id].fromRoute?.origin} → ${bookingTransfers[booking.id].fromRoute?.destination}\nTo: ${bookingTransfers[booking.id].toRoute?.origin} → ${bookingTransfers[booking.id].toRoute?.destination}\nReason: ${bookingTransfers[booking.id].reason}`)}
+                    className="inline-flex items-center px-3 py-1 border border-blue-300 text-sm text-blue-700 rounded-md hover:bg-blue-50 transition-colors"
+                  >
+                    <ArrowRightLeft className="h-4 w-4 mr-1" />
+                    View Transfer
+                  </button>
+                )}
                 {booking.status === 'PENDING' && (
                   <>
                     <button 
@@ -249,13 +300,31 @@ const OperatorBookings = () => {
                       Confirm
                     </button>
                     <button 
-                      onClick={() => updateBookingStatus(booking.id, 'CANCELLED', 'Cancelled by operator')}
+                      onClick={() => {
+                        if (window.confirm('Are you sure you want to cancel this booking?')) {
+                          updateBookingStatus(booking.id, 'CANCELLED', 'Cancelled by operator');
+                        }
+                      }}
                       className="inline-flex items-center px-3 py-1 border border-red-300 text-sm text-red-700 rounded-md hover:bg-red-50 transition-colors"
                     >
                       <XCircle className="h-4 w-4 mr-1" />
                       Cancel
                     </button>
                   </>
+                )}
+                {/* Cancel button for CONFIRMED bookings too */}
+                {booking.status === 'CONFIRMED' && !bookingTransfers[booking.id] && (
+                  <button 
+                    onClick={() => {
+                      if (window.confirm('Are you sure you want to cancel this confirmed booking?')) {
+                        updateBookingStatus(booking.id, 'CANCELLED', 'Cancelled by admin');
+                      }
+                    }}
+                    className="inline-flex items-center px-3 py-1 border border-red-300 text-sm text-red-700 rounded-md hover:bg-red-50 transition-colors"
+                  >
+                    <XCircle className="h-4 w-4 mr-1" />
+                    Cancel
+                  </button>
                 )}
               </div>
             </div>
@@ -321,6 +390,18 @@ const OperatorBookings = () => {
             </div>
           </div>
         </div>
+      )}
+
+      {/* Transfer Booking Modal */}
+      {transferBooking && (
+        <TransferBookingModal
+          booking={transferBooking}
+          onClose={() => setTransferBooking(null)}
+          onSuccess={() => {
+            loadBookings(); // Reload bookings after transfer
+            setTransferBooking(null);
+          }}
+        />
       )}
     </div>
   );

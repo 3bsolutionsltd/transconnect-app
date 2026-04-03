@@ -2,8 +2,10 @@ import axios from 'axios';
 import Constants from 'expo-constants';
 import { secureStorage } from './storage';
 
-const API_BASE_URL = Constants.expoConfig?.extra?.apiUrl || 
-  'https://transconnect-app-44ie.onrender.com/api';
+// Use environment variable first, then Expo config, then default to staging
+const API_BASE_URL = process.env.EXPO_PUBLIC_API_URL ||
+  Constants.expoConfig?.extra?.apiUrl || 
+  'https://transconnect-app-testing.onrender.com/api';
 
 export const apiClient = axios.create({
   baseURL: API_BASE_URL,

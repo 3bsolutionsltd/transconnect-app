@@ -8,11 +8,13 @@ export default function SplashScreen({ onFinish }: { onFinish: () => void }) {
 
   useEffect(() => {
     console.log('💫 Splash screen showing...');
+    console.log('💫 onFinish type:', typeof onFinish);
     
+    // Start animation
     Animated.parallel([
       Animated.timing(fadeAnim, {
         toValue: 1,
-        duration: 1000,
+        duration: 800,
         useNativeDriver: true,
       }),
       Animated.spring(scaleAnim, {
@@ -21,15 +23,36 @@ export default function SplashScreen({ onFinish }: { onFinish: () => void }) {
         friction: 2,
         useNativeDriver: true,
       }),
-    ]).start();
+    ]).start(() => {
+      console.log('🎨 Animation complete');
+    });
 
-    const timer = setTimeout(() => {
-      console.log('✅ Splash screen finished');
-      onFinish();
-    }, 1500); // Reduced from 2500ms to 1500ms
+    // Auto-finish after timeout - multiple failsafes
+    const timer1 = setTimeout(() => {
+      console.log('✅ Splash screen finished (timer 1)');
+      try {
+        onFinish();
+      } catch (error) {
+        console.error('Error finishing splash (timer 1):', error);
+      }
+    }, 1200);
+    
+    // Backup timer in case first one fails
+    const timer2 = setTimeout(() => {
+      console.log('⚠️ Backup splash finish triggered (timer 2)');
+      try {
+        onFinish();
+      } catch (error) {
+        console.error('Error finishing splash (timer 2):', error);
+      }
+    }, 2000);
 
-    return () => clearTimeout(timer);
-  }, []);
+    return () => {
+      console.log('🧹 Splash screen cleanup');
+      clearTimeout(timer1);
+      clearTimeout(timer2);
+    };
+  }, [onFinish]);
 
   return (
     <View style={styles.container}>
