@@ -5,32 +5,38 @@ import { body, validationResult } from 'express-validator';
 
 const router = Router();
 
-// Get all bookings for operator's routes
+// Get all bookings for operator's routes (or all bookings for admins)
 router.get('/bookings', authenticateToken, async (req: Request, res: Response) => {
   try {
     const userId = (req as any).user.id;
     const userRole = (req as any).user.role;
     const { page = 1, limit = 10, status, date, routeId } = req.query;
 
-    if (userRole !== 'OPERATOR') {
-      return res.status(403).json({ error: 'Only operators can access this endpoint' });
-    }
-
-    // Find operator by user ID
-    const operator = await prisma.operator.findUnique({
-      where: { userId }
-    });
-
-    if (!operator) {
-      return res.status(404).json({ error: 'Operator profile not found' });
+    if (userRole !== 'OPERATOR' && userRole !== 'ADMIN' && userRole !== 'MANAGER') {
+      return res.status(403).json({ error: 'Access denied' });
     }
 
     // Build where clause
-    const whereClause: any = {
-      route: {
-        operatorId: operator.id
+    const whereClause: any = {};
+    let operatorData: any = null;
+
+    // If operator, filter by their routes only
+    if (userRole === 'OPERATOR') {
+      // Find operator by user ID
+      const operator = await prisma.operator.findUnique({
+        where: { userId }
+      });
+
+      if (!operator) {
+        return res.status(404).json({ error: 'Operator profile not found' });
       }
-    };
+
+      whereClause.route = {
+        operatorId: operator.id
+      };
+      operatorData = operator;
+    }
+    // Admins and managers see all bookings (no filter)
 
     if (status) {
       whereClause.status = status;
@@ -134,7 +140,7 @@ router.get('/bookings', authenticateToken, async (req: Request, res: Response) =
       },
       summary: {
         totalBookings: total,
-        operator: operator.companyName
+        operator: operatorData?.companyName || 'All Operators'
       }
     });
   } catch (error) {
@@ -481,17 +487,9 @@ router.put('/bookings/:bookingId/status', [
     const userId = (req as any).user.id;
     const userRole = (req as any).user.role;
 
-    if (userRole !== 'OPERATOR') {
-      return res.status(403).json({ error: 'Only operators can update booking status' });
-    }
-
-    // Find operator by user ID
-    const operator = await prisma.operator.findUnique({
-      where: { userId }
-    });
-
-    if (!operator) {
-      return res.status(404).json({ error: 'Operator profile not found' });
+    // Allow ADMIN, MANAGER, and OPERATOR roles
+    if (userRole !== 'OPERATOR' && userRole !== 'ADMIN' && userRole !== 'MANAGER') {
+      return res.status(403).json({ error: 'Access denied' });
     }
 
     // Get booking with route details
@@ -511,10 +509,21 @@ router.put('/bookings/:bookingId/status', [
       return res.status(404).json({ error: 'Booking not found' });
     }
 
-    // Verify operator owns this booking's route
-    if (booking.route.operatorId !== operator.id) {
-      return res.status(403).json({ error: 'Not authorized to update this booking' });
+    // If operator, verify they own this booking's route
+    if (userRole === 'OPERATOR') {
+      const operator = await prisma.operator.findUnique({
+        where: { userId }
+      });
+
+      if (!operator) {
+        return res.status(404).json({ error: 'Operator profile not found' });
+      }
+
+      if (booking.route.operatorId !== operator.id) {
+        return res.status(403).json({ error: 'Not authorized to update this booking' });
+      }
     }
+    // Admins and managers can update any booking (no ownership check)
 
     // Update booking status
     const updatedBooking = await prisma.booking.update({

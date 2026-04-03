@@ -538,3 +538,385 @@ export const getTransferStatistics = async (req: Request, res: Response) => {
     });
   }
 };
+
+/**
+ * Create a transfer on behalf of a customer (Admin-initiated)
+ * POST /api/manager/transfers/create
+ */
+export const createTransferForCustomer = async (req: Request, res: Response) => {
+  try {
+    const managerId = (req as any).user?.id;
+    const {
+      bookingId,
+      targetTravelDate,
+      targetRouteId,
+      reason,
+      reasonDetails,
+      autoApprove = false, // Admin can choose to auto-approve
+    } = req.body;
+
+    // Validate required fields
+    if (!bookingId) {
+      return res.status(400).json({
+        success: false,
+        message: 'Booking ID is required',
+      });
+    }
+
+    if (!targetTravelDate && !targetRouteId) {
+      return res.status(400).json({
+        success: false,
+        message: 'At least one of targetTravelDate or targetRouteId must be provided',
+      });
+    }
+
+    if (!reason) {
+      return res.status(400).json({
+        success: false,
+        message: 'Reason is required',
+      });
+    }
+
+    // Fetch the booking
+    const booking = await prisma.booking.findUnique({
+      where: { id: bookingId },
+      include: {
+        user: true,
+        route: {
+          include: {
+            operator: true,
+          },
+        },
+      },
+    });
+
+    if (!booking) {
+      return res.status(404).json({
+        success: false,
+        message: 'Booking not found',
+      });
+    }
+
+    // Check booking status
+    if (booking.status !== BookingStatus.CONFIRMED) {
+      return res.status(400).json({
+        success: false,
+        message: 'Only confirmed bookings can be transferred',
+      });
+    }
+
+    // Check if there's already a pending transfer
+    const existingTransfer = await prisma.bookingTransfer.findFirst({
+      where: {
+        bookingId,
+        status: TransferStatus.PENDING,
+      },
+    });
+
+    if (existingTransfer) {
+      return res.status(400).json({
+        success: false,
+        message: 'This booking already has a pending transfer request',
+      });
+    }
+
+    const newTravelDate = targetTravelDate ? new Date(targetTravelDate) : booking.travelDate;
+    const newRouteId = targetRouteId || booking.routeId;
+
+    // Fetch the target route if changing routes
+    let targetRoute = booking.route;
+    if (targetRouteId && targetRouteId !== booking.routeId) {
+      const fetchedRoute = await prisma.route.findUnique({
+        where: { id: targetRouteId },
+        include: { operator: true },
+      });
+
+      if (!fetchedRoute) {
+        return res.status(404).json({
+          success: false,
+          message: 'Target route not found',
+        });
+      }
+
+      targetRoute = fetchedRoute;
+    }
+
+    // Check seat availability on new date/route
+    const seatAvailable = await checkSeatAvailability(
+      newRouteId,
+      newTravelDate,
+      booking.seatNumber
+    );
+
+    if (!seatAvailable) {
+      return res.status(400).json({
+        success: false,
+        message: 'Seat not available on the target date/route',
+      });
+    }
+
+    // Calculate price difference
+    const originalPrice = booking.totalAmount;
+    const newPrice = targetRoute.price;
+    const priceDifference = newPrice - originalPrice;
+
+    // Create transfer record
+    const transfer = await prisma.bookingTransfer.create({
+      data: {
+        bookingId,
+        userId: booking.userId,
+        fromRouteId: booking.routeId,
+        toRouteId: newRouteId,
+        fromTravelDate: booking.travelDate,
+        toTravelDate: newTravelDate,
+        reason,
+        reasonText: reasonDetails || `Admin-initiated transfer by manager ${managerId}`,
+        fromSeatNumber: booking.seatNumber,
+        toSeatNumber: booking.seatNumber,
+        originalAmount: originalPrice,
+        newAmount: newPrice,
+        priceDifference,
+        status: autoApprove ? TransferStatus.APPROVED : TransferStatus.PENDING,
+        reviewedBy: autoApprove ? managerId : null,
+        reviewedAt: autoApprove ? new Date() : null,
+      },
+      include: {
+        customer: {
+          select: {
+            id: true,
+            firstName: true,
+            lastName: true,
+            email: true,
+            phone: true,
+          },
+        },
+        booking: true,
+        fromRoute: true,
+        toRoute: true,
+      },
+    });
+
+    // If auto-approve, execute the transfer immediately
+    if (autoApprove) {
+      try {
+        await executeTransfer(
+          booking.id,
+          newRouteId,
+          newTravelDate,
+          booking.seatNumber,
+          newPrice,
+          managerId,
+          transfer.id
+        );
+
+        // Fetch updated transfer with relations
+        const updatedTransfer = await prisma.bookingTransfer.findUnique({
+          where: { id: transfer.id },
+          include: {
+            customer: {
+              select: {
+                id: true,
+                firstName: true,
+                lastName: true,
+                email: true,
+                phone: true,
+              },
+            },
+            booking: true,
+            fromRoute: true,
+            toRoute: true,
+          },
+        });
+
+        return res.status(201).json({
+          success: true,
+          message: 'Transfer created and executed successfully',
+          data: updatedTransfer,
+        });
+      } catch (error) {
+        return res.status(500).json({
+          success: false,
+          message: 'Transfer created but execution failed: ' + (error instanceof Error ? error.message : 'Unknown error'),
+        });
+      }
+    }
+
+    return res.status(201).json({
+      success: true,
+      message: 'Transfer request created successfully',
+      data: transfer,
+    });
+  } catch (error) {
+    console.error('Error creating transfer for customer:', error);
+    return res.status(500).json({
+      success: false,
+      message: 'Failed to create transfer request',
+      error: error instanceof Error ? error.message : 'Unknown error',
+    });
+  }
+};
+
+/**
+ * Batch transfer multiple bookings
+ * POST /api/manager/transfers/batch
+ */
+export const batchTransferBookings = async (req: Request, res: Response) => {
+  try {
+    const managerId = (req as any).user?.id;
+    const {
+      bookingIds,
+      targetTravelDate,
+      targetRouteId,
+      reason,
+      reasonDetails,
+      autoApprove = false,
+    } = req.body;
+
+    // Validate required fields
+    if (!bookingIds || !Array.isArray(bookingIds) || bookingIds.length === 0) {
+      return res.status(400).json({
+        success: false,
+        message: 'At least one booking ID is required',
+      });
+    }
+
+    if (!targetTravelDate && !targetRouteId) {
+      return res.status(400).json({
+        success: false,
+        message: 'At least one of targetTravelDate or targetRouteId must be provided',
+      });
+    }
+
+    if (!reason) {
+      return res.status(400).json({
+        success: false,
+        message: 'Reason is required',
+      });
+    }
+
+    const results = {
+      successful: [] as any[],
+      failed: [] as any[],
+    };
+
+    // Process each booking
+    for (const bookingId of bookingIds) {
+      try {
+        // Fetch the booking
+        const booking = await prisma.booking.findUnique({
+          where: { id: bookingId },
+          include: {
+            user: true,
+            route: true,
+          },
+        });
+
+        if (!booking) {
+          results.failed.push({
+            bookingId,
+            error: 'Booking not found',
+          });
+          continue;
+        }
+
+        if (booking.status !== BookingStatus.CONFIRMED) {
+          results.failed.push({
+            bookingId,
+            error: 'Only confirmed bookings can be transferred',
+          });
+          continue;
+        }
+
+        // Check for existing pending transfer
+        const existingTransfer = await prisma.bookingTransfer.findFirst({
+          where: {
+            bookingId,
+            status: TransferStatus.PENDING,
+          },
+        });
+
+        if (existingTransfer) {
+          results.failed.push({
+            bookingId,
+            error: 'Already has a pending transfer',
+          });
+          continue;
+        }
+
+        const newTravelDate = targetTravelDate ? new Date(targetTravelDate) : booking.travelDate;
+        const newRouteId = targetRouteId || booking.routeId;
+
+        // Calculate price difference
+        let newPrice = booking.totalAmount;
+        if (targetRouteId && targetRouteId !== booking.routeId) {
+          const targetRoute = await prisma.route.findUnique({
+            where: { id: targetRouteId },
+          });
+          if (targetRoute) {
+            newPrice = targetRoute.price;
+          }
+        }
+
+        const priceDifference = newPrice - booking.totalAmount;
+
+        // Create transfer record
+        const transfer = await prisma.bookingTransfer.create({
+          data: {
+            bookingId,
+            userId: booking.userId,
+            fromRouteId: booking.routeId,
+            toRouteId: newRouteId,
+            fromTravelDate: booking.travelDate,
+            toTravelDate: newTravelDate,
+            reason,
+            reasonText: reasonDetails || `Batch transfer by manager ${managerId}`,
+            fromSeatNumber: booking.seatNumber,
+            toSeatNumber: booking.seatNumber,
+            originalAmount: booking.totalAmount,
+            newAmount: newPrice,
+            priceDifference,
+            status: autoApprove ? TransferStatus.APPROVED : TransferStatus.PENDING,
+            reviewedBy: autoApprove ? managerId : null,
+            reviewedAt: autoApprove ? new Date() : null,
+          },
+        });
+
+        // If auto-approve, execute the transfer
+        if (autoApprove) {
+          await executeTransfer(
+            booking.id,
+            newRouteId,
+            newTravelDate,
+            booking.seatNumber,
+            newPrice,
+            managerId,
+            transfer.id
+          );
+        }
+
+        results.successful.push({
+          bookingId,
+          transferId: transfer.id,
+        });
+      } catch (error) {
+        results.failed.push({
+          bookingId,
+          error: error instanceof Error ? error.message : 'Unknown error',
+        });
+      }
+    }
+
+    return res.status(200).json({
+      success: true,
+      message: `Batch transfer completed. ${results.successful.length} successful, ${results.failed.length} failed`,
+      data: results,
+    });
+  } catch (error) {
+    console.error('Error processing batch transfer:', error);
+    return res.status(500).json({
+      success: false,
+      message: 'Failed to process batch transfer',
+      error: error instanceof Error ? error.message : 'Unknown error',
+    });
+  }
+};

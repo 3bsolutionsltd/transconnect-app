@@ -133,8 +133,9 @@ async function main() {
     }
   ];
 
+  const createdRoutes: any[] = [];
   for (const routeData of routes) {
-    await prisma.route.upsert({
+    const route = await prisma.route.upsert({
       where: {
         id: `${routeData.origin}-${routeData.destination}-${routeData.departureTime}`
       },
@@ -145,12 +146,64 @@ async function main() {
         active: true
       }
     });
+    createdRoutes.push(route);
+  }
+
+  // Create some test bookings
+  const tomorrow = new Date();
+  tomorrow.setDate(tomorrow.getDate() + 1);
+  tomorrow.setHours(0, 0, 0, 0);
+
+  const dayAfterTomorrow = new Date();
+  dayAfterTomorrow.setDate(dayAfterTomorrow.getDate() + 2);
+  dayAfterTomorrow.setHours(0, 0, 0, 0);
+
+  const bookings = [
+    {
+      id: 'booking-test-001',
+      userId: passenger.id,
+      routeId: createdRoutes[0].id,
+      travelDate: tomorrow,
+      seatNumber: 'A1',
+      totalAmount: createdRoutes[0].price,
+      status: 'CONFIRMED' as any,
+      qrCode: 'QR-TEST-001'
+    },
+    {
+      id: 'booking-test-002',
+      userId: passenger.id,
+      routeId: createdRoutes[1].id,
+      travelDate: tomorrow,
+      seatNumber: 'B5',
+      totalAmount: createdRoutes[1].price,
+      status: 'CONFIRMED' as any,
+      qrCode: 'QR-TEST-002'
+    },
+    {
+      id: 'booking-test-003',
+      userId: passenger.id,
+      routeId: createdRoutes[0].id,
+      travelDate: dayAfterTomorrow,
+      seatNumber: 'C3',
+      totalAmount: createdRoutes[0].price,
+      status: 'PENDING' as any,
+      qrCode: 'QR-TEST-003'
+    }
+  ];
+
+  for (const bookingData of bookings) {
+    await prisma.booking.upsert({
+      where: { id: bookingData.id },
+      update: {},
+      create: bookingData
+    });
   }
 
   console.log('✅ Database seeded successfully!');
   console.log(`👤 Admin user: admin@transconnect.ug / admin123`);
   console.log(`👤 Test passenger: john@example.com / password123`);
   console.log(`🚌 Created ${routes.length} routes`);
+  console.log(`📝 Created ${bookings.length} test bookings`);
 }
 
 main()
