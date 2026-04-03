@@ -7,7 +7,7 @@
     "dev": "nodemon src/index.ts",
     "build": "npx prisma generate && tsc --project tsconfig.prod.json",
     "build:dev": "tsc",
-    "start": "node scripts/fix-failed-migrations.js && npx prisma migrate deploy && node dist/index.js",
+    "start": "node scripts/check-production-migrations.js && echo 'Stopping here for safety - review migrations before deploying' && exit 1",
     "seed:staging": "node scripts/seed-staging-data.js",
     "postinstall": "npx prisma generate",
     "db:generate": "prisma generate",
