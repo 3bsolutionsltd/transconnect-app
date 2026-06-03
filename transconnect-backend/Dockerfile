@@ -29,6 +29,7 @@ RUN npm ci --omit=dev --ignore-scripts
 RUN npx prisma generate
 
 COPY --from=builder /app/dist ./dist
+COPY scripts ./scripts
 
 # Expose port
 EXPOSE 5000
