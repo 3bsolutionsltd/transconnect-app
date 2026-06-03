@@ -41,8 +41,10 @@ info "Force build  : $FORCE_BUILD"
 # ── Pull latest code ──────────────────────────────────────────
 section "Pulling latest code"
 cd "$REPO_ROOT"
+git config pull.rebase false
 git fetch origin
-git pull origin develop || warn "Could not pull — working with local HEAD"
+CURRENT_BRANCH=$(git rev-parse --abbrev-ref HEAD)
+git pull origin "$CURRENT_BRANCH" || warn "Could not pull — working with local HEAD"
 GIT_SHA=$(git rev-parse --short HEAD)
 info "HEAD: $GIT_SHA"
 
