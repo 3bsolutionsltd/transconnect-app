@@ -72,9 +72,11 @@ section "Waiting for backend health check"
 MAX_WAIT=90
 ELAPSED=0
 until docker compose -f "$COMPOSE_FILE" --env-file "$ENV_FILE" \
-    exec -T backend_staging curl -sf http://localhost:5000/health > /dev/null 2>&1; do
+    exec -T backend_staging wget -qO- http://localhost:5000/health > /dev/null 2>&1; do
     if [[ $ELAPSED -ge $MAX_WAIT ]]; then
-        error "Backend health check timed out after ${MAX_WAIT}s"
+        warn "Backend health check timed out after ${MAX_WAIT}s — printing container logs:"
+        docker compose -f "$COMPOSE_FILE" --env-file "$ENV_FILE" logs --tail=50 backend_staging || true
+        error "Backend did not become healthy in time"
     fi
     echo -n "."
     sleep 5
