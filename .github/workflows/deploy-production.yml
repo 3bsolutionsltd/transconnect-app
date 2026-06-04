@@ -90,7 +90,7 @@ jobs:
     name: Deploy production
     needs: test
     runs-on: ubuntu-latest
-    environment: production          # Requires environment protection rules
+    environment: Production          # Requires environment protection rules
 
     steps:
       - uses: actions/checkout@v4
