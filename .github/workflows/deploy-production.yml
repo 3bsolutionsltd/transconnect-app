@@ -1,0 +1,142 @@
+name: Deploy to Production
+
+on:
+  push:
+    tags:
+      - 'v*.*.*'            # Trigger on version tags: v1.0.0, v1.2.3, etc.
+  workflow_dispatch:
+    inputs:
+      force_build:
+        description: 'Force rebuild of Docker images (no cache)'
+        required: false
+        default: 'false'
+        type: boolean
+      confirm:
+        description: 'Type "deploy production" to confirm'
+        required: true
+        type: string
+
+concurrency:
+  group: production-deploy
+  cancel-in-progress: false    # Never cancel an in-flight production deploy
+
+jobs:
+  # ─── Guard: require explicit confirmation for manual runs ────
+  guard:
+    name: Deployment guard
+    runs-on: ubuntu-latest
+    steps:
+      - name: Validate manual confirmation
+        if: github.event_name == 'workflow_dispatch'
+        run: |
+          if [ "${{ github.event.inputs.confirm }}" != "deploy production" ]; then
+            echo "❌ Confirmation text did not match. Aborting."
+            exit 1
+          fi
+          echo "✅ Confirmation accepted."
+
+  # ─── Run full test suite ─────────────────────────────────────
+  test:
+    name: Run tests
+    needs: guard
+    runs-on: ubuntu-latest
+    services:
+      postgres:
+        image: postgres:15-alpine
+        env:
+          POSTGRES_PASSWORD: test_password
+          POSTGRES_DB: transconnect_test
+          POSTGRES_USER: transconnect_test
+        options: >-
+          --health-cmd pg_isready
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+        ports:
+          - 5432:5432
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '18'
+          cache: npm
+          cache-dependency-path: transconnect-backend/package-lock.json
+
+      - name: Install backend dependencies
+        working-directory: transconnect-backend
+        run: npm ci
+
+      - name: Configure test environment
+        working-directory: transconnect-backend
+        run: |
+          echo "DATABASE_URL=postgresql://transconnect_test:test_password@localhost:5432/transconnect_test" > .env
+          echo "JWT_SECRET=test-jwt-secret-at-least-32-characters-long" >> .env
+          echo "NODE_ENV=test" >> .env
+
+      - name: Apply DB schema
+        working-directory: transconnect-backend
+        run: |
+          npx prisma generate
+          npx prisma db push --force-reset
+
+      - name: Run tests
+        working-directory: transconnect-backend
+        run: npm test
+
+  # ─── Deploy to VPS over SSH ──────────────────────────────────
+  deploy:
+    name: Deploy production
+    needs: test
+    runs-on: ubuntu-latest
+    environment: production          # Requires environment protection rules
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set short SHA / tag
+        id: sha
+        run: |
+          echo "sha=$(git rev-parse --short HEAD)" >> $GITHUB_OUTPUT
+          echo "ref=${{ github.ref_name }}" >> $GITHUB_OUTPUT
+
+      - name: Deploy via SSH
+        uses: appleboy/ssh-action@v1.2.0
+        with:
+          host:     ${{ secrets.VPS_HOST }}
+          username: ${{ secrets.VPS_USER }}
+          key:      ${{ secrets.VPS_SSH_KEY }}
+          port:     ${{ secrets.VPS_PORT }}
+          timeout:  20m
+          script: |
+            set -e
+            cd /opt/transconnect/app
+            git fetch --tags origin
+            git checkout ${{ steps.sha.outputs.ref }} 2>/dev/null || git checkout ${{ steps.sha.outputs.sha }}
+
+            BUILD_FLAG=""
+            if [ "${{ github.event.inputs.force_build }}" = "true" ]; then
+              BUILD_FLAG="--build"
+            fi
+
+            # Non-interactive deploy (skip confirmation prompt)
+            SKIP_CONFIRM=1 bash transconnect-infra/scripts/deploy-production.sh $BUILD_FLAG
+
+      - name: Create GitHub release (tag-based only)
+        if: startsWith(github.ref, 'refs/tags/')
+        uses: softprops/action-gh-release@v2
+        with:
+          generate_release_notes: true
+
+      - name: Notify deployment status
+        if: always()
+        uses: slackapi/slack-github-action@v1.27.0
+        continue-on-error: true
+        with:
+          payload: |
+            {
+              "text": "${{ job.status == 'success' && '🚀' || '🔥' }} Production deploy *${{ job.status }}* — `${{ steps.sha.outputs.ref }}` by ${{ github.actor }}"
+            }
+        env:
+          SLACK_WEBHOOK_URL: ${{ secrets.SLACK_WEBHOOK_URL }}
