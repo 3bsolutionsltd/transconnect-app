@@ -20,6 +20,9 @@ concurrency:
   group: production-deploy
   cancel-in-progress: false    # Never cancel an in-flight production deploy
 
+env:
+  FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: true
+
 jobs:
   # ─── Guard: require explicit confirmation for manual runs ────
   guard:

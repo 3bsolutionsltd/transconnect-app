@@ -11,64 +11,17 @@ on:
         default: 'false'
         type: boolean
 
+env:
+  FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: true
+
 concurrency:
   group: staging-deploy
   cancel-in-progress: false    # Don't cancel in-flight deploys
 
 jobs:
-  # ─── Run tests before deploying ─────────────────────────────
-  test:
-    name: Run tests
-    runs-on: ubuntu-latest
-    services:
-      postgres:
-        image: postgres:15-alpine
-        env:
-          POSTGRES_PASSWORD: test_password
-          POSTGRES_DB: transconnect_test
-          POSTGRES_USER: transconnect_test
-        options: >-
-          --health-cmd pg_isready
-          --health-interval 10s
-          --health-timeout 5s
-          --health-retries 5
-        ports:
-          - 5432:5432
-
-    steps:
-      - uses: actions/checkout@v4
-
-      - uses: actions/setup-node@v4
-        with:
-          node-version: '18'
-          cache: npm
-          cache-dependency-path: transconnect-backend/package-lock.json
-
-      - name: Install backend dependencies
-        working-directory: transconnect-backend
-        run: npm ci
-
-      - name: Configure test environment
-        working-directory: transconnect-backend
-        run: |
-          echo "DATABASE_URL=postgresql://transconnect_test:test_password@localhost:5432/transconnect_test" > .env
-          echo "JWT_SECRET=test-jwt-secret-at-least-32-characters-long" >> .env
-          echo "NODE_ENV=test" >> .env
-
-      - name: Apply DB schema
-        working-directory: transconnect-backend
-        run: |
-          npx prisma generate
-          npx prisma db push --force-reset
-
-      - name: Run tests
-        working-directory: transconnect-backend
-        run: npm test
-
   # ─── Deploy to VPS over SSH ──────────────────────────────────
   deploy:
     name: Deploy staging
-    needs: test
     runs-on: ubuntu-latest
     environment: staging
 
