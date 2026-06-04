@@ -91,14 +91,22 @@ app.use(cors({
     
     const allowedOrigins = [
       "http://localhost:3000",
-      "http://localhost:3001", 
+      "http://localhost:3001",
       "https://transconnect.app",
       "https://www.transconnect.app",
-      "https://admin.transconnect.app", 
+      "https://admin.transconnect.app",
       "https://operators.transconnect.app",
+      // Staging VPS
+      "https://staging.transconnect.app",
+      "https://admin-staging.transconnect.app",
+      "https://api-staging.transconnect.app",
+      // Legacy Render URLs
       "https://transconnect-admin-staging.onrender.com",
       "https://transconnect-web-staging.onrender.com",
-      "https://staging.transconnect.app"
+      // Allow env-configured extra origins
+      ...( process.env.CORS_ORIGINS
+            ? process.env.CORS_ORIGINS.split(',').map(o => o.trim()).filter(Boolean)
+            : [] ),
     ];
     
     if (allowedOrigins.includes(origin)) {
