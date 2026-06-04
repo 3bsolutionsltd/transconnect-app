@@ -24,6 +24,8 @@ jobs:
     name: Deploy staging
     runs-on: ubuntu-latest
     environment: staging
+    env:
+      SLACK_WEBHOOK_URL: ${{ secrets.SLACK_WEBHOOK_URL }}
 
     steps:
       - uses: actions/checkout@v4
@@ -56,7 +58,7 @@ jobs:
             bash transconnect-infra/scripts/deploy-staging.sh $BUILD_FLAG
 
       - name: Notify deployment status
-        if: always() && secrets.SLACK_WEBHOOK_URL != ''
+        if: always() && env.SLACK_WEBHOOK_URL != ''
         uses: slackapi/slack-github-action@v1.27.0
         continue-on-error: true
         with:
@@ -65,4 +67,4 @@ jobs:
               "text": "${{ job.status == 'success' && '✅' || '❌' }} Staging deploy *${{ job.status }}* — `${{ steps.sha.outputs.sha }}` by ${{ github.actor }}"
             }
         env:
-          SLACK_WEBHOOK_URL: ${{ secrets.SLACK_WEBHOOK_URL }}
+          SLACK_WEBHOOK_URL: ${{ env.SLACK_WEBHOOK_URL }}
