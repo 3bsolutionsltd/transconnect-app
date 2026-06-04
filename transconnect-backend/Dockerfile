@@ -1,6 +1,9 @@
 # Backend Dockerfile
 FROM node:20-alpine AS builder
 
+# Required by Prisma engines on Alpine (OpenSSL 3.x)
+RUN apk add --no-cache openssl
+
 WORKDIR /app
 
 # Copy package files and Prisma schema first (needed for postinstall / prisma generate)
@@ -20,6 +23,9 @@ RUN npm run build
 
 # ── Production stage ──────────────────────────────────────────
 FROM node:20-alpine
+
+# Required by Prisma engines on Alpine (OpenSSL 3.x)
+RUN apk add --no-cache openssl
 
 WORKDIR /app
 
