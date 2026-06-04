@@ -71,8 +71,9 @@ docker compose -f "$COMPOSE_FILE" --env-file "$ENV_FILE" \
 section "Waiting for backend health check"
 MAX_WAIT=90
 ELAPSED=0
-until docker compose -f "$COMPOSE_FILE" --env-file "$ENV_FILE" \
-    exec -T backend_staging wget -qO- http://localhost:5000/health > /dev/null 2>&1; do
+# Check via the host-mapped port (127.0.0.1:5001 → container:5000)
+# Avoids exec inside container; uses host curl which is always available on Ubuntu/Debian VPS
+until curl -sf http://127.0.0.1:5001/health > /dev/null 2>&1; do
     if [[ $ELAPSED -ge $MAX_WAIT ]]; then
         warn "Backend health check timed out after ${MAX_WAIT}s — printing container logs:"
         docker compose -f "$COMPOSE_FILE" --env-file "$ENV_FILE" logs --tail=50 backend_staging || true
