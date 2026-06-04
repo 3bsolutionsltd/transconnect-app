@@ -2,36 +2,103 @@
 import Link from 'next/link'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent } from '@/components/ui/card'
-import { Bus, MapPin, Clock, Shield, Search, Car, Building, Compass, Users } from 'lucide-react'
+import { Bus, MapPin, Clock, Shield, Search, Car, Building, Compass, Users, Smartphone, CreditCard } from 'lucide-react'
 import Header from '@/components/Header'
 import { useState } from 'react'
+import { useRouter } from 'next/navigation'
 
 export default function HomePage() {
-  const [currentLocation, setCurrentLocation] = useState('Current Location');
+  const router = useRouter();
+  const [origin, setOrigin] = useState('');
   const [destination, setDestination] = useState('');
+  const [travelDate, setTravelDate] = useState('');
   const [activeMode, setActiveMode] = useState('Intercity');
 
-  const suggestions = [
-    { icon: Bus, text: "Bus to Gulu leaving in 20 mins", type: "bus", action: () => window.location.href = '/search?destination=Gulu' },
-    { icon: Car, text: "Ride to Garden City — 12 mins away", type: "ride", action: () => window.location.href = '/search?destination=Garden City' },
-    { icon: Building, text: "Hotels near Jinja Terminal", type: "hotel", action: () => window.location.href = '/search?destination=Jinja' }
-  ];
+  const today = new Date().toISOString().split('T')[0];
+
+  function handleSearch() {
+    const params = new URLSearchParams();
+    if (destination) params.set('destination', destination);
+    if (origin) params.set('origin', origin);
+    if (travelDate) params.set('date', travelDate);
+    router.push(`/search?${params.toString()}`);
+  }
+
+  function handleKeyDown(e: React.KeyboardEvent) {
+    if (e.key === 'Enter') handleSearch();
+  }
 
   const smartModes = [
-    { id: 'Intercity', label: 'Intercity', icon: Bus },
-    { id: 'Local Ride', label: 'Local Ride', icon: Car },
-    { id: 'Stay', label: 'Stay', icon: Building },
-    { id: 'Explore', label: 'Explore', icon: Compass }
+    {
+      id: 'Intercity',
+      label: 'Intercity',
+      icon: Bus,
+      placeholder: 'e.g. Kampala → Gulu',
+      description: 'Book long-distance bus tickets'
+    },
+    {
+      id: 'Local Ride',
+      label: 'Local Ride',
+      icon: Car,
+      placeholder: 'e.g. Garden City',
+      description: 'Find a shared ride nearby'
+    },
+    {
+      id: 'Stay',
+      label: 'Stay',
+      icon: Building,
+      placeholder: 'e.g. Jinja',
+      description: 'Hotels near bus terminals'
+    },
+    {
+      id: 'Explore',
+      label: 'Explore',
+      icon: Compass,
+      placeholder: 'e.g. Bwindi',
+      description: 'Discover destinations'
+    },
+  ];
+
+  const activeModeMeta = smartModes.find(m => m.id === activeMode)!;
+
+  const suggestions = [
+    { icon: Bus, text: 'Kampala → Gulu', sub: 'Intercity bus', dest: 'Gulu', orig: 'Kampala' },
+    { icon: Bus, text: 'Kampala → Jinja', sub: 'Intercity bus', dest: 'Jinja', orig: 'Kampala' },
+    { icon: Bus, text: 'Kampala → Mbarara', sub: 'Intercity bus', dest: 'Mbarara', orig: 'Kampala' },
+  ];
+
+  const whyItems = [
+    {
+      icon: Clock,
+      title: 'Book Anytime',
+      desc: '24/7 booking with instant confirmation and digital tickets'
+    },
+    {
+      icon: Shield,
+      title: 'Secure Digital',
+      desc: 'Safe payments and QR code tickets for contactless travel'
+    },
+    {
+      icon: CreditCard,
+      title: 'Mobile Money',
+      desc: 'Pay with MTN MoMo or Airtel Money — no cash needed'
+    },
+    {
+      icon: Smartphone,
+      title: 'Ticket on Your Phone',
+      desc: 'Your QR ticket lives on your phone, even offline'
+    },
   ];
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-blue-900 via-blue-800 to-blue-900">
       <Header />
-      
+
       {/* Main Content */}
       <div className="pt-4 pb-16 px-4 sm:pt-8">
         <div className="max-w-2xl mx-auto">
-          {/* Hero Section */}
+
+          {/* Hero */}
           <div className="text-center mb-8 sm:mb-12">
             <h1 className="text-2xl sm:text-4xl md:text-5xl font-bold text-white mb-4 leading-tight px-2">
               Your One-Stop<br />
@@ -45,128 +112,120 @@ export default function HomePage() {
               <h2 className="text-xl sm:text-2xl font-semibold text-gray-900 mb-4 sm:mb-6 text-center sm:text-left">
                 Where are you headed?
               </h2>
-              
-              {/* Search Form - Mobile First */}
-              <div className="space-y-4 mb-6">
+
+              {/* Smart Mode Tabs */}
+              <div className="grid grid-cols-4 gap-2 mb-6">
+                {smartModes.map((mode) => (
+                  <button
+                    key={mode.id}
+                    onClick={() => setActiveMode(mode.id)}
+                    className={`p-3 rounded-xl text-center transition-all touch-manipulation min-h-[60px] ${
+                      activeMode === mode.id
+                        ? 'bg-blue-900 text-white shadow-lg'
+                        : 'bg-gray-100 text-gray-700 hover:bg-gray-200 active:bg-gray-300'
+                    }`}
+                  >
+                    <mode.icon className="h-5 w-5 mx-auto mb-1" />
+                    <div className="text-xs font-medium leading-tight">{mode.label}</div>
+                  </button>
+                ))}
+              </div>
+
+              {activeMode !== 'Intercity' && (
+                <p className="text-sm text-blue-600 bg-blue-50 rounded-lg px-3 py-2 mb-4">
+                  {activeModeMeta.description}
+                </p>
+              )}
+
+              {/* Search Form */}
+              <div className="space-y-3 mb-6">
+                {activeMode === 'Intercity' && (
+                  <div className="relative">
+                    <MapPin className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400 h-5 w-5" />
+                    <input
+                      type="text"
+                      value={origin}
+                      onChange={(e) => setOrigin(e.target.value)}
+                      onKeyDown={handleKeyDown}
+                      className="w-full pl-10 pr-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent text-base"
+                      placeholder="From (e.g. Kampala)"
+                    />
+                  </div>
+                )}
                 <div className="relative">
-                  <MapPin className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 h-5 w-5" />
-                  <input
-                    type="text"
-                    value={currentLocation}
-                    onChange={(e) => setCurrentLocation(e.target.value)}
-                    className="w-full pl-10 pr-4 py-3 sm:py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent text-base"
-                    placeholder="Current Location"
-                  />
-                </div>
-                <div className="relative">
-                  <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 h-5 w-5" />
+                  <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400 h-5 w-5" />
                   <input
                     type="text"
                     value={destination}
                     onChange={(e) => setDestination(e.target.value)}
-                    className="w-full pl-10 pr-4 py-3 sm:py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent text-base"
-                    placeholder="Enter destination..."
+                    onKeyDown={handleKeyDown}
+                    className="w-full pl-10 pr-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent text-base"
+                    placeholder={activeModeMeta.placeholder}
                   />
                 </div>
-                <Button 
-                  className="w-full py-3 sm:py-3 bg-yellow-400 hover:bg-yellow-500 text-gray-900 font-semibold transition-all transform hover:scale-[1.02] active:scale-[0.98] touch-manipulation"
-                  onClick={() => {
-                    if (destination) {
-                      window.location.href = `/search?destination=${encodeURIComponent(destination)}&origin=${encodeURIComponent(currentLocation)}`;
-                    } else {
-                      window.location.href = '/search';
-                    }
-                  }}
+                {activeMode === 'Intercity' && (
+                  <div className="relative">
+                    <Clock className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400 h-5 w-5 pointer-events-none" />
+                    <input
+                      type="date"
+                      value={travelDate}
+                      min={today}
+                      onChange={(e) => setTravelDate(e.target.value)}
+                      onKeyDown={handleKeyDown}
+                      className="w-full pl-10 pr-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent text-base text-gray-700"
+                    />
+                  </div>
+                )}
+                <Button
+                  className="w-full py-3 bg-yellow-400 hover:bg-yellow-500 text-gray-900 font-semibold transition-all transform hover:scale-[1.02] active:scale-[0.98] touch-manipulation"
+                  onClick={handleSearch}
                 >
                   Search
                 </Button>
               </div>
 
-              {/* Suggestions */}
-              <div className="mb-6 sm:mb-8">
-                <h3 className="text-base sm:text-lg font-medium text-gray-700 mb-3 sm:mb-4">Suggestions:</h3>
-                <div className="space-y-2 sm:space-y-3">
-                  {suggestions.map((suggestion, index) => (
-                    <div 
-                      key={index} 
-                      className="flex items-center space-x-3 text-gray-600 hover:text-blue-600 cursor-pointer transition-colors p-3 sm:p-2 rounded-lg hover:bg-blue-50 active:bg-blue-100 min-h-[44px] touch-manipulation"
-                      onClick={suggestion.action}
-                    >
-                      <suggestion.icon className="h-5 w-5 flex-shrink-0" />
-                      <span className="text-sm sm:text-base">{suggestion.text}</span>
-                    </div>
-                  ))}
-                </div>
-              </div>
-
-              {/* Smart Mode */}
+              {/* Popular Routes */}
               <div>
-                <h3 className="text-base sm:text-lg font-medium text-gray-700 mb-3 sm:mb-4">Smart Mode</h3>
-                <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 sm:gap-3">
-                  {smartModes.map((mode) => (
-                    <button
-                      key={mode.id}
-                      onClick={() => setActiveMode(mode.id)}
-                      className={`p-3 sm:p-4 rounded-xl text-center transition-all touch-manipulation min-h-[60px] sm:min-h-auto ${
-                        activeMode === mode.id
-                          ? 'bg-blue-900 text-white shadow-lg'
-                          : 'bg-gray-100 text-gray-700 hover:bg-gray-200 active:bg-gray-300'
-                      }`}
+                <h3 className="text-sm font-medium text-gray-500 mb-3 uppercase tracking-wide">Popular routes</h3>
+                <div className="space-y-2">
+                  {suggestions.map((s, i) => (
+                    <div
+                      key={i}
+                      className="flex items-center justify-between p-3 rounded-lg hover:bg-blue-50 active:bg-blue-100 cursor-pointer transition-colors touch-manipulation min-h-[44px]"
+                      onClick={() => {
+                        const params = new URLSearchParams({ destination: s.dest, origin: s.orig });
+                        if (travelDate) params.set('date', travelDate);
+                        router.push(`/search?${params.toString()}`);
+                      }}
                     >
-                      <mode.icon className="h-5 w-5 sm:h-6 sm:w-6 mx-auto mb-1 sm:mb-2" />
-                      <div className="text-xs sm:text-sm font-medium">{mode.label}</div>
-                    </button>
-                  ))}
-                </div>
-              </div>
-            </CardContent>
-          </Card>
-
-          {/* Featured Trip Card */}
-          <Card className="mb-6 sm:mb-8 bg-blue-900 text-white shadow-2xl cursor-pointer transform hover:scale-[1.02] active:scale-[0.98] transition-all mx-2 sm:mx-0 touch-manipulation" onClick={() => window.location.href = '/search?destination=Gulu'}>
-            <CardContent className="p-4 sm:p-6">
-              <div className="flex justify-between items-start">
-                <div className="flex-1">
-                  <h3 className="text-lg sm:text-xl font-semibold mb-2">
-                    Bus to Gulu<br />
-                    leaving in 20 mins
-                  </h3>
-                  <div className="bg-blue-700 bg-opacity-50 rounded-lg p-3 mb-4">
-                    <div className="flex items-center space-x-2">
-                      <Users className="h-4 w-4 sm:h-5 sm:w-5" />
-                      <span className="text-xs sm:text-sm">5 nearby drivers available</span>
+                      <div className="flex items-center space-x-3">
+                        <s.icon className="h-5 w-5 text-blue-500 flex-shrink-0" />
+                        <div>
+                          <div className="text-sm font-medium text-gray-800">{s.text}</div>
+                          <div className="text-xs text-gray-500">{s.sub}</div>
+                        </div>
+                      </div>
+                      <span className="text-blue-500 text-xs font-medium">Search →</span>
                     </div>
-                  </div>
-                </div>
-                <div className="text-right ml-4 flex-shrink-0">
-                  <div className="bg-white bg-opacity-20 rounded-lg p-2 sm:p-3 mb-2">
-                    <MapPin className="h-6 w-6 sm:h-8 sm:w-8 text-blue-300 mx-auto" />
-                  </div>
-                  <div className="text-xs sm:text-sm font-semibold">5 nearby<br />drivers</div>
-                  <div className="text-xs opacity-75">av at J SX 60,000</div>
+                  ))}
                 </div>
               </div>
             </CardContent>
           </Card>
 
           {/* Why TransConnect */}
-          <div className="text-center px-2 sm:px-0">
+          <div className="text-center px-2 sm:px-0 mb-8">
             <h3 className="text-xl sm:text-2xl font-bold text-white mb-6 sm:mb-8">Why TransConnect</h3>
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-6">
-              <div className="text-center">
-                <div className="bg-white bg-opacity-10 rounded-full w-14 h-14 sm:w-16 sm:h-16 flex items-center justify-center mx-auto mb-4">
-                  <Clock className="h-6 w-6 sm:h-8 sm:w-8 text-white" />
+            <div className="grid grid-cols-2 gap-4 sm:gap-6">
+              {whyItems.map((item) => (
+                <div key={item.title} className="text-center">
+                  <div className="bg-white bg-opacity-10 rounded-full w-14 h-14 sm:w-16 sm:h-16 flex items-center justify-center mx-auto mb-3">
+                    <item.icon className="h-6 w-6 sm:h-8 sm:w-8 text-white" />
+                  </div>
+                  <h4 className="text-sm sm:text-base font-semibold text-white mb-1">{item.title}</h4>
+                  <p className="text-blue-200 text-xs sm:text-sm">{item.desc}</p>
                 </div>
-                <h4 className="text-base sm:text-lg font-semibold text-white mb-2">Book Anytime</h4>
-                <p className="text-blue-100 text-sm">24/7 booking with instant confirmation and digital tickets</p>
-              </div>
-              <div className="text-center">
-                <div className="bg-white bg-opacity-10 rounded-full w-14 h-14 sm:w-16 sm:h-16 flex items-center justify-center mx-auto mb-4">
-                  <Shield className="h-6 w-6 sm:h-8 sm:w-8 text-white" />
-                </div>
-                <h4 className="text-base sm:text-lg font-semibold text-white mb-2">Secure Digital</h4>
-                <p className="text-blue-100 text-sm">Safe payments and QR code tickets for contactless travel</p>
-              </div>
+              ))}
             </div>
           </div>
         </div>
@@ -183,7 +242,7 @@ export default function HomePage() {
             Connecting East Africa through smart transportation solutions
           </p>
           <p className="text-xs sm:text-sm text-blue-300">
-            © 2024 TransConnect. Built by 3B Solutions Ltd & Green Rokon Technologies Ltd.
+            © 2026 TransConnect. Built by 3B Solutions Ltd & Green Rokon Technologies Ltd.
           </p>
         </div>
       </footer>

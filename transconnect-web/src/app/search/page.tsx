@@ -4,18 +4,19 @@ import { fetchRoutes } from '../../lib/api';
 import Link from 'next/link';
 import Header from '@/components/Header';
 import { ArrowLeft } from 'lucide-react';
-import { useRouter } from 'next/navigation';
+import { useRouter, useSearchParams } from 'next/navigation';
 
 export default function SearchPage() {
-  const [origin, setOrigin] = useState('');
-  const [destination, setDestination] = useState('');
-  const [date, setDate] = useState('');
+  const searchParams = useSearchParams();
+  const [origin, setOrigin] = useState(searchParams.get('origin') || '');
+  const [destination, setDestination] = useState(searchParams.get('destination') || '');
+  const [date, setDate] = useState(searchParams.get('date') || '');
   const [routes, setRoutes] = useState<any[]>([]);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string>('');
   const router = useRouter();
 
-  // Load all routes when component mounts
+  // Load routes on mount (pre-seeded from URL params)
   React.useEffect(() => {
     handleSearch();
   }, []);
