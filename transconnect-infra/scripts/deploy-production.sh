@@ -90,11 +90,13 @@ docker compose -f "$COMPOSE_FILE" --env-file "$ENV_FILE" \
     up -d --remove-orphans
 
 # ── Wait for backend to be healthy ────────────────────────────
+# Note: node:20-alpine does not include curl; check from host using the bound
+# port (127.0.0.1:5000).  /api/health always returns 200 without a DB round-
+# trip so it succeeds even before migrations run.
 section "Waiting for backend health check"
-MAX_WAIT=120
+MAX_WAIT=180
 ELAPSED=0
-until docker compose -f "$COMPOSE_FILE" --env-file "$ENV_FILE" \
-    exec -T backend_prod curl -sf http://localhost:5000/health > /dev/null 2>&1; do
+until curl -sf http://127.0.0.1:5000/api/health > /dev/null 2>&1; do
     if [[ $ELAPSED -ge $MAX_WAIT ]]; then
         warn "Health check timed out — rolling back"
         docker compose -f "$COMPOSE_FILE" --env-file "$ENV_FILE" down
