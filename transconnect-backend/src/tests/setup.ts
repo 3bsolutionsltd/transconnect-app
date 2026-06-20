@@ -26,5 +26,9 @@ process.env.AIRTEL_API_BASE_URL = process.env.AIRTEL_API_BASE_URL || 'https://op
 process.env.AIRTEL_CLIENT_ID = process.env.AIRTEL_CLIENT_ID || 'test-airtel-client';
 process.env.AIRTEL_CLIENT_SECRET = process.env.AIRTEL_CLIENT_SECRET || 'test-airtel-secret';
 
+// Webhook secrets — required so the webhook handler doesn't return 500 for missing secret
+process.env.MTN_WEBHOOK_SECRET = process.env.MTN_WEBHOOK_SECRET || 'test-mtn-webhook-secret';
+process.env.AIRTEL_WEBHOOK_SECRET = process.env.AIRTEL_WEBHOOK_SECRET || 'test-airtel-webhook-secret';
+
 // Set timeout for all tests
 jest.setTimeout(30000);

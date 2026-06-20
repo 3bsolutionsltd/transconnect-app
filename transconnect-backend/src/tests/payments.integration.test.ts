@@ -37,6 +37,7 @@ jest.mock('../services/airtel.service', () => ({
       message: 'Transaction completed'
     }),
     validateAccountHolder: jest.fn().mockResolvedValue(true),
+    isPhoneNumberRegistered: jest.fn().mockResolvedValue(true),
     verifyWebhookSignature: jest.fn().mockReturnValue(true)
   })),
   AirtelMoneyService: jest.fn()
@@ -344,11 +345,24 @@ describe('Payment Integration Tests', () => {
     let testPaymentId: string;
 
     beforeAll(async () => {
+      // Create a fresh booking for status tests (bookingId already has a payment from initiate tests)
+      const route = await prisma.route.findFirst();
+      const statusBooking = await prisma.booking.create({
+        data: {
+          userId,
+          routeId: route!.id,
+          seatNumber: 'A5',
+          travelDate: new Date('2025-12-05'),
+          qrCode: 'QR-STATUS-001',
+          totalAmount: 15000,
+          status: 'PENDING'
+        }
+      });
       // Create a test payment
       const payment = await prisma.payment.create({
         data: {
-          bookingId: bookingId,
-          userId: userId,
+          bookingId: statusBooking.id,
+          userId,
           amount: 15000,
           method: 'MTN_MOBILE_MONEY',
           reference: 'TEST-REF-123',
