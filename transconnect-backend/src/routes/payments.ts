@@ -23,7 +23,7 @@ router.post('/initiate', [
   authenticateToken,
   body('bookingId').notEmpty().withMessage('Booking ID is required'),
   body('method').isIn(['MTN_MOBILE_MONEY', 'AIRTEL_MONEY', 'PESAPAL', 'CASH']).withMessage('Valid payment method is required'),
-  body('phoneNumber').optional().isMobilePhone('any').withMessage('Valid phone number is required for mobile money payments')
+  body('phoneNumber').optional({ checkFalsy: true }).isMobilePhone('any').withMessage('Valid phone number is required for mobile money payments')
 ], async (req: Request, res: Response) => {
   try {
     const errors = validationResult(req);
