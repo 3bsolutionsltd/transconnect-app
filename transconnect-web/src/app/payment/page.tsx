@@ -93,11 +93,11 @@ function PaymentContent() {
       }
       
       // Call actual payment API for online methods (MTN, Airtel, PesaPal)
-      const paymentRequest: Record<string, any> = {
-        bookingId: bookingData.id,
+      const paymentRequest = {
+        bookingId: bookingData.id as string,
         method: selectedMethod,
+        ...(phoneNumber ? { phoneNumber } : {})
       };
-      if (phoneNumber) paymentRequest.phoneNumber = phoneNumber;
 
       const response = await paymentApi.initiate(paymentRequest);
       
