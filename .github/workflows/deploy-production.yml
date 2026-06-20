@@ -94,6 +94,8 @@ jobs:
     needs: test
     runs-on: ubuntu-latest
     environment: Production          # Requires environment protection rules
+    env:
+      SLACK_WEBHOOK_URL: ${{ secrets.SLACK_WEBHOOK_URL }}
 
     steps:
       - uses: actions/checkout@v4
@@ -107,11 +109,12 @@ jobs:
       - name: Deploy via SSH
         uses: appleboy/ssh-action@v1.2.0
         with:
-          host:     ${{ secrets.VPS_HOST }}
-          username: ${{ secrets.VPS_USER }}
-          key:      ${{ secrets.VPS_SSH_KEY }}
-          port:     ${{ secrets.VPS_PORT }}
-          timeout:  20m
+          host:            ${{ secrets.VPS_HOST }}
+          username:        ${{ secrets.VPS_USER }}
+          key:             ${{ secrets.VPS_SSH_KEY }}
+          port:            ${{ secrets.VPS_PORT }}
+          timeout:         30s
+          command_timeout: 40m
           script: |
             set -e
             cd /opt/transconnect/app
@@ -133,7 +136,7 @@ jobs:
           generate_release_notes: true
 
       - name: Notify deployment status
-        if: always()
+        if: always() && env.SLACK_WEBHOOK_URL != ''
         uses: slackapi/slack-github-action@v1.27.0
         continue-on-error: true
         with:
