@@ -3,8 +3,9 @@ export const dynamic = 'force-dynamic';
 
 import { useSearchParams, useRouter } from 'next/navigation';
 import Link from 'next/link';
+import { Suspense } from 'react';
 
-export default function PaymentCancelledPage() {
+function PaymentCancelledContent() {
   const searchParams = useSearchParams();
   const router = useRouter();
   const ref = searchParams.get('ref');
@@ -41,5 +42,13 @@ export default function PaymentCancelledPage() {
         </div>
       </div>
     </main>
+  );
+}
+
+export default function PaymentCancelledPage() {
+  return (
+    <Suspense fallback={<main className="min-h-screen bg-gray-50 flex items-center justify-center"><div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600" /></main>}>
+      <PaymentCancelledContent />
+    </Suspense>
   );
 }

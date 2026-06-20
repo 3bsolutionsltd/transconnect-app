@@ -1,13 +1,13 @@
 'use client';
-export const dynamic = 'force-dynamic';
 import React, { useState } from 'react';
+import { Suspense } from 'react';
 import { fetchRoutes } from '../../lib/api';
 import Link from 'next/link';
 import Header from '@/components/Header';
 import { ArrowLeft } from 'lucide-react';
 import { useRouter, useSearchParams } from 'next/navigation';
 
-export default function SearchPage() {
+function SearchContent() {
   const searchParams = useSearchParams();
   const [origin, setOrigin] = useState(searchParams.get('origin') || '');
   const [destination, setDestination] = useState(searchParams.get('destination') || '');
@@ -201,5 +201,13 @@ export default function SearchPage() {
         )}
       </div>
     </div>
+  );
+}
+
+export default function SearchPage() {
+  return (
+    <Suspense fallback={<div className="min-h-screen flex items-center justify-center"><div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600" /></div>}>
+      <SearchContent />
+    </Suspense>
   );
 }
