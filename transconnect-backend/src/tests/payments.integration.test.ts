@@ -4,9 +4,43 @@ import jwt from 'jsonwebtoken';
 import app, { prisma } from './test-app';
 import { PaymentGatewayFactory } from '../services/payment-gateway.factory';
 
-// Mock the payment services to avoid real API calls in tests
-jest.mock('../services/mtn.service');
-jest.mock('../services/airtel.service');
+// Mock the payment services with proper implementations to avoid real API calls
+jest.mock('../services/mtn.service', () => ({
+  createMTNService: jest.fn(() => ({
+    requestPayment: jest.fn().mockResolvedValue({
+      transactionId: 'MTN-TX-123456',
+      status: 'PENDING',
+      reason: 'Pending'
+    }),
+    getTransactionStatus: jest.fn().mockResolvedValue({
+      externalId: 'MTN-TX-123456',
+      status: 'SUCCESSFUL',
+      financialTransactionId: 'FIN-MTN-123456',
+      reason: 'Transaction completed'
+    }),
+    validateAccountHolder: jest.fn().mockResolvedValue(true),
+    verifyWebhookSignature: jest.fn().mockReturnValue(true)
+  })),
+  MTNMobileMoneyService: jest.fn()
+}));
+
+jest.mock('../services/airtel.service', () => ({
+  createAirtelService: jest.fn(() => ({
+    requestPayment: jest.fn().mockResolvedValue({
+      transactionId: 'AIRTEL-TX-123456',
+      status: 'PENDING',
+      reason: 'Pending'
+    }),
+    getTransactionStatus: jest.fn().mockResolvedValue({
+      transactionId: 'AIRTEL-TX-123456',
+      status: 'SUCCESS',
+      message: 'Transaction completed'
+    }),
+    validateAccountHolder: jest.fn().mockResolvedValue(true),
+    verifyWebhookSignature: jest.fn().mockReturnValue(true)
+  })),
+  AirtelMoneyService: jest.fn()
+}));
 
 describe('Payment Integration Tests', () => {
   let authToken: string;
