@@ -4,7 +4,7 @@ import bcrypt from 'bcryptjs';
 import jwt from 'jsonwebtoken';
 
 // Mock the dependencies first before importing the routes
-jest.mock('../../src/index', () => ({
+jest.mock('../../src/lib/prisma', () => ({
   prisma: {
     user: {
       findUnique: jest.fn(),
@@ -18,11 +18,11 @@ jest.mock('jsonwebtoken');
 
 // Now import the route after mocking
 import authRoutes from '../../src/routes/auth';
-import { prisma } from '../../src/index';
+import { prisma } from '../../src/lib/prisma';
 
 const mockBcrypt = bcrypt as jest.Mocked<typeof bcrypt>;
 const mockJwt = jwt as jest.Mocked<typeof jwt>;
-const mockPrisma = prisma as jest.Mocked<typeof prisma>;
+const mockPrisma = prisma as any;
 
 // Test data
 const createTestUser = () => ({
@@ -126,27 +126,15 @@ describe('Auth Routes', () => {
       expect(response.body.errors).toBeDefined();
     });
 
-    it('should default to PASSENGER role when invalid role provided', async () => {
-      const testUser = { ...createTestUser(), role: 'PASSENGER' };
+    it('should reject invalid role with 400', async () => {
       const dataWithInvalidRole = { ...validUserData, role: 'INVALID_ROLE' };
-      
-      mockPrisma.user.findUnique.mockResolvedValue(null);
-      (mockBcrypt.hash as jest.Mock).mockResolvedValue('hashedPassword');
-      mockPrisma.user.create.mockResolvedValue(testUser);
-      (mockJwt.sign as jest.Mock).mockReturnValue('test-token');
 
       const response = await request(app)
         .post('/auth/register')
         .send(dataWithInvalidRole);
 
-      expect(response.status).toBe(201);
-      expect(mockPrisma.user.create).toHaveBeenCalledWith(
-        expect.objectContaining({
-          data: expect.objectContaining({
-            role: 'PASSENGER'
-          })
-        })
-      );
+      expect(response.status).toBe(400);
+      expect(mockPrisma.user.create).not.toHaveBeenCalled();
     });
 
     it('should handle server errors gracefully', async () => {

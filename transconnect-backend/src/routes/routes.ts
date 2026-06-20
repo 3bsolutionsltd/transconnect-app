@@ -1,5 +1,5 @@
 import { Router, Request, Response } from 'express';
-import { prisma } from '../index';
+import { prisma } from '../lib/prisma';
 import { authenticateToken } from '../middleware/auth';
 import { searchRoutesWithSegments } from '../services/routeSegmentService';
 import { osrmService } from '../services/osrm.service';

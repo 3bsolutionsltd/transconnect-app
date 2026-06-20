@@ -4,7 +4,7 @@
  */
 
 import { Router, Request, Response } from 'express';
-import { prisma } from '../index';
+import { prisma } from '../lib/prisma';
 import { authenticateToken, requireRole } from '../middleware/auth';
 import { createRouteSegments } from '../services/routeSegmentService';
 import { osrmService } from '../services/osrm.service';

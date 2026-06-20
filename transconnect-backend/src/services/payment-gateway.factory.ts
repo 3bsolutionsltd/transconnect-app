@@ -300,6 +300,11 @@ export class PaymentGatewayFactory {
   }
 
   static async validatePaymentMethod(method: PaymentMethod, phoneNumber?: string, country?: string): Promise<boolean> {
+    // Cash doesn't need a payment provider — always valid
+    if (method === 'CASH') {
+      return true;
+    }
+
     try {
       const provider = this.getProvider(method);
       
@@ -336,7 +341,7 @@ export class PaymentGatewayFactory {
       'CASH': 'Cash Payment'
     };
 
-    return displayNames[method] || method;
+    return displayNames[method] || 'Unknown Payment Method';
   }
 }
 

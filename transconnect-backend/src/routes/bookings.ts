@@ -1,5 +1,5 @@
 import { Router, Request, Response } from 'express';
-import { prisma } from '../index';
+import { prisma } from '../lib/prisma';
 import { authenticateToken } from '../middleware/auth';
 import { body, validationResult } from 'express-validator';
 import QRCode from 'qrcode';

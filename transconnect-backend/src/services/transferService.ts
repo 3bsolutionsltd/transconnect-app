@@ -5,7 +5,7 @@
  * Business logic for booking transfers
  */
 
-import { prisma } from '../index';
+import { prisma } from '../lib/prisma';
 import { Booking, Route, Payment, PaymentMethod, PaymentStatus } from '@prisma/client';
 
 /**
