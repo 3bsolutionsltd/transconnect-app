@@ -32,7 +32,7 @@ router.post('/initiate', [
     }
 
     const { bookingId, method, phoneNumber } = req.body;
-    const userId = (req as any).user.userId;
+    const userId = (req as any).user.id;
 
     // Verify booking exists and belongs to user
     const booking = await prisma.booking.findUnique({
@@ -278,7 +278,7 @@ router.post('/initiate', [
 router.get('/:paymentId/status', authenticateToken, async (req: Request, res: Response) => {
   try {
     const { paymentId } = req.params;
-    const userId = (req as any).user.userId;
+    const userId = (req as any).user.id;
 
     const payment = await prisma.payment.findUnique({
       where: { id: paymentId },
@@ -662,7 +662,7 @@ function mapGatewayStatusToPaymentStatus(gateway: string, gatewayStatus: string)
 // Get payment history for user
 router.get('/history', authenticateToken, async (req: Request, res: Response) => {
   try {
-    const userId = (req as any).user.userId;
+    const userId = (req as any).user.id;
     const { page = 1, limit = 10 } = req.query;
 
     const payments = await prisma.payment.findMany({
@@ -713,7 +713,7 @@ router.get('/history', authenticateToken, async (req: Request, res: Response) =>
 router.post('/:paymentId/complete', authenticateToken, async (req: Request, res: Response) => {
   try {
     const { paymentId } = req.params;
-    const userId = (req as any).user.userId;
+    const userId = (req as any).user.id;
 
     const payment = await prisma.payment.findUnique({
       where: { id: paymentId },

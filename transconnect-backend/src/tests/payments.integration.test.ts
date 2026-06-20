@@ -378,7 +378,7 @@ describe('Payment Integration Tests', () => {
         // No authorization header
         .expect(401);
 
-      expect(response.body).toHaveProperty('error', 'No token provided');
+      expect(response.body).toHaveProperty('error', 'Access token required');
     });
   });
 
@@ -386,11 +386,24 @@ describe('Payment Integration Tests', () => {
     let testPaymentId: string;
 
     beforeAll(async () => {
+      // Create a fresh booking for webhook testing (bookingId already has a payment from initiate tests)
+      const route = await prisma.route.findFirst();
+      const webhookBooking = await prisma.booking.create({
+        data: {
+          userId,
+          routeId: route!.id,
+          seatNumber: 'A10',
+          travelDate: new Date('2025-12-10'),
+          qrCode: 'QR-WEBHOOK-001',
+          totalAmount: 15000,
+          status: 'PENDING'
+        }
+      });
       // Create a test payment for webhook testing
       const payment = await prisma.payment.create({
         data: {
-          bookingId: bookingId,
-          userId: userId,
+          bookingId: webhookBooking.id,
+          userId,
           amount: 15000,
           method: 'MTN_MOBILE_MONEY',
           reference: 'WEBHOOK-TEST-123',
@@ -425,11 +438,23 @@ describe('Payment Integration Tests', () => {
     });
 
     it('should process Airtel webhook', async () => {
-      // Create another test payment for Airtel
+      // Create a fresh booking + payment for Airtel webhook test
+      const route = await prisma.route.findFirst();
+      const airtelBooking = await prisma.booking.create({
+        data: {
+          userId,
+          routeId: route!.id,
+          seatNumber: 'A11',
+          travelDate: new Date('2025-12-11'),
+          qrCode: 'QR-WEBHOOK-002',
+          totalAmount: 15000,
+          status: 'PENDING'
+        }
+      });
       const payment = await prisma.payment.create({
         data: {
-          bookingId: bookingId,
-          userId: userId,
+          bookingId: airtelBooking.id,
+          userId,
           amount: 15000,
           method: 'AIRTEL_MONEY',
           reference: 'AIRTEL-TEST-123',
