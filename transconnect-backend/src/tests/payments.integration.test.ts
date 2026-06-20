@@ -57,7 +57,8 @@ describe('Payment Integration Tests', () => {
         firstName: 'Payment',
         lastName: 'Tester',
         phone: '256701234567',
-        role: 'PASSENGER'
+        role: 'PASSENGER',
+        verified: true
       }
     });
     userId = user.id;
@@ -79,7 +80,8 @@ describe('Payment Integration Tests', () => {
             firstName: 'Test',
             lastName: 'Operator',
             phone: '256702345678',
-            role: 'OPERATOR'
+            role: 'OPERATOR',
+            verified: true
           }
         }
       }
