@@ -78,8 +78,8 @@ router.post('/initiate', [
     // Demo mode: use PAYMENT_DEMO_MODE=true in .env to skip real payment provider calls
     const demoMode = process.env.PAYMENT_DEMO_MODE === 'true';
 
-    // Validate phone number for mobile money payments (skip in demo mode)
-    if (!demoMode && PaymentGatewayFactory.isOnlinePayment(method as PaymentMethod)) {
+    // Validate phone number for mobile money payments (skip in demo mode and for redirect-based providers like PesaPal)
+    if (!demoMode && PaymentGatewayFactory.isOnlinePayment(method as PaymentMethod) && !PaymentGatewayFactory.isRedirectBased(method as PaymentMethod)) {
       if (!phoneNumber) {
         return res.status(400).json({ error: 'Phone number is required for mobile money payments' });
       }
