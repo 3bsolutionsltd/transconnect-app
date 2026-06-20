@@ -69,7 +69,7 @@ docker compose -f "$COMPOSE_FILE" --env-file "$ENV_FILE" \
 
 # ── Wait for backend to be healthy ────────────────────────────
 section "Waiting for backend health check"
-MAX_WAIT=90
+MAX_WAIT=180
 ELAPSED=0
 # Check via the host-mapped port (127.0.0.1:5001 → container:5000)
 # Avoids exec inside container; uses host curl which is always available on Ubuntu/Debian VPS

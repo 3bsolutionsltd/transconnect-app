@@ -329,6 +329,14 @@ deployMigrations().then(() => {
     
     // Start agent cleanup scheduler
     startAgentCleanupScheduler();
+
+    // Run segment back-fill in the background after the server is already listening
+    // (previously this blocked startup via the npm start chain)
+    const { execFile } = require('child_process');
+    execFile('node', ['scripts/add-segments-to-routes.js'], (err: any) => {
+      if (err) console.warn('⚠️  add-segments-to-routes finished with error:', err.message);
+      else console.log('✅ Route segments back-fill complete');
+    });
   });
 });
 
