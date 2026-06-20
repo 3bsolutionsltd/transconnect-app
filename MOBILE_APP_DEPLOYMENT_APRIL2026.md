@@ -214,6 +214,7 @@ npx eas build --platform android --profile production
 
 # Download and submit to Play Store
 # https://play.google.com/console
+# Play Store listing: https://play.google.com/store/apps/details?id=com.transconnect.mobile&hl=en
 ```
 **Timeline**: 1-3 days review
 

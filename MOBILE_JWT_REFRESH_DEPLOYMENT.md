@@ -134,6 +134,7 @@ npx expo run:ios --configuration Release
 
 #### Google Play Store
 1. Go to [Play Console](https://play.google.com/console)
+2. View Play Store listing: https://play.google.com/store/apps/details?id=com.transconnect.mobile&hl=en
 2. Upload new APK/AAB
 3. Update release notes:
    ```

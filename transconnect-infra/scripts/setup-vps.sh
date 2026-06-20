@@ -179,8 +179,13 @@ if ! grep -q 'sites-enabled' /etc/nginx/nginx.conf; then
     sed -i '/http {/a\    include /etc/nginx/sites-enabled/*;' /etc/nginx/nginx.conf
 fi
 
-nginx -t && systemctl reload nginx
-info "Nginx reloaded successfully"
+if nginx -t; then
+    systemctl reload nginx
+    info "Nginx reloaded successfully"
+else
+    warn "nginx -t failed (SSL certs not yet issued — this is expected)."
+    warn "Nginx was NOT reloaded. It will load correctly after step 5 (SSL certs)."
+fi
 
 # ── 11. SSL Certificates ──────────────────────────────────────
 info ""
@@ -196,8 +201,7 @@ info "    --non-interactive --agree-tos -m $ALERT_EMAIL"
 info ""
 info "  # Staging certificates"
 info "  certbot --nginx -d $STAGING_DOMAIN \\"
-info "    -d api-staging.${DOMAIN#*.} \\"
-info "    -d admin-staging.${DOMAIN#*.} \\"
+info "    -d api-staging.$DOMAIN -d admin-staging.$DOMAIN \\"
 info "    --non-interactive --agree-tos -m $ALERT_EMAIL"
 info ""
 info "  Certbot auto-renewal is enabled by default."
