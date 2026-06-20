@@ -11,6 +11,7 @@ import {
   StandardPaymentRequest 
 } from '../services/payment-gateway.factory';
 import { NotificationService } from '../services/notification.service';
+import { getPesapalService } from '../services/pesapal.service';
 import QRCode from 'qrcode';
 import crypto from 'crypto';
 
@@ -21,7 +22,7 @@ const notificationService = NotificationService.getInstance();
 router.post('/initiate', [
   authenticateToken,
   body('bookingId').notEmpty().withMessage('Booking ID is required'),
-  body('method').isIn(['MTN_MOBILE_MONEY', 'AIRTEL_MONEY', 'FLUTTERWAVE', 'CASH']).withMessage('Valid payment method is required'),
+  body('method').isIn(['MTN_MOBILE_MONEY', 'AIRTEL_MONEY', 'FLUTTERWAVE', 'PESAPAL', 'CASH']).withMessage('Valid payment method is required'),
   body('phoneNumber').optional().isMobilePhone('any').withMessage('Valid phone number is required for mobile money payments')
 ], async (req: Request, res: Response) => {
   try {
@@ -43,7 +44,8 @@ router.post('/initiate', [
             id: true,
             firstName: true,
             lastName: true,
-            phone: true
+            phone: true,
+            email: true
           }
         }
       }
@@ -73,8 +75,8 @@ router.post('/initiate', [
       return res.status(400).json({ error: 'Payment already initiated for this booking' });
     }
 
-    // Check if demo mode is enabled (temporarily force enabled until env var is properly set)
-    const demoMode = true; // TODO: Change back to process.env.PAYMENT_DEMO_MODE === 'true' when env var is set
+    // Demo mode: use PAYMENT_DEMO_MODE=true in .env to skip real payment provider calls
+    const demoMode = process.env.PAYMENT_DEMO_MODE === 'true';
 
     // Validate phone number for mobile money payments (skip in demo mode)
     if (!demoMode && PaymentGatewayFactory.isOnlinePayment(method as PaymentMethod)) {
@@ -162,13 +164,25 @@ router.post('/initiate', [
         // Process online payment with actual provider
         const provider = PaymentGatewayFactory.getProvider(method as PaymentMethod);
         
-        const paymentRequest: StandardPaymentRequest = {
+        const paymentRequest: StandardPaymentRequest & {
+          userEmail?: string;
+          userFirstName?: string;
+          userLastName?: string;
+          callbackUrl?: string;
+          cancellationUrl?: string;
+        } = {
           amount: booking.totalAmount,
           currency: 'UGX',
           reference: paymentReference,
           phoneNumber: phoneNumber || booking.user.phone || '',
           description: `Bus ticket: ${booking.route.origin} to ${booking.route.destination}`,
-          country: 'UG'
+          country: 'UG',
+          // PesaPal extras
+          userEmail:     (booking.user as any).email || '',
+          userFirstName: booking.user.firstName,
+          userLastName:  booking.user.lastName,
+          callbackUrl:   `${process.env.FRONTEND_URL || 'https://transconnect.app'}/payment/callback?ref=${paymentReference}`,
+          cancellationUrl: `${process.env.FRONTEND_URL || 'https://transconnect.app'}/payment/cancelled?ref=${paymentReference}`,
         };
 
         paymentResponse = await provider.requestPayment(paymentRequest);
@@ -424,7 +438,8 @@ router.post('/webhook/:gateway', async (req: Request, res: Response) => {
     const webhookSecrets: Record<string, string> = {
       'mtn': process.env.MTN_WEBHOOK_SECRET || '',
       'airtel': process.env.AIRTEL_WEBHOOK_SECRET || '',
-      'flutterwave': process.env.FLUTTERWAVE_WEBHOOK_SECRET || ''
+      'flutterwave': process.env.FLUTTERWAVE_WEBHOOK_SECRET || '',
+      'pesapal': process.env.PESAPAL_WEBHOOK_SECRET || ''
     };
 
     const secret = webhookSecrets[gateway.toLowerCase()];
@@ -893,5 +908,92 @@ function generateBookingSignature(bookingId: string, userId: string): string {
   
   return Math.abs(hash).toString(16);
 }
+
+// ── PesaPal IPN (Instant Payment Notification) ──────────────────────────────
+// PesaPal calls this as a GET request when a payment completes.
+// URL format: GET /api/payments/ipn/pesapal?orderTrackingId=xxx&orderMerchantReference=xxx&orderNotificationType=MERCHANT
+router.get('/ipn/pesapal', async (req: Request, res: Response) => {
+  const { orderTrackingId, orderMerchantReference } = req.query as Record<string, string>;
+
+  if (!orderTrackingId || !orderMerchantReference) {
+    return res.status(400).json({ error: 'Missing orderTrackingId or orderMerchantReference' });
+  }
+
+  try {
+    // Re-fetch status from PesaPal (never trust the IPN payload alone)
+    const pesapal = getPesapalService();
+    const status = await pesapal.verifyAndGetStatus(orderTrackingId);
+
+    // Find the payment by merchant reference (= our paymentReference)
+    const payment = await prisma.payment.findFirst({
+      where: { reference: orderMerchantReference },
+      include: { booking: { include: { user: true, route: true } } }
+    });
+
+    if (!payment) {
+      console.error(`[PesaPal IPN] Payment not found for reference: ${orderMerchantReference}`);
+      return res.status(404).json({ error: 'Payment not found' });
+    }
+
+    if (payment.status === 'COMPLETED' || payment.status === 'FAILED') {
+      // Already processed — PesaPal expects a 200 response regardless
+      return res.status(200).json({ message: 'Already processed' });
+    }
+
+    const newStatus: PaymentStatus =
+      status.paymentStatus === 'COMPLETED' ? 'COMPLETED' :
+      status.paymentStatus === 'FAILED'    ? 'FAILED'    :
+      status.paymentStatus === 'REVERSED'  ? 'FAILED'    : 'PENDING';
+
+    await prisma.payment.update({
+      where: { id: payment.id },
+      data: {
+        status: newStatus,
+        transactionId: status.confirmationCode || orderTrackingId,
+        metadata: {
+          ...((payment.metadata as object) || {}),
+          pesapalOrderTrackingId: orderTrackingId,
+          pesapalConfirmationCode: status.confirmationCode,
+          pesapalPaymentMethod: status.paymentMethod,
+          pesapalPaymentAccount: status.paymentAccount,
+          ipnProcessedAt: new Date().toISOString(),
+        },
+      },
+    });
+
+    if (newStatus === 'COMPLETED') {
+      await prisma.booking.update({
+        where: { id: payment.bookingId },
+        data: { status: 'CONFIRMED' },
+      });
+      await generateBookingQRCode(payment.bookingId);
+
+      try {
+        await notificationService.sendPaymentConfirmation({
+          userId: payment.userId,
+          bookingId: payment.bookingId,
+          passengerName: `${payment.booking.user.firstName} ${payment.booking.user.lastName}`,
+          amount: payment.amount,
+          method: 'PesaPal',
+          transactionId: status.confirmationCode || orderTrackingId,
+        });
+      } catch (notifErr) {
+        console.error('[PesaPal IPN] Notification error:', notifErr);
+      }
+    } else if (newStatus === 'FAILED') {
+      await prisma.booking.update({
+        where: { id: payment.bookingId },
+        data: { status: 'CANCELLED' },
+      });
+    }
+
+    console.log(`[PesaPal IPN] ${orderMerchantReference} → ${newStatus}`);
+    // PesaPal expects a 200 with the orderNotificationType in the response
+    res.status(200).json({ orderNotificationType: req.query.orderNotificationType, orderTrackingId, orderMerchantReference });
+  } catch (error) {
+    console.error('[PesaPal IPN] Error processing IPN:', error);
+    res.status(500).json({ error: 'IPN processing failed' });
+  }
+});
 
 export default router;

@@ -37,6 +37,7 @@ enum PaymentMethod {
   MTN_MOBILE_MONEY
   AIRTEL_MONEY
   FLUTTERWAVE
+  PESAPAL
   CASH
 }
 
