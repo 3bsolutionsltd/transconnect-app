@@ -22,7 +22,7 @@ const notificationService = NotificationService.getInstance();
 router.post('/initiate', [
   authenticateToken,
   body('bookingId').notEmpty().withMessage('Booking ID is required'),
-  body('method').isIn(['MTN_MOBILE_MONEY', 'AIRTEL_MONEY', 'FLUTTERWAVE', 'PESAPAL', 'CASH']).withMessage('Valid payment method is required'),
+  body('method').isIn(['MTN_MOBILE_MONEY', 'AIRTEL_MONEY', 'PESAPAL', 'CASH']).withMessage('Valid payment method is required'),
   body('phoneNumber').optional().isMobilePhone('any').withMessage('Valid phone number is required for mobile money payments')
 ], async (req: Request, res: Response) => {
   try {
@@ -767,7 +767,7 @@ router.post('/:paymentId/complete', authenticateToken, async (req: Request, res:
 // Validate payment method and phone number
 router.post('/validate', [
   authenticateToken,
-  body('method').isIn(['MTN_MOBILE_MONEY', 'AIRTEL_MONEY', 'FLUTTERWAVE']).withMessage('Valid payment method is required'),
+  body('method').isIn(['MTN_MOBILE_MONEY', 'AIRTEL_MONEY', 'PESAPAL']).withMessage('Valid payment method is required'),
   body('phoneNumber').isMobilePhone('any').withMessage('Valid phone number is required')
 ], async (req: Request, res: Response) => {
   try {

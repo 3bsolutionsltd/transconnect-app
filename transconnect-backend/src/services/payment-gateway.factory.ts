@@ -320,16 +320,16 @@ export class PaymentGatewayFactory {
   }
 
   static getSupportedMethods(): PaymentMethod[] {
-    return ['MTN_MOBILE_MONEY', 'AIRTEL_MONEY', 'FLUTTERWAVE', 'PESAPAL', 'CASH'];
+    return ['MTN_MOBILE_MONEY', 'AIRTEL_MONEY', 'PESAPAL', 'CASH'];
   }
 
   static isOnlinePayment(method: PaymentMethod): boolean {
-    return ['MTN_MOBILE_MONEY', 'AIRTEL_MONEY', 'FLUTTERWAVE', 'PESAPAL'].includes(method);
+    return ['MTN_MOBILE_MONEY', 'AIRTEL_MONEY', 'PESAPAL'].includes(method);
   }
 
   /** PesaPal is a redirect-based (hosted checkout) provider, not a silent push */
   static isRedirectPayment(method: PaymentMethod): boolean {
-    return method === 'PESAPAL' || method === 'FLUTTERWAVE';
+    return method === 'PESAPAL';
   }
 
   static getMethodDisplayName(method: PaymentMethod): string {

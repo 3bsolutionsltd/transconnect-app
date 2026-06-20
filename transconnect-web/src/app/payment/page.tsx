@@ -49,7 +49,7 @@ function PaymentContent() {
   const paymentMethods = [
     { id: 'MTN_MOBILE_MONEY', name: 'MTN Mobile Money', icon: Smartphone, color: 'text-yellow-600' },
     { id: 'AIRTEL_MONEY', name: 'Airtel Money', icon: Smartphone, color: 'text-red-600' },
-    { id: 'FLUTTERWAVE', name: 'Card Payment', icon: CreditCard, color: 'text-blue-600' },
+    { id: 'PESAPAL', name: 'PesaPal (Card / Bank)', icon: CreditCard, color: 'text-purple-600', description: 'Pay securely via PesaPal checkout' },
     { id: 'CASH', name: 'Cash Payment (Over the Counter)', icon: Banknote, color: 'text-green-600', description: 'Pay at operator office or at boarding' },
   ];
 
@@ -60,7 +60,7 @@ function PaymentContent() {
       return;
     }
 
-    if (!phoneNumber && selectedMethod !== 'FLUTTERWAVE' && selectedMethod !== 'CASH') {
+    if (!phoneNumber && selectedMethod !== 'PESAPAL' && selectedMethod !== 'CASH') {
       notificationService.showWarning('Phone Number Required', 'Please enter your phone number to proceed with payment');
       return;
     }
@@ -103,6 +103,12 @@ function PaymentContent() {
       
       if (response && response.paymentId) {
         setPaymentId(response.paymentId);
+
+        // Redirect-based providers (PesaPal, Flutterwave hosted) return a checkoutUrl
+        if (response.checkoutUrl) {
+          window.location.href = response.checkoutUrl;
+          return;
+        }
         
         // For demo mode, payment should complete immediately
         if (response.status === 'COMPLETED') {
@@ -328,39 +334,21 @@ function PaymentContent() {
                       </p>
                     </div>
                   </div>
-                ) : selectedMethod === 'FLUTTERWAVE' ? (
+                ) : selectedMethod === 'PESAPAL' ? (
                   <div className="space-y-4">
-                    <div>
-                      <label className="block text-sm font-medium text-gray-700 mb-1">
-                        Card Number
-                      </label>
-                      <input
-                        type="text"
-                        placeholder="1234 5678 9012 3456"
-                        className="form-input"
-                      />
+                    <div className="bg-purple-50 border border-purple-200 rounded-lg p-4">
+                      <h4 className="font-semibold text-purple-900 mb-2 flex items-center">
+                        <CreditCard className="h-5 w-5 mr-2" />
+                        PesaPal Secure Checkout
+                      </h4>
+                      <p className="text-sm text-purple-800">
+                        You will be redirected to the PesaPal secure payment page where you can pay by card, bank transfer, or mobile money.
+                      </p>
                     </div>
-                    <div className="grid grid-cols-2 gap-4">
-                      <div>
-                        <label className="block text-sm font-medium text-gray-700 mb-1">
-                          Expiry Date
-                        </label>
-                        <input
-                          type="text"
-                          placeholder="MM/YY"
-                          className="form-input"
-                        />
-                      </div>
-                      <div>
-                        <label className="block text-sm font-medium text-gray-700 mb-1">
-                          CVV
-                        </label>
-                        <input
-                          type="text"
-                          placeholder="123"
-                          className="form-input"
-                        />
-                      </div>
+                    <div className="bg-blue-50 border border-blue-200 rounded-lg p-3">
+                      <p className="text-sm text-blue-800">
+                        <strong>Note:</strong> After completing payment on PesaPal, you will be returned here automatically.
+                      </p>
                     </div>
                   </div>
                 ) : (
