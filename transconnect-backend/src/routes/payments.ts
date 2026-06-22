@@ -97,6 +97,12 @@ router.post('/initiate', [
       }
     }
 
+    // Remove any previously failed payment so we can create a fresh one
+    // (bookingId has a unique constraint — only one payment row per booking)
+    await prisma.payment.deleteMany({
+      where: { bookingId, status: 'FAILED' }
+    });
+
     // Generate payment reference
     const paymentReference = `PAY${Date.now()}${Math.random().toString(36).substr(2, 4).toUpperCase()}`;
 
