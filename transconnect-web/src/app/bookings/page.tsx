@@ -191,7 +191,7 @@ export default function BookingsPage() {
     const now = new Date();
     const hoursUntilTravel = (travelDate.getTime() - now.getTime()) / (1000 * 60 * 60);
     
-    return booking.status === 'PENDING' && hoursUntilTravel > 2; // Can pay up to 2 hours before travel
+    return booking.status === 'PENDING' && hoursUntilTravel > 0; // Can pay up until departure
   };
 
   if (!isAuthenticated) {
