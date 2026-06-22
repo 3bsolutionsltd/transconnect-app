@@ -72,7 +72,22 @@ router.post('/initiate', [
     });
 
     if (existingPayment) {
-      return res.status(400).json({ error: 'Payment already initiated for this booking' });
+      // If a COMPLETED payment exists, hard-block
+      if (existingPayment.status === 'COMPLETED') {
+        return res.status(400).json({ error: 'Payment already completed for this booking' });
+      }
+
+      // PENDING: allow retry if the payment is older than 15 minutes (stale redirect)
+      const staleThreshold = new Date(Date.now() - 15 * 60 * 1000);
+      if (existingPayment.createdAt < staleThreshold) {
+        await prisma.payment.update({
+          where: { id: existingPayment.id },
+          data: { status: 'FAILED' }
+        });
+        // fall through and create a new payment below
+      } else {
+        return res.status(400).json({ error: 'Payment already initiated for this booking' });
+      }
     }
 
     // Demo mode: use PAYMENT_DEMO_MODE=true in .env to skip real payment provider calls
@@ -187,8 +202,8 @@ router.post('/initiate', [
           userEmail:     (booking.user as any).email || '',
           userFirstName: booking.user.firstName,
           userLastName:  booking.user.lastName,
-          callbackUrl:   `${process.env.FRONTEND_URL || 'https://transconnect.app'}/payment/callback?ref=${paymentReference}`,
-          cancellationUrl: `${process.env.FRONTEND_URL || 'https://transconnect.app'}/payment/cancelled?ref=${paymentReference}`,
+          callbackUrl:   `${process.env.FRONTEND_URL || 'https://transconnect.app'}/payment/callback?paymentId=${payment.id}&bookingId=${payment.bookingId}&ref=${paymentReference}`,
+          cancellationUrl: `${process.env.FRONTEND_URL || 'https://transconnect.app'}/payment/cancelled?paymentId=${payment.id}&bookingId=${payment.bookingId}&ref=${paymentReference}`,
         };
 
         paymentResponse = await provider.requestPayment(paymentRequest);
@@ -304,8 +319,14 @@ router.get('/:paymentId/status', authenticateToken, async (req: Request, res: Re
     const { paymentId } = req.params;
     const userId = (req as any).user.id;
 
-    const payment = await prisma.payment.findUnique({
-      where: { id: paymentId },
+    // Support lookup by UUID id OR by payment reference string (PAY...)
+    const payment = await prisma.payment.findFirst({
+      where: {
+        OR: [
+          { id: paymentId },
+          { reference: paymentId }
+        ]
+      },
       include: {
         booking: {
           select: {
