@@ -37,7 +37,23 @@ function PaymentContent() {
     if (booking) {
       try {
         const parsed = JSON.parse(decodeURIComponent(booking));
-        setBookingData(parsed);
+
+        // Live check: fetch current booking status from the API
+        // (URL param status is stale — set at booking creation time)
+        import('@/lib/api').then(({ getBookingStatus, authApi }) => {
+          getBookingStatus(parsed.id, authApi.getToken())
+            .then((live: any) => {
+              if (live?.status === 'CONFIRMED' || live?.status === 'COMPLETED') {
+                const successData = encodeURIComponent(
+                  JSON.stringify({ ...parsed, ...live })
+                );
+                router.replace(`/booking-success?booking=${successData}`);
+              } else {
+                setBookingData(parsed);
+              }
+            })
+            .catch(() => setBookingData(parsed)); // fallback: show payment page on API error
+        });
       } catch (error) {
         router.push('/search');
       }
