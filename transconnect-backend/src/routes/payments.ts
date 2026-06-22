@@ -266,10 +266,28 @@ router.post('/initiate', [
         });
       }
 
-      throw error; // Re-throw unexpected errors
+      // For all other errors, also mark payment FAILED so the user can retry
+      await prisma.payment.update({
+        where: { id: payment.id },
+        data: {
+          status: 'FAILED',
+          metadata: {
+            ...(payment.metadata as object || {}),
+            error: {
+              message: error instanceof Error ? error.message : 'Unknown error'
+            }
+          }
+        }
+      });
+
+      throw error; // Re-throw to outer catch for logging + response
     }
   } catch (error) {
     console.error('Error initiating payment:', error);
+    const msg = error instanceof Error ? error.message : '';
+    if (msg.includes('PESAPAL_CONSUMER_KEY') || msg.includes('PESAPAL_CONSUMER_SECRET')) {
+      return res.status(503).json({ error: 'PesaPal payment is not yet configured on this server. Please use MTN Mobile Money, Airtel Money, or Cash.' });
+    }
     res.status(500).json({ error: 'Failed to initiate payment' });
   }
 });

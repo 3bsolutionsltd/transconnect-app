@@ -96,6 +96,14 @@ export class PesapalService {
   // ── Auth ────────────────────────────────────────────────────────────────
 
   async getAuthToken(): Promise<string> {
+    // Fail fast with a clear message when credentials are not configured
+    if (!this.consumerKey || !this.consumerSecret) {
+      throw new Error(
+        '[PesaPal] PESAPAL_CONSUMER_KEY and PESAPAL_CONSUMER_SECRET must be set. ' +
+        'Register at developer.pesapal.com to obtain sandbox credentials, then add them to the server .env.'
+      );
+    }
+
     // Return cached token if still valid (with 60-second buffer)
     if (this.cachedToken && this.tokenExpiry && new Date() < new Date(this.tokenExpiry.getTime() - 60_000)) {
       return this.cachedToken;
