@@ -3,9 +3,9 @@ import React, { useEffect, useState } from 'react';
 import Link from 'next/link';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
-import { Calendar, MapPin, Clock, QrCode, Download, User, ArrowRight, X, Edit, RefreshCw, CreditCard } from 'lucide-react';
+import { Calendar, MapPin, Clock, QrCode, Download, User, ArrowRight, X, Edit, RefreshCw, CreditCard, CheckCircle } from 'lucide-react';
 import { useAuth } from '@/contexts/AuthContext';
-import { getMyBookings, cancelBooking, modifyBookingDate } from '@/lib/api';
+import { getMyBookings, cancelBooking, modifyBookingDate, paymentApi } from '@/lib/api';
 import { useNotificationService } from '@/lib/notificationService';
 import Header from '@/components/Header';
 import ConfirmationDialog from '@/components/ui/ConfirmationDialog';
@@ -18,6 +18,7 @@ export default function BookingsPage() {
   const [cancellingId, setCancellingId] = useState<string | null>(null);
   const [modifyingId, setModifyingId] = useState<string | null>(null);
   const [newDate, setNewDate] = useState('');
+  const [checkingStatusId, setCheckingStatusId] = useState<string | null>(null);
   const [confirmDialog, setConfirmDialog] = useState<{
     isOpen: boolean;
     title: string;
@@ -186,6 +187,32 @@ export default function BookingsPage() {
     window.location.href = `/payment?booking=${bookingData}`;
   };
 
+  const handleCheckStatus = async (booking: any) => {
+    if (!booking.payment?.id) return;
+    setCheckingStatusId(booking.id);
+    try {
+      const result = await paymentApi.getStatus(booking.payment.id);
+      if (result.status === 'COMPLETED') {
+        setBookings(prev => prev.map(b =>
+          b.id === booking.id ? { ...b, status: 'CONFIRMED' } : b
+        ));
+        toast.success('Payment confirmed! Your booking is now confirmed.');
+        loadBookings(); // Refresh to get QR code
+      } else if (result.status === 'FAILED') {
+        setBookings(prev => prev.map(b =>
+          b.id === booking.id ? { ...b, status: 'PENDING' } : b
+        ));
+        toast.error('Payment failed. Please try again.');
+      } else {
+        toast('Payment is still processing. Please check again in a moment.', { icon: '⏳' });
+      }
+    } catch {
+      toast.error('Could not check payment status. Please try again.');
+    } finally {
+      setCheckingStatusId(null);
+    }
+  };
+
   const canPayBooking = (booking: any) => {
     const travelDate = new Date(booking.travelDate);
     const now = new Date();
@@ -348,7 +375,7 @@ export default function BookingsPage() {
                   </div>
                   
                   {/* Booking Management Actions */}
-                  {(canPayBooking(booking) || canCancelBooking(booking) || canModifyBooking(booking)) && (
+                  {(canPayBooking(booking) || booking.payment?.id || canCancelBooking(booking) || canModifyBooking(booking)) && (
                     <div className="border-t pt-4 mt-4">
                       {/* Pay Now Button for Pending Bookings */}
                       {canPayBooking(booking) && (
@@ -363,6 +390,27 @@ export default function BookingsPage() {
                           </Button>
                           <p className="text-xs text-gray-500 mt-1">
                             • Complete payment to confirm your booking
+                          </p>
+                        </div>
+                      )}
+
+                      {/* Check Status Button — for PENDING bookings that have a payment in progress */}
+                      {booking.status === 'PENDING' && booking.payment?.id && (
+                        <div className="mb-4">
+                          <Button
+                            onClick={() => handleCheckStatus(booking)}
+                            disabled={checkingStatusId === booking.id}
+                            variant="outline"
+                            size="sm"
+                            className="border-blue-300 text-blue-600 hover:bg-blue-50"
+                          >
+                            {checkingStatusId === booking.id
+                              ? <><RefreshCw className="h-4 w-4 mr-1 animate-spin" />Checking…</>
+                              : <><CheckCircle className="h-4 w-4 mr-1" />Check Payment Status</>
+                            }
+                          </Button>
+                          <p className="text-xs text-gray-500 mt-1">
+                            • Already paid? Click to refresh your booking status
                           </p>
                         </div>
                       )}
