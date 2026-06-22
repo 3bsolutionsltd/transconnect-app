@@ -373,7 +373,7 @@ router.get('/:paymentId/status', authenticateToken, async (req: Request, res: Re
         // Update payment status if changed
         if (newStatus !== payment.status) {
           await prisma.payment.update({
-            where: { id: paymentId },
+            where: { id: payment.id },
             data: {
               status: newStatus,
               metadata: {
