@@ -1,14 +1,25 @@
 'use client';
 export const dynamic = 'force-dynamic';
 
+import { useEffect, Suspense } from 'react';
 import { useSearchParams, useRouter } from 'next/navigation';
 import Link from 'next/link';
-import { Suspense } from 'react';
+import { paymentApi } from '@/lib/api';
 
 function PaymentCancelledContent() {
   const searchParams = useSearchParams();
   const router = useRouter();
+  const paymentId = searchParams.get('paymentId');
   const ref = searchParams.get('ref');
+
+  useEffect(() => {
+    // Call status endpoint — it will query PesaPal, detect FAILED/CANCELLED,
+    // and mark our payment record as FAILED so the user can retry immediately.
+    const id = paymentId || ref;
+    if (id) {
+      paymentApi.getStatus(id).catch(() => {/* ignore — auto-expires after 15 min */});
+    }
+  }, [paymentId, ref]);
 
   return (
     <main className="min-h-screen bg-gray-50 flex items-center justify-center p-4">
@@ -31,10 +42,10 @@ function PaymentCancelledContent() {
 
         <div className="flex flex-col gap-3">
           <button
-            onClick={() => router.back()}
+            onClick={() => router.push('/bookings')}
             className="bg-blue-600 text-white rounded-xl py-3 font-semibold hover:bg-blue-700 transition"
           >
-            Try Again
+            Try Again (My Bookings)
           </button>
           <Link href="/" className="text-gray-500 hover:underline text-sm">
             Back to Home
