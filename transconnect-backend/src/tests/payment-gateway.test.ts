@@ -9,7 +9,7 @@ describe('Payment Gateway Factory Tests', () => {
       expect(methods.length).toBeGreaterThan(0);
       expect(methods).toContain('MTN_MOBILE_MONEY');
       expect(methods).toContain('AIRTEL_MONEY');
-      expect(methods).toContain('FLUTTERWAVE');
+      expect(methods).toContain('PESAPAL');
       expect(methods).toContain('CASH');
     });
   });
@@ -18,7 +18,7 @@ describe('Payment Gateway Factory Tests', () => {
     it('should correctly identify online payment methods', () => {
       expect(PaymentGatewayFactory.isOnlinePayment('MTN_MOBILE_MONEY')).toBe(true);
       expect(PaymentGatewayFactory.isOnlinePayment('AIRTEL_MONEY')).toBe(true);
-      expect(PaymentGatewayFactory.isOnlinePayment('FLUTTERWAVE')).toBe(true);
+      expect(PaymentGatewayFactory.isOnlinePayment('PESAPAL')).toBe(true);
       expect(PaymentGatewayFactory.isOnlinePayment('CASH')).toBe(false);
     });
 
