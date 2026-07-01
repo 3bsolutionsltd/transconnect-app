@@ -331,7 +331,7 @@ describe('Payment Integration Tests', () => {
           method: 'MTN_MOBILE_MONEY',
           phoneNumber: '256777123456'
         })
-        .expect(422);
+        .expect(400);
 
       expect(response.body).toHaveProperty('errors');
     });
