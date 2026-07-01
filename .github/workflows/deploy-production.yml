@@ -126,7 +126,7 @@ jobs:
           script: |
             set -e
             cd /opt/transconnect/app
-            git fetch --tags origin
+            git fetch --tags --force origin
             git checkout ${{ steps.sha.outputs.ref }} 2>/dev/null || git checkout ${{ steps.sha.outputs.sha }}
 
             BUILD_FLAG=""
