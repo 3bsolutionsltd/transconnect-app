@@ -49,7 +49,7 @@ fi
 # ── Pull latest code ──────────────────────────────────────────
 section "Pulling latest code (main/master)"
 cd "$REPO_ROOT"
-git fetch origin
+git fetch origin --tags --force
 git pull origin master || git pull origin main || warn "Could not pull — working with local HEAD"
 GIT_SHA=$(git rev-parse --short HEAD)
 info "HEAD: $GIT_SHA"
