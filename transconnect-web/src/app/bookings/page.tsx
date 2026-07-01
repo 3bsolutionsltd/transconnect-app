@@ -3,7 +3,7 @@ import React, { useEffect, useState } from 'react';
 import Link from 'next/link';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
-import { Calendar, MapPin, Clock, QrCode, Download, User, ArrowRight, X, Edit, RefreshCw, CreditCard, CheckCircle } from 'lucide-react';
+import { Calendar, MapPin, Clock, QrCode, Download, User, ArrowRight, X, Edit, RefreshCw, CreditCard, CheckCircle, ArrowLeftRight } from 'lucide-react';
 import { useAuth } from '@/contexts/AuthContext';
 import { getMyBookings, cancelBooking, modifyBookingDate, paymentApi } from '@/lib/api';
 import { useNotificationService } from '@/lib/notificationService';
@@ -451,6 +451,18 @@ export default function BookingsPage() {
                             <X className="h-4 w-4 mr-1" />
                             {cancellingId === booking.id ? 'Cancelling...' : 'Cancel Booking'}
                           </Button>
+                        )}
+                        {(booking.status === 'CONFIRMED' || booking.status === 'PENDING') && (
+                          <Link href={`/transfers/request?bookingId=${booking.id}`}>
+                            <Button
+                              variant="outline"
+                              size="sm"
+                              className="text-purple-600 border-purple-300 hover:bg-purple-50"
+                            >
+                              <ArrowLeftRight className="h-4 w-4 mr-1" />
+                              Request Transfer
+                            </Button>
+                          </Link>
                         )}
                       </div>
                       
