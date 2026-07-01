@@ -540,15 +540,15 @@ describe('Payment Integration Tests', () => {
   describe('PaymentGatewayFactory', () => {
     it('should return supported payment methods', () => {
       const methods = PaymentGatewayFactory.getSupportedMethods();
-      expect(methods).toContain('MTN_MOBILE_MONEY');
-      expect(methods).toContain('AIRTEL_MONEY');
       expect(methods).toContain('PESAPAL');
       expect(methods).toContain('CASH');
+      expect(methods).not.toContain('MTN_MOBILE_MONEY');
+      expect(methods).not.toContain('AIRTEL_MONEY');
     });
 
     it('should identify online payment methods', () => {
-      expect(PaymentGatewayFactory.isOnlinePayment('MTN_MOBILE_MONEY')).toBe(true);
-      expect(PaymentGatewayFactory.isOnlinePayment('AIRTEL_MONEY')).toBe(true);
+      expect(PaymentGatewayFactory.isOnlinePayment('MTN_MOBILE_MONEY')).toBe(false);
+      expect(PaymentGatewayFactory.isOnlinePayment('AIRTEL_MONEY')).toBe(false);
       expect(PaymentGatewayFactory.isOnlinePayment('PESAPAL')).toBe(true);
       expect(PaymentGatewayFactory.isOnlinePayment('CASH')).toBe(false);
     });
@@ -556,6 +556,7 @@ describe('Payment Integration Tests', () => {
     it('should return display names for payment methods', () => {
       expect(PaymentGatewayFactory.getMethodDisplayName('MTN_MOBILE_MONEY')).toBe('MTN Mobile Money');
       expect(PaymentGatewayFactory.getMethodDisplayName('AIRTEL_MONEY')).toBe('Airtel Money');
+      expect(PaymentGatewayFactory.getMethodDisplayName('PESAPAL')).toBe('PesaPal (supports MTN & Airtel Money)');
       expect(PaymentGatewayFactory.getMethodDisplayName('FLUTTERWAVE')).toBe('Card Payment');
       expect(PaymentGatewayFactory.getMethodDisplayName('CASH')).toBe('Cash Payment');
     });
