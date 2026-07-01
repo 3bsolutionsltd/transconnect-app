@@ -147,17 +147,18 @@ describe('Payment Integration Tests', () => {
       expect(methods).toEqual(
         expect.arrayContaining([
           expect.objectContaining({
-            value: 'MTN_MOBILE_MONEY',
-            label: 'MTN Mobile Money',
+            value: 'PESAPAL',
             isOnline: true
           }),
           expect.objectContaining({
-            value: 'AIRTEL_MONEY',
-            label: 'Airtel Money',
-            isOnline: true
+            value: 'CASH',
+            isOnline: false
           })
         ])
       );
+      const methodValues = methods.map((m: any) => m.value);
+      expect(methodValues).not.toContain('MTN_MOBILE_MONEY');
+      expect(methodValues).not.toContain('AIRTEL_MONEY');
     });
   });
 
@@ -207,25 +208,23 @@ describe('Payment Integration Tests', () => {
   });
 
   describe('POST /api/payments/initiate', () => {
-    it('should initiate MTN Mobile Money payment', async () => {
+    it('should initiate cash payment for first booking', async () => {
       const response = await request(app)
         .post('/api/payments/initiate')
         .set('Authorization', `Bearer ${authToken}`)
         .send({
           bookingId: bookingId,
-          method: 'MTN_MOBILE_MONEY',
-          phoneNumber: '256777123456'
+          method: 'CASH'
         })
         .expect(200);
 
       expect(response.body).toHaveProperty('paymentId');
       expect(response.body).toHaveProperty('paymentReference');
       expect(response.body).toHaveProperty('status', 'PENDING');
-      expect(response.body).toHaveProperty('provider', 'MTN Mobile Money');
-      expect(response.body).toHaveProperty('transactionId');
+      expect(response.body).toHaveProperty('provider', 'Cash Payment');
     });
 
-    it('should initiate Airtel Money payment', async () => {
+    it('should initiate cash payment for second booking', async () => {
       // Create another booking for this test
       const route = await prisma.route.findFirst();
       const booking = await prisma.booking.create({
@@ -245,13 +244,12 @@ describe('Payment Integration Tests', () => {
         .set('Authorization', `Bearer ${authToken}`)
         .send({
           bookingId: booking.id,
-          method: 'AIRTEL_MONEY',
-          phoneNumber: '256750123456'
+          method: 'CASH'
         })
         .expect(200);
 
       expect(response.body).toHaveProperty('paymentId');
-      expect(response.body).toHaveProperty('provider', 'Airtel Money');
+      expect(response.body).toHaveProperty('provider', 'Cash Payment');
       expect(response.body).toHaveProperty('status', 'PENDING');
     });
 
@@ -290,8 +288,7 @@ describe('Payment Integration Tests', () => {
         .set('Authorization', `Bearer ${authToken}`)
         .send({
           bookingId: 'non-existent-id',
-          method: 'MTN_MOBILE_MONEY',
-          phoneNumber: '256777123456'
+          method: 'CASH'
         })
         .expect(404);
 
@@ -299,21 +296,20 @@ describe('Payment Integration Tests', () => {
     });
 
     it('should reject duplicate payment', async () => {
-      // Try to create another payment for the same booking
+      // Try to create another payment for the same booking (bookingId already has a payment)
       const response = await request(app)
         .post('/api/payments/initiate')
         .set('Authorization', `Bearer ${authToken}`)
         .send({
           bookingId: bookingId,
-          method: 'MTN_MOBILE_MONEY',
-          phoneNumber: '256777123456'
+          method: 'CASH'
         })
         .expect(400);
 
       expect(response.body).toHaveProperty('error', 'Payment already initiated for this booking');
     });
 
-    it('should require phone number for mobile money', async () => {
+    it('should reject unsupported payment method (MTN/Airtel disabled)', async () => {
       const route = await prisma.route.findFirst();
       const booking = await prisma.booking.create({
         data: {
@@ -332,12 +328,12 @@ describe('Payment Integration Tests', () => {
         .set('Authorization', `Bearer ${authToken}`)
         .send({
           bookingId: booking.id,
-          method: 'MTN_MOBILE_MONEY'
-          // Missing phoneNumber
+          method: 'MTN_MOBILE_MONEY',
+          phoneNumber: '256777123456'
         })
-        .expect(400);
+        .expect(422);
 
-      expect(response.body).toHaveProperty('error', 'Phone number is required for mobile money payments');
+      expect(response.body).toHaveProperty('errors');
     });
   });
 

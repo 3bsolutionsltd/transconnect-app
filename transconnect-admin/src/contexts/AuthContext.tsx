@@ -26,8 +26,10 @@ export const useAuth = () => {
   return context;
 };
 
-// Use the same API configuration as the main api.ts file
-const API_BASE_URL = process.env.REACT_APP_API_URL || 'http://localhost:5000/api';
+// Ensure API_BASE_URL always ends with /api so endpoints like /auth/login resolve correctly
+// regardless of whether REACT_APP_API_URL is set with or without the /api suffix.
+const _rawApiUrl = process.env.REACT_APP_API_URL || 'http://localhost:5000/api';
+const API_BASE_URL = _rawApiUrl.replace(/\/api\/?$/, '') + '/api';
 
 const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
   const [user, setUser] = useState<User | null>(null);

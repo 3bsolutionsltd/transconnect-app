@@ -320,11 +320,11 @@ export class PaymentGatewayFactory {
   }
 
   static getSupportedMethods(): PaymentMethod[] {
-    return ['MTN_MOBILE_MONEY', 'AIRTEL_MONEY', 'PESAPAL', 'CASH'];
+    return ['PESAPAL', 'CASH'];
   }
 
   static isOnlinePayment(method: PaymentMethod): boolean {
-    return ['MTN_MOBILE_MONEY', 'AIRTEL_MONEY', 'PESAPAL'].includes(method);
+    return ['PESAPAL'].includes(method);
   }
 
   /** PesaPal is a redirect-based (hosted checkout) provider, not a silent push */
@@ -337,7 +337,7 @@ export class PaymentGatewayFactory {
       'MTN_MOBILE_MONEY': 'MTN Mobile Money',
       'AIRTEL_MONEY': 'Airtel Money',
       'FLUTTERWAVE': 'Card Payment',
-      'PESAPAL': 'PesaPal',
+      'PESAPAL': 'PesaPal (supports MTN & Airtel Money)',
       'CASH': 'Cash Payment'
     };
 

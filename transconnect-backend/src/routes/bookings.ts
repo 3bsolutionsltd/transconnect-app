@@ -118,16 +118,14 @@ router.post('/', [
       boarding = route.stops.find(stop => stop.stopName === boardingStop);
       alighting = route.stops.find(stop => stop.stopName === alightingStop);
 
-      if (!boarding || !alighting) {
-        return res.status(400).json({ error: 'Invalid boarding or alighting stop' });
+      if (boarding && alighting) {
+        if (boarding.order >= alighting.order) {
+          return res.status(400).json({ error: 'Boarding stop must be before alighting stop' });
+        }
+        // Calculate price based on stops
+        finalPrice = alighting.priceFromOrigin - boarding.priceFromOrigin;
       }
-
-      if (boarding.order >= alighting.order) {
-        return res.status(400).json({ error: 'Boarding stop must be before alighting stop' });
-      }
-
-      // Calculate price based on stops
-      finalPrice = alighting.priceFromOrigin - boarding.priceFromOrigin;
+      // If stops not found in DB (e.g. fallback names), use full route price silently
     }
 
     // Check seat availability
