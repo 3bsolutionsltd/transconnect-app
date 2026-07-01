@@ -4,7 +4,6 @@ export const dynamic = 'force-dynamic';
 import { useEffect, Suspense } from 'react';
 import { useSearchParams, useRouter } from 'next/navigation';
 import Link from 'next/link';
-import { paymentApi } from '@/lib/api';
 
 function PaymentCancelledContent() {
   const searchParams = useSearchParams();
@@ -13,12 +12,16 @@ function PaymentCancelledContent() {
   const ref = searchParams.get('ref');
 
   useEffect(() => {
-    // Call status endpoint — it will query PesaPal, detect FAILED/CANCELLED,
-    // and mark our payment record as FAILED so the user can retry immediately.
+    // Directly cancel the payment so the user can retry immediately.
     const id = paymentId || ref;
-    if (id) {
-      paymentApi.getStatus(id).catch(() => {/* ignore — auto-expires after 15 min */});
-    }
+    if (!id) return;
+    const token = typeof window !== 'undefined' ? localStorage.getItem('token') : null;
+    if (!token) return;
+    const apiBase = process.env.NEXT_PUBLIC_API_URL || '/api';
+    fetch(`${apiBase}/payments/${encodeURIComponent(id)}/cancel`, {
+      method: 'POST',
+      headers: { Authorization: `Bearer ${token}` },
+    }).catch(() => {/* ignore — stale-PENDING auto-expires after 15 min anyway */});
   }, [paymentId, ref]);
 
   return (

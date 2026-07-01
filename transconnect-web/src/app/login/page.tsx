@@ -35,11 +35,6 @@ export default function LoginPage() {
     }
   }
 
-  function fillTestCredentials() {
-    setEmail('passenger@example.com');
-    setPassword('passenger123');
-  }
-
   return (
     <div className="min-h-screen bg-gradient-to-br from-blue-50 to-indigo-100 flex items-center justify-center p-4">
       <div className="w-full max-w-md">
@@ -115,25 +110,6 @@ export default function LoginPage() {
               >
                 Forgot your password?
               </Link>
-            </div>
-
-            {/* Test Credentials */}
-            <div className="mt-6 p-4 bg-blue-50 rounded-lg border border-blue-200">
-              <h4 className="text-sm font-medium text-blue-900 mb-2">Test Credentials</h4>
-              <p className="text-xs text-blue-700 mb-2">Use these for testing:</p>
-              <div className="text-xs text-blue-600 space-y-1">
-                <div><strong>Email:</strong> passenger@example.com</div>
-                <div><strong>Password:</strong> passenger123</div>
-              </div>
-              <Button 
-                type="button" 
-                variant="outline" 
-                size="sm" 
-                onClick={fillTestCredentials}
-                className="mt-3 w-full touch-manipulation"
-              >
-                Fill Test Credentials
-              </Button>
             </div>
 
             <div className="mt-6 text-center">

@@ -844,6 +844,49 @@ router.post('/validate', [
   }
 });
 
+// Cancel a pending payment (called when user cancels on PesaPal or other redirect provider)
+router.post('/:paymentId/cancel', authenticateToken, async (req: Request, res: Response) => {
+  try {
+    const { paymentId } = req.params;
+    const userId = (req as any).user.id;
+
+    const payment = await prisma.payment.findFirst({
+      where: { OR: [{ id: paymentId }, { reference: paymentId }] },
+      include: { booking: { select: { userId: true } } }
+    });
+
+    if (!payment) {
+      return res.status(404).json({ error: 'Payment not found' });
+    }
+
+    if (payment.booking.userId !== userId) {
+      return res.status(403).json({ error: 'Not authorized' });
+    }
+
+    if (payment.status !== 'PENDING') {
+      // Already resolved — just return success so the client can proceed
+      return res.json({ success: true, status: payment.status });
+    }
+
+    await prisma.payment.update({
+      where: { id: payment.id },
+      data: {
+        status: 'FAILED',
+        metadata: {
+          ...(payment.metadata as object || {}),
+          cancelledByUser: true,
+          cancelledAt: new Date().toISOString()
+        }
+      }
+    });
+
+    res.json({ success: true, status: 'FAILED' });
+  } catch (error) {
+    console.error('Error cancelling payment:', error);
+    res.status(500).json({ error: 'Failed to cancel payment' });
+  }
+});
+
 // Get supported payment methods
 router.get('/methods', async (req: Request, res: Response) => {
   try {
