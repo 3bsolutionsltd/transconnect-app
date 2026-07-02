@@ -61,7 +61,7 @@ const AgentManagement = () => {
   const [statusReason, setStatusReason] = useState('');
   const [updatingStatus, setUpdatingStatus] = useState(false);
 
-  const API_BASE_URL = process.env.REACT_APP_API_URL || 'http://localhost:5000/api';
+  const API_BASE_URL = (process.env.REACT_APP_API_URL || 'http://localhost:5000/api').replace(/\/api\/?$/, '') + '/api';
 
   useEffect(() => {
     loadAgents();

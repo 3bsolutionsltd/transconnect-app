@@ -21,7 +21,7 @@ const OperatorBookings = () => {
   const [transferBooking, setTransferBooking] = useState<any>(null); // For transfer modal
   const [bookingTransfers, setBookingTransfers] = useState<{[key: string]: any}>({}); // Transfer status by booking ID
 
-  const API_BASE_URL = process.env.REACT_APP_API_URL || 'http://localhost:5000/api';
+  const API_BASE_URL = (process.env.REACT_APP_API_URL || 'http://localhost:5000/api').replace(/\/api\/?$/, '') + '/api';
 
   const loadBookings = useCallback(async () => {
     try {

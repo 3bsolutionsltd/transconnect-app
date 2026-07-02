@@ -33,10 +33,10 @@ const OnlineAgentsView = () => {
     if (showRefreshing) setRefreshing(true);
     
     try {
-      const API_BASE_URL = process.env.REACT_APP_API_URL || 'http://localhost:5000';
-      const token = localStorage.getItem('adminToken') || localStorage.getItem('authToken');
+      const API_BASE_URL = (process.env.REACT_APP_API_URL || 'http://localhost:5000/api').replace(/\/api\/?$/, '') + '/api';
+      const token = localStorage.getItem('admin_token');
       
-      const response = await fetch(`${API_BASE_URL}/api/agents/online`, {
+      const response = await fetch(`${API_BASE_URL}/agents/online`, {
         headers: {
           'Authorization': `Bearer ${token}`,
           'Content-Type': 'application/json',

@@ -21,7 +21,7 @@ const TransferBookingModal: React.FC<TransferBookingModalProps> = ({ booking, on
     autoApprove: true, // Admin can auto-approve
   });
 
-  const API_BASE_URL = process.env.REACT_APP_API_URL || 'http://localhost:5000/api';
+  const API_BASE_URL = (process.env.REACT_APP_API_URL || 'http://localhost:5000/api').replace(/\/api\/?$/, '') + '/api';
 
   // Load available routes
   useEffect(() => {
