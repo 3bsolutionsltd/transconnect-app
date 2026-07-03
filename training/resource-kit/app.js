@@ -19,18 +19,46 @@ const resourceData = {
         role: 'infantry',
         file: '../infantry-onboarding-guide.md',
         available: true
+    },
+    'amplifier-workflow': {
+        title: 'Daily Workflow & Procedures',
+        role: 'amplifier',
+        file: '../amplifier-daily-workflow.md',
+        available: true
+    },
+    'amplifier-whatsapp-templates': {
+        title: 'WhatsApp Response Templates',
+        role: 'amplifier',
+        file: '../amplifier-whatsapp-templates.md',
+        available: true
+    },
+    'amplifier-weekly-report': {
+        title: 'Weekly Report Template',
+        role: 'amplifier',
+        file: '../amplifier-weekly-report-template.md',
+        available: true
+    },
+    'amplifier-troubleshooting': {
+        title: 'Troubleshooting Guide',
+        role: 'amplifier',
+        file: '../amplifier-troubleshooting-guide.md',
+        available: true
+    },
+    'amplifier-faq': {
+        title: 'Customer Support FAQ',
+        role: 'amplifier',
+        file: '../amplifier-support-faq.md',
+        available: true
     }
 };
 
 // Generate prompts for resources not yet created
 const generatePrompts = {
-    'amplifier-workflow': '/generate-training Amplifier daily workflow',
     'general-workflow': '/generate-training General daily workflow',
     'infantry-workflow': '/generate-training Infantry daily workflow',
     'amplifier-scripts': '/generate-training Amplifier communication scripts',
     'general-scripts': '/generate-training General communication scripts',
     'infantry-scripts': '/generate-training Infantry communication scripts',
-    'amplifier-troubleshooting': '/generate-training Amplifier troubleshooting guide',
     'general-troubleshooting': '/generate-training General troubleshooting guide',
     'infantry-troubleshooting': '/generate-training Infantry troubleshooting guide',
     'amplifier-performance': '/generate-training Amplifier performance assessment',
