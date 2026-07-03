@@ -2,7 +2,7 @@
   "expo": {
     "name": "TransConnect",
     "slug": "transconnect-mobile",
-    "version": "1.0.10",
+    "version": "1.0.12",
     "orientation": "portrait",
     "userInterfaceStyle": "automatic",
     "icon": "./assets/images/logo.png",
@@ -18,7 +18,7 @@
     "ios": {
       "supportsTablet": false,
       "bundleIdentifier": "com.transconnect.mobile",
-      "buildNumber": "1.0.10",
+      "buildNumber": "1.0.12",
       "infoPlist": {
         "NSCameraUsageDescription": "This app uses the camera to scan QR codes for ticket verification",
         "NSLocationWhenInUseUsageDescription": "This app uses your location to show nearby bus stops and routes",
@@ -31,7 +31,8 @@
         "backgroundColor": "#1E40AF"
       },
       "package": "com.transconnect.mobile",
-      "versionCode": 11,
+      "versionCode": 14,
+      "edgeToEdge": true,
       "permissions": [
         "CAMERA",
         "ACCESS_FINE_LOCATION",
@@ -55,9 +56,17 @@
     "web": {},
     "plugins": [
       "expo-camera",
-      "expo-notifications",
+      ["expo-notifications", {
+        "icon": "./assets/images/logo.png",
+        "color": "#1E40AF"
+      }],
       "expo-location",
-      "expo-secure-store"
+      "expo-secure-store",
+      ["expo-status-bar", {
+        "style": "light",
+        "backgroundColor": "#1E40AF",
+        "translucent": true
+      }]
     ],
     "extra": {
       "apiUrl": "https://transconnect-app-44ie.onrender.com/api",
