@@ -10,21 +10,20 @@ on:
       - '.github/workflows/deploy-training.yml'
   workflow_dispatch:
 
-permissions:
-  contents: read
-  pages: write
-  id-token: write
-
 concurrency:
   group: "pages"
   cancel-in-progress: false
 
 jobs:
   deploy:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      pages: write
+      id-token: write
     environment:
       name: github-pages
       url: ${{ steps.deployment.outputs.page_url }}
-    runs-on: ubuntu-latest
     steps:
       - name: Checkout
         uses: actions/checkout@v5
@@ -35,9 +34,9 @@ jobs:
       - name: Upload artifact
         uses: actions/upload-pages-artifact@v5
         with:
-          # Upload entire training folder so markdown files are accessible
           path: 'training'
       
       - name: Deploy to GitHub Pages
         id: deployment
         uses: actions/deploy-pages@v5
+        timeout-minutes: 10
