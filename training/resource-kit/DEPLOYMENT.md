@@ -48,19 +48,43 @@ The site automatically redeploys whenever you:
 
 ## 🌐 Custom Domain (Optional)
 
-### Option A: Subdomain (Recommended)
-Set up: `training.transconnect.ug` or `learn.transconnect.ug`
+### Option A: Subdomain (Recommended) - ✅ YOU'RE HERE!
+You've already set up: `learn.transconnect.app`
 
-1. Add DNS record:
-   ```
-   Type: CNAME
-   Name: training
-   Value: 3bsolutionsltd.github.io
-   ```
+**Your setup:**
+```
+Type: CNAME
+Name: learn
+Value: 3bsolutionsltd.github.io
+```
 
-2. In GitHub Settings → Pages → Custom domain:
-   - Enter: `training.transconnect.ug`
-   - Check "Enforce HTTPS"
+**Your live URLs:**
+- Primary: `http://learn.transconnect.app/`
+- Backup: `https://3bsolutionsltd.github.io/transconnect-app/`
+
+**To enable HTTPS** (recommended):
+1. Go to GitHub Settings → Pages
+2. Wait for DNS check to complete (green checkmark)
+3. Check "Enforce HTTPS"
+4. Your URL becomes: `https://learn.transconnect.app/` (secure)
+
+### Other Custom Domain Options
+
+If you want to change the domain:
+
+**training.transconnect.app:**
+```
+Type: CNAME
+Name: training
+Value: 3bsolutionsltd.github.io
+```
+
+**docs.transconnect.app:**
+```
+Type: CNAME  
+Name: docs
+Value: 3bsolutionsltd.github.io
+```
 
 ### Option B: Subdirectory
 Use your existing domain: `transconnect.ug/training/`
