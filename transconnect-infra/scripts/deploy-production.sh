@@ -98,9 +98,10 @@ MAX_WAIT=180
 ELAPSED=0
 until curl -sf http://127.0.0.1:5000/api/health > /dev/null 2>&1; do
     if [[ $ELAPSED -ge $MAX_WAIT ]]; then
-        warn "Health check timed out — rolling back"
-        docker compose -f "$COMPOSE_FILE" --env-file "$ENV_FILE" down
-        error "Deployment rolled back. Restore from backup: $BACKUP_FILE"
+        warn "Health check timed out after ${MAX_WAIT}s — leaving containers running for inspection"
+        warn "Check logs: docker logs tc_backend_prod"
+        warn "Manual recovery: docker compose -f $COMPOSE_FILE --env-file $ENV_FILE restart"
+        error "Deployment health check failed. Site may be degraded — DO NOT run 'down' without a backup plan."
     fi
     echo -n "."
     sleep 5
