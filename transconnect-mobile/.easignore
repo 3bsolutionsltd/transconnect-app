@@ -1,0 +1,19 @@
+# Compiled AAB/APK files
+*.aab
+*.apk
+
+# Build artifacts
+*.log
+*.tmp
+
+# Documentation
+*.md
+PRODUCTION_BUILD_GUIDE.md
+privacy-policy.html
+privacy-policy.md
+
+# Test files
+test-app.js
+
+# Large asset directories that aren't needed for build
+.expo/
