@@ -161,29 +161,14 @@ router.post('/', [
       const passenger = passengers[i];
       const seatNumber = seatNumbers[i];
 
-      // Generate QR code data
-      const qrData = {
-        routeId: routeId,
-        seatNumber: seatNumber,
-        travelDate: travelDate,
-        route: boardingStop && alightingStop 
-          ? `${boardingStop} → ${alightingStop}` 
-          : `${route.origin} → ${route.destination}`,
-        busPlate: route.bus.plateNumber,
-        passengerName: `${passenger.firstName} ${passenger.lastName}`,
-        timestamp: Date.now()
-      };
-
-      const qrCode = await QRCode.toDataURL(JSON.stringify(qrData));
-
-      // Create booking with all required fields
+      // Create booking first so we have the ID for the QR URL
       const booking = await prisma.booking.create({
         data: {
           userId,
           routeId,
           seatNumber: seatNumber,
           travelDate: new Date(travelDate),
-          qrCode,
+          qrCode: '',  // updated below once we have the booking ID
           totalAmount: finalPrice,
           boardingStop: boardingStop || null,
           alightingStop: alightingStop || null,
@@ -192,7 +177,12 @@ router.post('/', [
         }
       });
 
-      bookings.push(booking);
+      // Generate QR code as a clickable URL so phone cameras open the ticket page
+      const frontendUrl = process.env.FRONTEND_URL || 'https://transconnect.app';
+      const qrCode = await QRCode.toDataURL(`${frontendUrl}/ticket/${booking.id}`);
+      await prisma.booking.update({ where: { id: booking.id }, data: { qrCode } });
+
+      bookings.push({ ...booking, qrCode });
     }
 
     // Fetch complete booking data with relations

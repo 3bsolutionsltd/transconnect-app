@@ -73,8 +73,16 @@ export default function BookingDetailsPage() {
         },
       });
 
+      if (response.status === 401) {
+        router.push('/login');
+        return;
+      }
+
       if (!response.ok) {
-        throw new Error('Failed to fetch booking details');
+        const body = await response.json().catch(() => ({}));
+        throw new Error(
+          body.error || (response.status === 403 ? 'You are not authorised to view this ticket.' : `Error ${response.status}`)
+        );
       }
 
       const data = await response.json();

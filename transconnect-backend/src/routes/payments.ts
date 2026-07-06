@@ -964,8 +964,9 @@ async function generateBookingQRCode(bookingId: string): Promise<string | null> 
       signature: generateBookingSignature(booking.id, booking.userId)
     };
 
-    // Generate QR code as data URL
-    const qrCodeDataURL = await QRCode.toDataURL(JSON.stringify(qrData), {
+    // Generate QR code as a clickable URL so phone cameras open the ticket page
+    const frontendUrl = process.env.FRONTEND_URL || 'https://transconnect.app';
+    const qrCodeDataURL = await QRCode.toDataURL(`${frontendUrl}/ticket/${bookingId}`, {
       width: 256,
       margin: 2,
       color: {

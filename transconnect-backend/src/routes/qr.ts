@@ -116,10 +116,16 @@ router.post('/validate', async (req: Request, res: Response) => {
     }
 
     let parsedData;
-    try {
-      parsedData = typeof qrData === 'string' ? JSON.parse(qrData) : qrData;
-    } catch (e) {
-      return res.status(400).json({ error: 'Invalid QR code format' });
+    // Support URL format QRs: https://transconnect.app/ticket/{bookingId}
+    if (typeof qrData === 'string' && /\/ticket\/([a-z0-9]+)/i.test(qrData)) {
+      const match = qrData.match(/\/ticket\/([a-z0-9]+)/i);
+      parsedData = { bookingId: match?.[1] };
+    } else {
+      try {
+        parsedData = typeof qrData === 'string' ? JSON.parse(qrData) : qrData;
+      } catch (e) {
+        return res.status(400).json({ error: 'Invalid QR code format' });
+      }
     }
 
     const { bookingId, signature } = parsedData;
@@ -156,13 +162,16 @@ router.post('/validate', async (req: Request, res: Response) => {
       });
     }
 
-    // Verify signature
-    const expectedSignature = generateBookingSignature(booking.id, booking.userId);
-    if (signature !== expectedSignature) {
-      return res.status(400).json({ 
-        valid: false, 
-        error: 'Invalid QR code signature' 
-      });
+    // Verify signature only for legacy JSON-format QRs (URL-format QRs are trusted by ID alone)
+    const isUrlFormat = typeof qrData === 'string' && /\/ticket\/([a-z0-9]+)/i.test(qrData);
+    if (!isUrlFormat && signature) {
+      const expectedSignature = generateBookingSignature(booking.id, booking.userId);
+      if (signature !== expectedSignature) {
+        return res.status(400).json({ 
+          valid: false, 
+          error: 'Invalid QR code signature' 
+        });
+      }
     }
 
     // Check booking status
