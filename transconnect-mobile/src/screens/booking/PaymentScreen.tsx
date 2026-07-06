@@ -9,7 +9,9 @@ import {
   ActivityIndicator,
   Alert,
   Modal,
+  Linking,
 } from 'react-native';
+import { WebView } from 'react-native-webview';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
 import { bookingsApi } from '../../services/api';
@@ -29,6 +31,8 @@ export default function PaymentScreen({ route, navigation }: any) {
   const [loading, setLoading] = useState(false);
   const [showPaymentModal, setShowPaymentModal] = useState(false);
   const [paymentStatus, setPaymentStatus] = useState<'pending' | 'success' | 'failed'>('pending');
+  const [showWebView, setShowWebView] = useState(false);
+  const [pesapalUrl, setPesapalUrl] = useState('');
 
   const paymentMethods = [
     {
@@ -174,7 +178,19 @@ export default function PaymentScreen({ route, navigation }: any) {
       // Call payment API
       const paymentResponse = await bookingsApi.initiatePayment(paymentData);
       
-      // Check if payment completed immediately (demo mode)
+      // Check if we have a checkout URL (PesaPal redirect flow)
+      if (paymentResponse.data.checkoutUrl) {
+        console.log('📱 Opening PesaPal checkout:', paymentResponse.data.checkoutUrl);
+        setLoading(false);
+        setShowPaymentModal(false);
+        
+        // Open PesaPal checkout in WebView
+        setPesapalUrl(paymentResponse.data.checkoutUrl);
+        setShowWebView(true);
+        return;
+      }
+      
+      // Check if payment completed immediately (demo mode or instant payment)
       if (paymentResponse.data.status === 'COMPLETED') {
         setPaymentStatus('success');
         setLoading(false);
@@ -182,7 +198,7 @@ export default function PaymentScreen({ route, navigation }: any) {
         // Send payment success notification
         await notificationService.sendPaymentSuccess(
           routeData.price * selectedSeats.length,
-          paymentResponse.data.payment.reference
+          paymentResponse.data.payment?.reference || paymentResponse.data.paymentReference
         );
 
         // Send booking confirmation notification
@@ -190,7 +206,7 @@ export default function PaymentScreen({ route, navigation }: any) {
           searchParams.from,
           searchParams.to,
           format(new Date(travelDate), 'MMM dd, yyyy'),
-          paymentResponse.data.booking.id.slice(0, 8)
+          createdBooking.id.slice(0, 8)
         );
 
         // Schedule trip reminder
@@ -204,16 +220,15 @@ export default function PaymentScreen({ route, navigation }: any) {
         setTimeout(() => {
           setShowPaymentModal(false);
           navigation.navigate('BookingConfirmation', {
-            booking: paymentResponse.data.booking,
+            booking: createdBooking,
             route: routeData,
             searchParams,
-            paymentRef: paymentResponse.data.payment.reference,
+            paymentRef: paymentResponse.data.payment?.reference || paymentResponse.data.paymentReference,
           });
         }, 1500);
       } else {
-        // Payment pending - simulate processing
-        await new Promise(resolve => setTimeout(resolve, 3000));
-
+        // Payment is pending - this shouldn't normally happen without checkoutUrl
+        console.warn('⚠️ Payment initiated but no checkout URL provided');
         setPaymentStatus('success');
         setLoading(false);
 
@@ -223,7 +238,7 @@ export default function PaymentScreen({ route, navigation }: any) {
             booking: createdBooking,
             route: routeData,
             searchParams,
-            paymentRef: paymentResponse.data.reference,
+            paymentRef: paymentResponse.data.paymentReference,
           });
         }, 1500);
       }
@@ -475,6 +490,127 @@ export default function PaymentScreen({ route, navigation }: any) {
             )}
           </View>
         </View>
+      </Modal>
+
+      {/* PesaPal WebView Modal */}
+      <Modal
+        visible={showWebView}
+        animationType="slide"
+        onRequestClose={() => {
+          Alert.alert(
+            'Cancel Payment?',
+            'Are you sure you want to cancel this payment?',
+            [
+              { text: 'Continue Payment', style: 'cancel' },
+              {
+                text: 'Cancel',
+                style: 'destructive',
+                onPress: () => {
+                  setShowWebView(false);
+                  setPesapalUrl('');
+                  navigation.goBack();
+                }
+              }
+            ]
+          );
+        }}
+      >
+        <SafeAreaView style={{ flex: 1, backgroundColor: '#FFFFFF' }}>
+          <View style={styles.webViewHeader}>
+            <TouchableOpacity
+              onPress={() => {
+                Alert.alert(
+                  'Cancel Payment?',
+                  'Are you sure you want to cancel this payment?',
+                  [
+                    { text: 'Continue Payment', style: 'cancel' },
+                    {
+                      text: 'Cancel',
+                      style: 'destructive',
+                      onPress: () => {
+                        setShowWebView(false);
+                        setPesapalUrl('');
+                        navigation.goBack();
+                      }
+                    }
+                  ]
+                );
+              }}
+              style={styles.closeButton}
+            >
+              <Ionicons name="close" size={24} color="#374151" />
+            </TouchableOpacity>
+            <Text style={styles.webViewTitle}>PesaPal Secure Checkout</Text>
+            <View style={{ width: 40 }} />
+          </View>
+          
+          {pesapalUrl ? (
+            <WebView
+              source={{ uri: pesapalUrl }}
+              onNavigationStateChange={(navState) => {
+                console.log('📱 WebView navigation:', navState.url);
+                
+                // Check if payment was completed or cancelled based on callback URL
+                if (navState.url.includes('/payment/callback') || 
+                    navState.url.includes('/payment/success') ||
+                    navState.url.includes('transconnect.app/callback')) {
+                  
+                  // Extract payment reference or status from URL
+                  const urlParams = new URLSearchParams(navState.url.split('?')[1]);
+                  const status = urlParams.get('status') || urlParams.get('OrderTrackingId');
+                  
+                  console.log('✅ Payment callback detected:', status);
+                  
+                  setShowWebView(false);
+                  setPesapalUrl('');
+                  
+                  // Show success modal briefly then navigate
+                  setShowPaymentModal(true);
+                  setPaymentStatus('success');
+                  
+                  setTimeout(() => {
+                    setShowPaymentModal(false);
+                    navigation.navigate('BookingConfirmation', {
+                      booking: route.params.booking || { id: 'PENDING' },
+                      route: routeData,
+                      searchParams,
+                      paymentRef: status || 'PESAPAL-PENDING',
+                    });
+                  }, 1500);
+                } else if (navState.url.includes('/payment/cancel') || 
+                          navState.url.includes('cancelled')) {
+                  console.log('❌ Payment cancelled');
+                  setShowWebView(false);
+                  setPesapalUrl('');
+                  Alert.alert('Payment Cancelled', 'Your payment was cancelled. Please try again.');
+                }
+              }}
+              startInLoadingState
+              renderLoading={() => (
+                <View style={{ flex: 1, justifyContent: 'center', alignItems: 'center' }}>
+                  <ActivityIndicator size="large" color="#3B82F6" />
+                  <Text style={{ marginTop: 10, color: '#6B7280' }}>Loading PesaPal...</Text>
+                </View>
+              )}
+              onError={(syntheticEvent) => {
+                const { nativeEvent } = syntheticEvent;
+                console.error('❌ WebView error:', nativeEvent);
+                Alert.alert(
+                  'Connection Error',
+                  'Failed to load payment page. Please check your internet connection.',
+                  [
+                    { text: 'Try Again', onPress: () => setShowWebView(false) },
+                    { text: 'Cancel', onPress: () => navigation.goBack() }
+                  ]
+                );
+              }}
+            />
+          ) : (
+            <View style={{ flex: 1, justifyContent: 'center', alignItems: 'center' }}>
+              <ActivityIndicator size="large" color="#3B82F6" />
+            </View>
+          )}
+        </SafeAreaView>
       </Modal>
     </SafeAreaView>
   );
@@ -764,5 +900,23 @@ const styles = StyleSheet.create({
   },
   errorIcon: {
     marginBottom: 8,
+  },
+  webViewHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    paddingHorizontal: 16,
+    paddingVertical: 12,
+    borderBottomWidth: 1,
+    borderBottomColor: '#E5E7EB',
+    backgroundColor: '#FFFFFF',
+  },
+  webViewTitle: {
+    fontSize: 16,
+    fontWeight: '600',
+    color: '#1F2937',
+  },
+  closeButton: {
+    padding: 8,
   },
 });
