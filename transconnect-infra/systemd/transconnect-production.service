@@ -11,21 +11,25 @@ RemainAfterExit=yes
 WorkingDirectory=/opt/transconnect/app
 
 ExecStartPre=/usr/bin/docker compose \
+  --project-name transconnect-production \
   -f transconnect-infra/docker/docker-compose.production.yml \
   --env-file /opt/transconnect/production/.env \
   pull --quiet
 
 ExecStart=/usr/bin/docker compose \
+  --project-name transconnect-production \
   -f transconnect-infra/docker/docker-compose.production.yml \
   --env-file /opt/transconnect/production/.env \
   up -d
 
 ExecStop=/usr/bin/docker compose \
+  --project-name transconnect-production \
   -f transconnect-infra/docker/docker-compose.production.yml \
   --env-file /opt/transconnect/production/.env \
   stop
 
 ExecReload=/usr/bin/docker compose \
+  --project-name transconnect-production \
   -f transconnect-infra/docker/docker-compose.production.yml \
   --env-file /opt/transconnect/production/.env \
   up -d

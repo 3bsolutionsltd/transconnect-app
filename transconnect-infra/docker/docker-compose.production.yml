@@ -5,6 +5,8 @@
 # Admin:    admin.transconnect.app
 # ============================================================
 
+name: transconnect-production
+
 services:
   # ─── PostgreSQL Database ────────────────────────────────
   postgres_prod:
