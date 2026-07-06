@@ -567,21 +567,16 @@ router.post('/verify-otp', [
           phone: normalizedPhone,
           role: 'PASSENGER',
           verified: true // Phone verified via OTP
-        },
-        select: {
-          id: true,
-          email: true,
-          firstName: true,
-          lastName: true,
-          phone: true,
-          role: true,
-          verified: true
         }
       });
 
       console.log(`✅ New passenger account created: ${user.id}`);
     } else {
       console.log(`✅ Existing user logged in: ${user.id}`);
+    }
+
+    if (!user) {
+      return res.status(500).json({ error: 'Failed to resolve user account' });
     }
 
     // Generate JWT token with 30-day expiry
