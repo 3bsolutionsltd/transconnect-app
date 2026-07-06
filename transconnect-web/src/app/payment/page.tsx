@@ -63,9 +63,7 @@ function PaymentContent() {
   }, [searchParams, router, user, loading]);
 
   const paymentMethods = [
-    { id: 'MTN_MOBILE_MONEY', name: 'MTN Mobile Money', icon: Smartphone, color: 'text-yellow-600' },
-    { id: 'AIRTEL_MONEY', name: 'Airtel Money', icon: Smartphone, color: 'text-red-600' },
-    { id: 'PESAPAL', name: 'PesaPal (Card / Bank)', icon: CreditCard, color: 'text-purple-600', description: 'Pay securely via PesaPal checkout' },
+    { id: 'PESAPAL', name: 'PesaPal (MTN MoMo / Airtel / Card)', icon: CreditCard, color: 'text-purple-600', description: 'Pay via PesaPal — supports MTN Mobile Money, Airtel Money, Visa & Mastercard' },
     { id: 'CASH', name: 'Cash Payment (Over the Counter)', icon: Banknote, color: 'text-green-600', description: 'Pay at operator office or at boarding' },
   ];
 

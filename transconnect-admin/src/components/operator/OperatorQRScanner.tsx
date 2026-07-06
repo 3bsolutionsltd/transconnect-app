@@ -114,18 +114,19 @@ const OperatorQRScanner = () => {
         parsedData = { rawData: qrData };
       }
 
-      // Check if this looks like a booking QR
-      if (parsedData.bookingId && parsedData.passengerName) {
+      // A booking QR contains passengerName + seatNumber (initial creation format)
+      // OR bookingId + passengerName (payment-completion regenerated format).
+      // A pure route-selection QR only has routeId with NO passengerName.
+      const isBookingQR =
+        (parsedData.passengerName && parsedData.seatNumber) ||
+        (parsedData.bookingId && parsedData.passengerName);
+
+      if (isBookingQR) {
         console.log('Valid booking QR detected, validating...');
-      } else if (parsedData.routeId || parsedData.seatNumber) {
-        setError(`This appears to be a route selection QR code. 
-                  To validate a passenger ticket, you need the QR code from a completed booking.
-                  Ask the passenger to show their booking confirmation QR code.`);
-        stopCamera();
-        return;
-      } else {
-        setError(`QR code format not recognized. 
-                  Please scan a valid booking confirmation QR code from TransConnect.`);
+      } else if (!parsedData.rawData) {
+        setError(
+          'QR code format not recognized. Please scan a valid booking confirmation QR code from TransConnect.'
+        );
         stopCamera();
         return;
       }

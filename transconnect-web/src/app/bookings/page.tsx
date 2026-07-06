@@ -361,6 +361,13 @@ export default function BookingsPage() {
                       <span className={`px-3 py-1 rounded-full text-xs font-medium border ${getStatusColor(booking.status)}`}>
                         {booking.status}
                       </span>
+                      <Link
+                        href={`/bookings/${booking.id}`}
+                        className="inline-flex items-center px-3 py-1 text-xs font-medium text-blue-600 border border-blue-300 rounded-full hover:bg-blue-50 transition-colors"
+                      >
+                        <ArrowRight className="h-3 w-3 mr-1" />
+                        View Ticket
+                      </Link>
                       {booking.qrCode && booking.status !== 'CANCELLED' && (
                         <Button 
                           variant="outline" 

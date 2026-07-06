@@ -135,7 +135,8 @@ export default function BookingForm({ routeId, price, selectedSeats = [], defaul
           })),
           pricePerSeat: effectivePrice,
           boardingStop: boardingStop,
-          alightingStop: alightingStop
+          alightingStop: alightingStop,
+          qrCode: primaryBooking?.qrCode || null
         };      // Redirect to payment page with booking data
       const bookingData = encodeURIComponent(JSON.stringify(bookingForPayment));
       router.push(`/payment?booking=${bookingData}`);

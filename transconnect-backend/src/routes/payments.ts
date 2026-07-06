@@ -459,7 +459,14 @@ router.get('/:paymentId/status', authenticateToken, async (req: Request, res: Re
       reference: payment.reference,
       transactionId: payment.transactionId,
       createdAt: payment.createdAt,
-      message: statusMessage
+      message: statusMessage,
+      booking: {
+        id: payment.bookingId,
+        qrCode: (await prisma.booking.findUnique({
+          where: { id: payment.bookingId },
+          select: { qrCode: true, status: true, seatNumber: true }
+        }))?.qrCode || null
+      }
     });
   } catch (error) {
     console.error('Error checking payment status:', error);
