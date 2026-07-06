@@ -23,7 +23,7 @@ import { format } from 'date-fns';
 type PaymentMethod = 'pesapal' | 'cash';
 
 export default function PaymentScreen({ route, navigation }: any) {
-  const { route: routeData, passengers, searchParams, selectedSeats, totalAmount } = route.params;
+  const { route: routeData, passengers, searchParams, selectedSeats, totalAmount, isRetry, booking: existingBooking } = route.params;
   const { user } = useAuth();
   
   const [selectedMethod, setSelectedMethod] = useState<PaymentMethod | null>('cash');
@@ -118,21 +118,29 @@ export default function PaymentScreen({ route, navigation }: any) {
         lastName: user?.lastName || user?.name?.split(' ')[1] || `${i + 1}`,
       }));
 
-      // Create booking
-      const bookingData = {
-        routeId: routeData.id,
-        seatNumbers: selectedSeats,
-        travelDate,
-        passengers: passengerData,
-        boardingStop: searchParams.from,
-        alightingStop: searchParams.to,
-      };
+      let createdBooking;
 
-      const response = await bookingsApi.createBooking(bookingData);
-      const createdBooking = response.data.bookings?.[0] || response.data;
-      
-      // Save booking to offline storage immediately
-      await offlineStorage.saveBooking(createdBooking);
+      // If this is a retry payment, use existing booking instead of creating new one
+      if (isRetry && existingBooking) {
+        createdBooking = existingBooking;
+        console.log('🔄 Retrying payment for existing booking:', createdBooking.id);
+      } else {
+        // Create new booking
+        const bookingData = {
+          routeId: routeData.id,
+          seatNumbers: selectedSeats,
+          travelDate,
+          passengers: passengerData,
+          boardingStop: searchParams.from,
+          alightingStop: searchParams.to,
+        };
+
+        const response = await bookingsApi.createBooking(bookingData);
+        createdBooking = response.data.bookings?.[0] || response.data;
+        
+        // Save booking to offline storage immediately
+        await offlineStorage.saveBooking(createdBooking);
+      }
       
       // Handle cash payments differently - no payment API call needed
       if (selectedMethod === 'cash') {
@@ -350,7 +358,7 @@ export default function PaymentScreen({ route, navigation }: any) {
         <TouchableOpacity onPress={() => navigation.goBack()}>
           <Ionicons name="arrow-back" size={24} color="#1F2937" />
         </TouchableOpacity>
-        <Text style={styles.headerTitle}>Payment</Text>
+        <Text style={styles.headerTitle}>{isRetry ? 'Complete Payment' : 'Payment'}</Text>
         <View style={{ width: 24 }} />
       </View>
 
