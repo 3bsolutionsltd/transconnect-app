@@ -362,6 +362,15 @@ router.get('/:id', authenticateToken, async (req: Request, res: Response) => {
             }
           }
         },
+        user: {
+          select: {
+            id: true,
+            firstName: true,
+            lastName: true,
+            email: true,
+            phone: true
+          }
+        },
         payment: true,
         verification: true
       }
