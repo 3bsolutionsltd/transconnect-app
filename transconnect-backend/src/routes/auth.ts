@@ -5,6 +5,9 @@ import { prisma } from '../lib/prisma';
 import { body, validationResult } from 'express-validator';
 import { EmailService } from '../services/email.service';
 import { authenticateToken } from '../middleware/auth';
+import { sendOtp, verifyOtpCode } from '../tools/agents/otp.tool';
+import MultiProviderSMSService from '../services/multi-provider-sms.service';
+import { PhoneNormalizer } from '../utils/phone-normalizer';
 
 const router = Router();
 
@@ -447,6 +450,173 @@ router.delete('/delete-account', authenticateToken, async (req: Request, res: Re
   } catch (error) {
     console.error('Delete account error:', error);
     res.status(500).json({ error: 'Failed to delete account' });
+  }
+});
+
+// Phone OTP Login/Registration - Request OTP
+router.post('/request-otp', [
+  body('phoneNumber').notEmpty().withMessage('Phone number is required')
+], async (req: Request, res: Response) => {
+  try {
+    const errors = validationResult(req);
+    if (!errors.isEmpty()) {
+      return res.status(400).json({ errors: errors.array() });
+    }
+
+    const { phoneNumber } = req.body;
+
+    // Normalize phone number
+    const phoneValidation = PhoneNormalizer.normalize(phoneNumber, 'UG');
+    
+    if (!phoneValidation.isValid) {
+      return res.status(400).json({ 
+        error: 'Invalid phone number format',
+        details: phoneValidation.issues,
+        expected: 'Use formats like: +256700123456, 0700123456, or 700123456'
+      });
+    }
+
+    const normalizedPhone = phoneValidation.normalizedNumber!;
+    console.log(`📱 OTP request for: "${phoneNumber}" → "${normalizedPhone}"`);
+
+    // Generate OTP
+    const otpResult = await sendOtp(normalizedPhone);
+    
+    // Send OTP via SMS
+    const smsService = MultiProviderSMSService.getInstance();
+    const smsResult = await smsService.sendOTP(normalizedPhone, otpResult.otp, 'login');
+    
+    console.log(`📱 SMS Result: ${smsResult.success ? '✅' : '❌'} via ${smsResult.provider}`);
+    if (smsResult.cost) console.log(`💰 Estimated cost: ${smsResult.cost}`);
+    
+    if (!smsResult.success) {
+      return res.status(500).json({
+        error: 'Failed to send OTP',
+        details: smsResult.error,
+        message: 'Unable to send OTP via SMS. Please try again later.'
+      });
+    }
+
+    res.status(200).json({ 
+      message: 'OTP sent successfully',
+      phoneNumber: normalizedPhone,
+      next_step: 'verify_otp',
+      delivery: {
+        sms: true,
+        provider: smsResult.provider,
+        instruction: 'Please enter the 6-digit code sent to your phone'
+      }
+    });
+  } catch (error: any) {
+    console.error('Request OTP error:', error);
+    res.status(500).json({ error: 'Failed to send OTP' });
+  }
+});
+
+// Phone OTP Login/Registration - Verify OTP
+router.post('/verify-otp', [
+  body('phoneNumber').notEmpty().withMessage('Phone number is required'),
+  body('otp').isLength({ min: 6, max: 6 }).withMessage('OTP must be 6 digits')
+], async (req: Request, res: Response) => {
+  try {
+    const errors = validationResult(req);
+    if (!errors.isEmpty()) {
+      return res.status(400).json({ errors: errors.array() });
+    }
+
+    const { phoneNumber, otp } = req.body;
+
+    // Normalize phone number
+    const phoneValidation = PhoneNormalizer.normalize(phoneNumber, 'UG');
+    const normalizedPhone = phoneValidation.isValid ? phoneValidation.normalizedNumber! : phoneNumber;
+    
+    console.log(`📱 OTP verification for: "${phoneNumber}" → "${normalizedPhone}"`);
+
+    // Verify OTP
+    const ok = await verifyOtpCode(normalizedPhone, otp);
+    if (!ok) {
+      return res.status(400).json({ error: 'Invalid or expired OTP' });
+    }
+
+    // Check if user exists
+    let user = await prisma.user.findFirst({
+      where: { phone: normalizedPhone }
+    });
+
+    let isNewUser = false;
+
+    // If user doesn't exist, create a new PASSENGER account
+    if (!user) {
+      isNewUser = true;
+      console.log(`🆕 Creating new user account for ${normalizedPhone}`);
+      
+      // Generate default names from phone number
+      const phoneDigits = normalizedPhone.replace(/\D/g, '').slice(-4);
+      const firstName = 'Passenger';
+      const lastName = phoneDigits;
+      
+      // Hash a temporary password (user can set it later if needed)
+      const tempPassword = await bcrypt.hash(Math.random().toString(36).slice(-12), 12);
+
+      user = await prisma.user.create({
+        data: {
+          email: `${normalizedPhone.replace(/\D/g, '')}@transconnect.app`, // Temporary email
+          password: tempPassword,
+          firstName,
+          lastName,
+          phone: normalizedPhone,
+          role: 'PASSENGER',
+          verified: true // Phone verified via OTP
+        },
+        select: {
+          id: true,
+          email: true,
+          firstName: true,
+          lastName: true,
+          phone: true,
+          role: true,
+          verified: true
+        }
+      });
+
+      console.log(`✅ New passenger account created: ${user.id}`);
+    } else {
+      console.log(`✅ Existing user logged in: ${user.id}`);
+    }
+
+    // Generate JWT token with 30-day expiry
+    const token = jwt.sign(
+      { userId: user.id, email: user.email, role: user.role },
+      process.env.JWT_SECRET!,
+      { expiresIn: '30d' }
+    );
+
+    // Calculate expiry timestamp
+    const expiresAt = new Date();
+    expiresAt.setDate(expiresAt.getDate() + 30);
+
+    const userResponse = {
+      id: user.id,
+      email: user.email,
+      firstName: user.firstName,
+      lastName: user.lastName,
+      phone: user.phone,
+      role: user.role
+    };
+
+    res.status(isNewUser ? 201 : 200).json({ 
+      user: userResponse, 
+      token,
+      expiresIn: '30d',
+      expiresAt: expiresAt.toISOString(),
+      isNewUser,
+      message: isNewUser 
+        ? 'Account created and logged in successfully' 
+        : 'Logged in successfully'
+    });
+  } catch (error: any) {
+    console.error('Verify OTP error:', error);
+    res.status(500).json({ error: 'Failed to verify OTP' });
   }
 });
 
