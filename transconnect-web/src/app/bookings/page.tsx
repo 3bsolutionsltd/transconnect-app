@@ -214,11 +214,8 @@ export default function BookingsPage() {
   };
 
   const canPayBooking = (booking: any) => {
-    const travelDate = new Date(booking.travelDate);
-    const now = new Date();
-    const hoursUntilTravel = (travelDate.getTime() - now.getTime()) / (1000 * 60 * 60);
-    
-    return booking.status === 'PENDING' && hoursUntilTravel > 0; // Can pay up until departure
+    // Allow payment for any PENDING booking — backend will enforce business rules
+    return booking.status === 'PENDING';
   };
 
   if (!isAuthenticated) {
