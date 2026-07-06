@@ -58,8 +58,17 @@ export default function BookingsPage() {
       case 'pending': return 'text-yellow-600 bg-yellow-50 border-yellow-200';
       case 'cancelled': return 'text-red-600 bg-red-50 border-red-200';
       case 'completed': return 'text-blue-600 bg-blue-50 border-blue-200';
+      case 'expired': return 'text-gray-500 bg-gray-100 border-gray-300';
       default: return 'text-gray-600 bg-gray-50 border-gray-200';
     }
+  };
+
+  const isBookingExpired = (booking: any) => {
+    const travelDate = new Date(booking.travelDate);
+    // Combine travel date with departure time for precise check
+    const [hours, minutes] = (booking.route?.departureTime || '00:00').split(':').map(Number);
+    travelDate.setHours(hours, minutes, 0, 0);
+    return booking.status === 'PENDING' && travelDate < new Date();
   };
 
   const downloadQRCode = (booking: any) => {
@@ -166,9 +175,8 @@ export default function BookingsPage() {
     const travelDate = new Date(booking.travelDate);
     const now = new Date();
     const hoursUntilTravel = (travelDate.getTime() - now.getTime()) / (1000 * 60 * 60);
-    
-    // Allow cancellation of confirmed bookings 24 hours before travel
-    // Allow cancellation of pending bookings anytime before travel
+    // Allow cancelling expired pending bookings (to clean them up) or future bookings
+    if (isBookingExpired(booking)) return true;
     return (booking.status === 'CONFIRMED' && hoursUntilTravel > 24) || 
            (booking.status === 'PENDING' && hoursUntilTravel > 2);
   };
@@ -214,8 +222,8 @@ export default function BookingsPage() {
   };
 
   const canPayBooking = (booking: any) => {
-    // Allow payment for any PENDING booking — backend will enforce business rules
-    return booking.status === 'PENDING';
+    // Only show Pay Now if booking is PENDING and trip hasn't departed yet
+    return booking.status === 'PENDING' && !isBookingExpired(booking);
   };
 
   if (!isAuthenticated) {
@@ -355,8 +363,12 @@ export default function BookingsPage() {
                     </div>
                     
                     <div className="flex items-center space-x-3">
-                      <span className={`px-3 py-1 rounded-full text-xs font-medium border ${getStatusColor(booking.status)}`}>
-                        {booking.status}
+                      <span className={`px-3 py-1 rounded-full text-xs font-medium border ${
+                        isBookingExpired(booking)
+                          ? getStatusColor('expired')
+                          : getStatusColor(booking.status)
+                      }`}>
+                        {isBookingExpired(booking) ? 'EXPIRED' : booking.status}
                       </span>
                       <Link
                         href={`/bookings/${booking.id}`}
@@ -379,8 +391,16 @@ export default function BookingsPage() {
                   </div>
                   
                   {/* Booking Management Actions */}
-                  {(canPayBooking(booking) || booking.payment?.id || canCancelBooking(booking) || canModifyBooking(booking)) && (
+                  {(canPayBooking(booking) || isBookingExpired(booking) || booking.payment?.id || canCancelBooking(booking) || canModifyBooking(booking)) && (
                     <div className="border-t pt-4 mt-4">
+                      {/* Expired notice for unpaid bookings past departure */}
+                      {isBookingExpired(booking) && (
+                        <div className="mb-4 flex items-start gap-2 text-sm text-gray-500 bg-gray-50 rounded-lg p-3">
+                          <X className="h-4 w-4 mt-0.5 flex-shrink-0 text-gray-400" />
+                          <span>This booking expired — the bus has already departed without payment. You can cancel it to clean up your bookings.</span>
+                        </div>
+                      )}
+
                       {/* Pay Now Button for Pending Bookings */}
                       {canPayBooking(booking) && (
                         <div className="mb-4">
