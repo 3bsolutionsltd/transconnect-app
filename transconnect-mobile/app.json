@@ -2,7 +2,7 @@
   "expo": {
     "name": "TransConnect",
     "slug": "transconnect-mobile",
-    "version": "1.0.16",
+    "version": "1.0.17",
     "orientation": "portrait",
     "userInterfaceStyle": "automatic",
     "icon": "./assets/images/logo.png",
@@ -31,7 +31,7 @@
         "backgroundColor": "#1E40AF"
       },
       "package": "com.transconnect.mobile",
-      "versionCode": 16,
+      "versionCode": 17,
       "edgeToEdge": true,
       "permissions": [
         "CAMERA",
