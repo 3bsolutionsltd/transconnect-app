@@ -1,7 +1,7 @@
 'use client';
 export const dynamic = 'force-dynamic';
 import React, { useState, useEffect } from 'react';
-import { useRouter, useSearchParams } from 'next/navigation';
+import { useRouter } from 'next/navigation';
 import Link from 'next/link';
 import { ArrowLeft, Bus, Calendar, Clock, ArrowRight, Info } from 'lucide-react';
 import { Button } from '@/components/ui/button';
@@ -23,9 +23,18 @@ const REASON_OPTIONS = [
 type TransferReason = typeof REASON_OPTIONS[number]['value'];
 
 export default function TransferRequestPage() {
+  return <TransferRequestContent />;
+}
+
+function TransferRequestContent() {
   const router = useRouter();
-  const searchParams = useSearchParams();
-  const bookingId = searchParams.get('bookingId');
+  // Use window.location.search to read params client-side only (avoids SSR pre-render issue)
+  const [bookingId, setBookingId] = useState<string | null>(null);
+
+  useEffect(() => {
+    const params = new URLSearchParams(window.location.search);
+    setBookingId(params.get('bookingId'));
+  }, []);
   const { isAuthenticated, loading: authLoading } = useAuth();
 
   const [booking, setBooking] = useState<any>(null);
