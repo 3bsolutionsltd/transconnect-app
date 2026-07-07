@@ -5,8 +5,6 @@
 # Admin:    admin-staging.transconnect.app
 # ============================================================
 
-name: transconnect-staging
-
 services:
   # ─── PostgreSQL Database ────────────────────────────────
   postgres_staging:
