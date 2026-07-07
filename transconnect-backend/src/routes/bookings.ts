@@ -326,7 +326,9 @@ router.put('/:id/cancel', authenticateToken, async (req: Request, res: Response)
     const now = new Date();
     const hoursUntilTravel = (travelDate.getTime() - now.getTime()) / (1000 * 60 * 60);
 
-    if (hoursUntilTravel < 2) {
+    // Allow cancellation of expired bookings (negative hours) or bookings with 2+ hours remaining
+    // Only block cancellations that are within 2 hours of future travel
+    if (hoursUntilTravel > 0 && hoursUntilTravel < 2) {
       return res.status(400).json({ error: 'Cannot cancel booking less than 2 hours before travel' });
     }
 

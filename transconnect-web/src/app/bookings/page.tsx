@@ -72,11 +72,42 @@ export default function BookingsPage() {
   };
 
   const downloadQRCode = (booking: any) => {
-    if (booking.qrCode) {
-      const link = document.createElement('a');
-      link.download = `transconnect-ticket-${booking.id}.png`;
-      link.href = booking.qrCode;
-      link.click();
+    if (!booking.qrCode) return;
+
+    try {
+      // Detect iOS Safari
+      const isIOS = /iPad|iPhone|iPod/.test(navigator.userAgent);
+      const isSafari = /^((?!chrome|android).)*safari/i.test(navigator.userAgent);
+      
+      if (isIOS || isSafari) {
+        // For iOS/Safari, open in new tab
+        const newWindow = window.open();
+        if (newWindow) {
+          newWindow.document.write(`
+            <html>
+              <head><title>TransConnect Ticket - ${booking.id}</title></head>
+              <body style="margin:0;display:flex;align-items:center;justify-content:center;min-height:100vh;background:#f3f4f6;">
+                <div style="text-align:center;">
+                  <img src="${booking.qrCode}" alt="Ticket QR Code" style="max-width:90vw;max-height:80vh;" />
+                  <p style="margin-top:20px;color:#666;">Long-press the image to save it to your device</p>
+                </div>
+              </body>
+            </html>
+          `);
+          newWindow.document.close();
+        }
+      } else {
+        // For other browsers, try direct download
+        const link = document.createElement('a');
+        link.download = `transconnect-ticket-${booking.id}.png`;
+        link.href = booking.qrCode;
+        document.body.appendChild(link);
+        link.click();
+        document.body.removeChild(link);
+      }
+    } catch (error) {
+      console.error('Error downloading QR code:', error);
+      notificationService.showError('Download Failed', 'Unable to download. Please take a screenshot instead.');
     }
   };
 
