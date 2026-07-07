@@ -1,8 +1,9 @@
 'use client';
+export const dynamic = 'force-dynamic';
 import React, { useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import Link from 'next/link';
-import { ArrowLeft, SwapHoriz, Clock, CheckCircle2, XCircle, Ban, CheckCheck, ChevronDown, ChevronUp } from 'lucide-react';
+import { ArrowLeft, ArrowLeftRight, Clock, CheckCircle2, XCircle, Ban, CheckCheck, ChevronDown, ChevronUp } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent } from '@/components/ui/card';
 import { useAuth } from '@/contexts/AuthContext';
@@ -88,7 +89,7 @@ export default function TransfersPage() {
           <Card>
             <CardContent className="flex flex-col items-center py-16 text-center">
               <div className="w-16 h-16 bg-gray-100 rounded-full flex items-center justify-center mb-4">
-                <SwapHoriz size={32} className="text-gray-400" />
+                <ArrowLeftRight size={32} className="text-gray-400" />
               </div>
               <h3 className="text-lg font-semibold text-gray-700 mb-2">No Transfer Requests</h3>
               <p className="text-sm text-gray-400 mb-6">You haven&apos;t requested any booking transfers yet.</p>
