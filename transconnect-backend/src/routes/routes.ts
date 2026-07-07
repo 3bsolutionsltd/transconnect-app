@@ -47,7 +47,7 @@ router.get('/', async (req: Request, res: Response) => {
     const { origin, destination, travelDate } = req.query;
     console.log('Routes API called with params:', { origin, destination, travelDate });
 
-    // If both origin and destination provided, use segment-based search (supports stopovers!)
+    // If both origin and destination provided, use segment-based search then fall back to direct search
     if (origin && destination) {
       console.log('Using segment-based search for stopover support');
       const travelDate_parsed = travelDate ? new Date(travelDate as string) : undefined;
@@ -68,13 +68,32 @@ router.get('/', async (req: Request, res: Response) => {
         departureTime: result.departureTime,
         bus: result.busInfo,
         operator: result.operatorInfo,
-        segments: result.segments, // Include segment details
+        segments: result.segments,
         active: true,
         segmentEnabled: true
       }));
 
-      console.log('Transformed routes:', transformedRoutes.map(r => ({ id: r.id, origin: r.origin, destination: r.destination })));
-      return res.json(transformedRoutes);
+      // If segment search found results, return them
+      if (transformedRoutes.length > 0) {
+        console.log('Segment search found:', transformedRoutes.length, 'routes');
+        return res.json(transformedRoutes);
+      }
+
+      // Fall back to direct route search for routes without segments configured
+      console.log('Segment search empty, falling back to direct route search');
+      const directRoutes = await prisma.route.findMany({
+        where: {
+          active: true,
+          origin: { contains: origin as string, mode: 'insensitive' },
+          destination: { contains: destination as string, mode: 'insensitive' }
+        },
+        include: {
+          operator: { select: { id: true, companyName: true, approved: true } },
+          bus: { select: { id: true, plateNumber: true, model: true, capacity: true } }
+        }
+      });
+      console.log('Direct route search found:', directRoutes.length, 'routes');
+      return res.json(directRoutes);
     }
 
     // Otherwise, use legacy query for listing all routes

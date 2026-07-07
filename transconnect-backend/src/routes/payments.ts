@@ -23,7 +23,8 @@ router.post('/initiate', [
   authenticateToken,
   body('bookingId').notEmpty().withMessage('Booking ID is required'),
   body('method').isIn(['PESAPAL', 'CASH']).withMessage('Valid payment method is required (PESAPAL or CASH)'),
-  body('phoneNumber').optional({ checkFalsy: true }).isMobilePhone('any').withMessage('Valid phone number is required for mobile money payments')
+  body('phoneNumber').optional({ checkFalsy: true }).isMobilePhone('any').withMessage('Valid phone number is required for mobile money payments'),
+  body('totalAmount').optional().isNumeric().withMessage('totalAmount must be a number')
 ], async (req: Request, res: Response) => {
   try {
     const errors = validationResult(req);
@@ -31,7 +32,7 @@ router.post('/initiate', [
       return res.status(400).json({ errors: errors.array() });
     }
 
-    const { bookingId, method, phoneNumber } = req.body;
+    const { bookingId, method, phoneNumber, totalAmount: requestedTotal } = req.body;
     const userId = (req as any).user.id;
 
     // Verify booking exists and belongs to user
@@ -112,6 +113,12 @@ router.post('/initiate', [
       }
     }
 
+    // Use the requested total if it's a valid multiple of the per-booking amount
+    // (covers multi-seat bookings where each seat is a separate booking record)
+    const chargeAmount = (requestedTotal && Number(requestedTotal) >= booking.totalAmount)
+      ? Number(requestedTotal)
+      : booking.totalAmount;
+
     // Remove any previously failed payment so we can create a fresh one
     // (bookingId has a unique constraint — only one payment row per booking)
     await prisma.payment.deleteMany({
@@ -126,7 +133,7 @@ router.post('/initiate', [
       data: {
         bookingId,
         userId,
-        amount: booking.totalAmount,
+        amount: chargeAmount,
         method: method as PaymentMethod,
         reference: paymentReference,
         status: 'PENDING',

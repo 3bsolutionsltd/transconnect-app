@@ -110,7 +110,9 @@ function PaymentContent() {
       const paymentRequest = {
         bookingId: bookingData.id as string,
         method: selectedMethod,
-        ...(phoneNumber ? { phoneNumber } : {})
+        ...(phoneNumber ? { phoneNumber } : {}),
+        // Pass total for multi-seat bookings (backend uses it instead of single-booking amount)
+        ...(bookingData.totalAmount ? { totalAmount: bookingData.totalAmount } : {})
       };
 
       const response = await paymentApi.initiate(paymentRequest);
