@@ -8,6 +8,143 @@ import { NotificationService } from '../services/notification.service';
 const router = Router();
 const notificationService = NotificationService.getInstance();
 
+// ── ADMIN: all bookings with pagination and filters ────────────────────────
+router.get('/admin/all', authenticateToken, async (req: Request, res: Response) => {
+  try {
+    const requestUser = (req as any).user;
+    if (requestUser.role !== 'ADMIN') {
+      return res.status(403).json({ error: 'Admin access required' });
+    }
+
+    const {
+      page = '1',
+      limit = '50',
+      status,
+      operatorId,
+      paymentStatus,
+      paymentMethod,
+      dateFrom,
+      dateTo,
+      search,        // passenger name / booking ID
+    } = req.query;
+
+    const pageNum  = Math.max(1, parseInt(page as string));
+    const limitNum = Math.min(200, Math.max(1, parseInt(limit as string)));
+    const skip     = (pageNum - 1) * limitNum;
+
+    // Build where clause
+    const where: any = {};
+    if (status)      where.status = status;
+    if (dateFrom || dateTo) {
+      where.travelDate = {};
+      if (dateFrom) where.travelDate.gte = new Date(dateFrom as string);
+      if (dateTo)   where.travelDate.lte = new Date(dateTo as string);
+    }
+    if (operatorId) {
+      where.route = { operatorId };
+    }
+    if (search) {
+      // Search by booking ID prefix or passenger details via join
+      where.OR = [
+        { id: { startsWith: search as string } },
+        { user: { firstName: { contains: search as string, mode: 'insensitive' } } },
+        { user: { lastName:  { contains: search as string, mode: 'insensitive' } } },
+        { user: { phone:     { contains: search as string } } },
+      ];
+    }
+
+    // Payment filters applied on the payment join
+    const paymentWhere: any = {};
+    if (paymentStatus) paymentWhere.status = paymentStatus;
+    if (paymentMethod) paymentWhere.method = paymentMethod;
+
+    const [bookings, total] = await Promise.all([
+      prisma.booking.findMany({
+        where,
+        include: {
+          route: {
+            include: {
+              operator: { select: { id: true, companyName: true } },
+              bus:      { select: { plateNumber: true, model: true } },
+            },
+          },
+          user: {
+            select: { id: true, firstName: true, lastName: true, email: true, phone: true },
+          },
+          payment: {
+            where: Object.keys(paymentWhere).length ? paymentWhere : undefined,
+            select: { id: true, status: true, method: true, amount: true, reference: true, createdAt: true },
+          },
+        },
+        orderBy: { createdAt: 'desc' },
+        skip,
+        take: limitNum,
+      }),
+      prisma.booking.count({ where }),
+    ]);
+
+    // Aggregate stats for the filtered set
+    const allPayments = await prisma.payment.findMany({
+      where: { booking: where, status: 'COMPLETED' },
+      select: { amount: true },
+    });
+    const totalRevenue = allPayments.reduce((sum, p) => sum + p.amount, 0);
+
+    const statusCounts = await prisma.booking.groupBy({
+      by: ['status'],
+      where,
+      _count: { status: true },
+    });
+
+    res.json({
+      bookings,
+      pagination: {
+        page: pageNum,
+        limit: limitNum,
+        total,
+        totalPages: Math.ceil(total / limitNum),
+      },
+      stats: {
+        total,
+        totalRevenue,
+        byStatus: Object.fromEntries(statusCounts.map(s => [s.status, s._count.status])),
+      },
+    });
+  } catch (error) {
+    console.error('Error fetching admin bookings:', error);
+    res.status(500).json({ error: 'Failed to fetch bookings' });
+  }
+});
+
+// ── ADMIN: confirm a cash payment manually ────────────────────────────────
+router.post('/admin/confirm-payment/:bookingId', authenticateToken, async (req: Request, res: Response) => {
+  try {
+    const requestUser = (req as any).user;
+    if (requestUser.role !== 'ADMIN') {
+      return res.status(403).json({ error: 'Admin access required' });
+    }
+    const { bookingId } = req.params;
+
+    const booking = await prisma.booking.findUnique({
+      where: { id: bookingId },
+      include: { payment: true },
+    });
+    if (!booking) return res.status(404).json({ error: 'Booking not found' });
+
+    await prisma.$transaction([
+      prisma.booking.update({ where: { id: bookingId }, data: { status: 'CONFIRMED' } }),
+      ...(booking.payment
+        ? [prisma.payment.update({ where: { id: booking.payment.id }, data: { status: 'COMPLETED' } })]
+        : []),
+    ]);
+
+    res.json({ success: true, message: 'Booking confirmed and payment marked complete' });
+  } catch (error) {
+    console.error('Error confirming booking:', error);
+    res.status(500).json({ error: 'Failed to confirm booking' });
+  }
+});
+
 // Get user's bookings
 router.get('/my-bookings', authenticateToken, async (req: Request, res: Response) => {
   try {

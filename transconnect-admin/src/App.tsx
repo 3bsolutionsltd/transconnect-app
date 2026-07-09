@@ -27,6 +27,7 @@ import QRScannerPage from './components/QRScannerPage';
 import AgentManagement from './components/AgentManagement';
 import OperatorLayout from './components/operator/OperatorLayout';
 import OperatorBookings from './components/operator/OperatorBookings';
+import MasterBookings from './components/MasterBookings';
 
 // Dashboard Component
 const Dashboard = () => {
@@ -640,7 +641,7 @@ const AdminLayout = () => {
               <Route path="/" element={<Dashboard />} />
               <Route path="/routes" element={<RouteManagement />} />
               <Route path="/operators" element={<OperatorManagement />} />
-              <Route path="/bookings" element={<OperatorBookings />} />
+              <Route path="/bookings" element={user?.role === 'ADMIN' ? <MasterBookings /> : <OperatorBookings />} />
               <Route path="/agents" element={<AgentManagement />} />
               <Route path="/qr-scanner" element={<QRScannerPage />} />
               <Route path="/analytics" element={<Analytics />} />
