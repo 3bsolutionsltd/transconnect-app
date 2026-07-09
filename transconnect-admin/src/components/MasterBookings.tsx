@@ -1,8 +1,8 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import {
-  Search, Filter, Download, RefreshCw, CheckCircle, XCircle,
-  Calendar, MapPin, User, CreditCard, Bus, ChevronLeft, ChevronRight,
-  TrendingUp, DollarSign, Clock, AlertCircle
+  Search, Filter, Download, RefreshCw, CheckCircle,
+  Calendar, MapPin, ChevronLeft, ChevronRight,
+  DollarSign, Clock, AlertCircle
 } from 'lucide-react';
 
 const API_BASE_URL = (process.env.REACT_APP_API_URL || 'http://localhost:5000/api').replace(/\/api\/?$/, '') + '/api';
@@ -84,7 +84,10 @@ export default function MasterBookings() {
       const res = await fetch(`${API_BASE_URL}/operators`, {
         headers: { Authorization: `Bearer ${token}` },
       });
-      if (res.ok) setOperators((await res.json()).operators || await res.json() || []);
+      if (res.ok) {
+        const payload = await res.json();
+        setOperators(Array.isArray(payload) ? payload : (payload.operators || []));
+      }
     } catch {}
   }, [token]);
 
@@ -162,7 +165,7 @@ export default function MasterBookings() {
           { label: 'Total Bookings', value: stats.total || 0, icon: Calendar, color: 'text-blue-600 bg-blue-50' },
           { label: 'Confirmed',      value: stats.byStatus?.CONFIRMED || 0, icon: CheckCircle, color: 'text-green-600 bg-green-50' },
           { label: 'Pending',        value: stats.byStatus?.PENDING || 0, icon: Clock, color: 'text-yellow-600 bg-yellow-50' },
-          { label: 'Revenue (UGX)',  value: `${((stats.totalRevenue || 0) / 1000).toFixed(0)}K`, icon: DollarSign, color: 'text-purple-600 bg-purple-50' },
+          { label: 'Confirmed Revenue (UGX)',  value: `${((stats.totalRevenue || 0) / 1000).toFixed(0)}K`, icon: DollarSign, color: 'text-purple-600 bg-purple-50' },
         ].map(card => (
           <div key={card.label} className="bg-white rounded-xl border p-4 flex items-center gap-3">
             <div className={`p-2 rounded-lg ${card.color}`}>
@@ -188,7 +191,7 @@ export default function MasterBookings() {
               value={search}
               onChange={e => setSearch(e.target.value)}
               onKeyDown={e => e.key === 'Enter' && fetchBookings(true)}
-              placeholder="Name, phone, booking ID…"
+              placeholder="Search by passenger name, phone, or booking ID"
               className="w-full pl-9 pr-3 py-2 text-sm border rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
             />
           </div>
@@ -275,7 +278,7 @@ export default function MasterBookings() {
               <table className="w-full text-sm">
                 <thead className="bg-gray-50 border-b">
                   <tr>
-                    {['Booking','Passenger','Route','Travel Date','Seat','Status','Payment','Amount','Operator','Actions'].map(h => (
+                    {['Booking','Passenger','Route','Travel Date','Seat','Status','Payment Method/Status','Amount','Operator','Actions'].map(h => (
                       <th key={h} className="px-4 py-3 text-left text-xs font-semibold text-gray-500 uppercase tracking-wide whitespace-nowrap">
                         {h}
                       </th>
@@ -364,7 +367,7 @@ export default function MasterBookings() {
                                 className="inline-flex items-center gap-1 px-2 py-1 text-xs bg-green-600 text-white rounded hover:bg-green-700 disabled:opacity-50"
                               >
                                 <CheckCircle className="h-3 w-3" />
-                                {confirmingId === booking.id ? '…' : 'Confirm'}
+                                {confirmingId === booking.id ? '…' : 'Confirm Cash'}
                               </button>
                             )}
                           </div>
@@ -422,16 +425,18 @@ export default function MasterBookings() {
                   <button
                     disabled={page <= 1}
                     onClick={() => setPage(p => p - 1)}
-                    className="p-1 rounded hover:bg-gray-100 disabled:opacity-40"
+                    className="inline-flex items-center gap-1 px-2 py-1 rounded border hover:bg-gray-100 disabled:opacity-40"
                   >
                     <ChevronLeft className="h-5 w-5" />
+                    <span>Previous</span>
                   </button>
                   <span>Page {pagination.page} / {pagination.totalPages}</span>
                   <button
                     disabled={page >= pagination.totalPages}
                     onClick={() => setPage(p => p + 1)}
-                    className="p-1 rounded hover:bg-gray-100 disabled:opacity-40"
+                    className="inline-flex items-center gap-1 px-2 py-1 rounded border hover:bg-gray-100 disabled:opacity-40"
                   >
+                    <span>Next</span>
                     <ChevronRight className="h-5 w-5" />
                   </button>
                 </div>

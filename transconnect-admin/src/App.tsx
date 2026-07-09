@@ -641,7 +641,7 @@ const AdminLayout = () => {
               <Route path="/" element={<Dashboard />} />
               <Route path="/routes" element={<RouteManagement />} />
               <Route path="/operators" element={<OperatorManagement />} />
-              <Route path="/bookings" element={user?.role === 'ADMIN' ? <MasterBookings /> : <OperatorBookings />} />
+              <Route path="/bookings" element={<MasterBookings />} />
               <Route path="/agents" element={<AgentManagement />} />
               <Route path="/qr-scanner" element={<QRScannerPage />} />
               <Route path="/analytics" element={<Analytics />} />

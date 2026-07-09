@@ -12,7 +12,7 @@ const notificationService = NotificationService.getInstance();
 router.get('/admin/all', authenticateToken, async (req: Request, res: Response) => {
   try {
     const requestUser = (req as any).user;
-    if (requestUser.role !== 'ADMIN') {
+    if (requestUser.role !== 'ADMIN' && requestUser.role !== 'MANAGER') {
       return res.status(403).json({ error: 'Admin access required' });
     }
 
@@ -43,6 +43,14 @@ router.get('/admin/all', authenticateToken, async (req: Request, res: Response) 
     if (operatorId) {
       where.route = { operatorId };
     }
+    if (paymentStatus || paymentMethod) {
+      where.payment = {
+        is: {
+          ...(paymentStatus && { status: paymentStatus }),
+          ...(paymentMethod && { method: paymentMethod }),
+        },
+      };
+    }
     if (search) {
       // Search by booking ID prefix or passenger details via join
       where.OR = [
@@ -52,11 +60,6 @@ router.get('/admin/all', authenticateToken, async (req: Request, res: Response) 
         { user: { phone:     { contains: search as string } } },
       ];
     }
-
-    // Payment filters applied on the payment join
-    const paymentWhere: any = {};
-    if (paymentStatus) paymentWhere.status = paymentStatus;
-    if (paymentMethod) paymentWhere.method = paymentMethod;
 
     const [bookings, total] = await Promise.all([
       prisma.booking.findMany({
@@ -72,7 +75,6 @@ router.get('/admin/all', authenticateToken, async (req: Request, res: Response) 
             select: { id: true, firstName: true, lastName: true, email: true, phone: true },
           },
           payment: {
-            where: Object.keys(paymentWhere).length ? paymentWhere : undefined,
             select: { id: true, status: true, method: true, amount: true, reference: true, createdAt: true },
           },
         },
@@ -84,11 +86,11 @@ router.get('/admin/all', authenticateToken, async (req: Request, res: Response) 
     ]);
 
     // Aggregate stats for the filtered set
-    const allPayments = await prisma.payment.findMany({
+    const revenueAgg = await prisma.payment.aggregate({
       where: { booking: where, status: 'COMPLETED' },
-      select: { amount: true },
+      _sum: { amount: true },
     });
-    const totalRevenue = allPayments.reduce((sum, p) => sum + p.amount, 0);
+    const totalRevenue = revenueAgg._sum.amount || 0;
 
     const statusCounts = await prisma.booking.groupBy({
       by: ['status'],
@@ -120,7 +122,7 @@ router.get('/admin/all', authenticateToken, async (req: Request, res: Response) 
 router.post('/admin/confirm-payment/:bookingId', authenticateToken, async (req: Request, res: Response) => {
   try {
     const requestUser = (req as any).user;
-    if (requestUser.role !== 'ADMIN') {
+    if (requestUser.role !== 'ADMIN' && requestUser.role !== 'MANAGER') {
       return res.status(403).json({ error: 'Admin access required' });
     }
     const { bookingId } = req.params;
@@ -131,11 +133,30 @@ router.post('/admin/confirm-payment/:bookingId', authenticateToken, async (req: 
     });
     if (!booking) return res.status(404).json({ error: 'Booking not found' });
 
+    if (booking.status !== 'PENDING') {
+      return res.status(400).json({ error: 'Only pending bookings can be confirmed as cash' });
+    }
+
+    if (booking.payment && booking.payment.method !== 'CASH') {
+      return res.status(400).json({ error: 'Only cash bookings can be confirmed with this action' });
+    }
+
     await prisma.$transaction([
       prisma.booking.update({ where: { id: bookingId }, data: { status: 'CONFIRMED' } }),
       ...(booking.payment
         ? [prisma.payment.update({ where: { id: booking.payment.id }, data: { status: 'COMPLETED' } })]
-        : []),
+        : [
+            prisma.payment.create({
+              data: {
+                bookingId: booking.id,
+                userId: booking.userId,
+                amount: booking.totalAmount,
+                method: 'CASH',
+                status: 'COMPLETED',
+                reference: `CASH-${booking.id.slice(-6).toUpperCase()}-${Date.now().toString().slice(-6)}`,
+              },
+            }),
+          ]),
     ]);
 
     res.json({ success: true, message: 'Booking confirmed and payment marked complete' });
