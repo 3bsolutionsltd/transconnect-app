@@ -9,7 +9,6 @@ import {
   Users,
   Clock,
   CheckCircle,
-  XCircle,
   AlertCircle
 } from 'lucide-react';
 

@@ -2,8 +2,6 @@ import React, { useState, useEffect, useCallback } from 'react';
 import { 
   MapPin, 
   Clock, 
-  DollarSign, 
-  TrendingUp,
   AlertCircle,
   Eye,
   BarChart3,
