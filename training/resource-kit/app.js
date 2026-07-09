@@ -50,11 +50,17 @@ const resourceData = {
         file: '../amplifier-support-faq.md',
         available: true
     }
+    ,
+    'general-workflow': {
+        title: 'Daily Workflow & Procedures',
+        role: 'general',
+        file: '../general-daily-workflow.md',
+        available: true
+    }
 };
 
 // Generate prompts for resources not yet created
 const generatePrompts = {
-    'general-workflow': '/generate-training General daily workflow',
     'infantry-workflow': '/generate-training Infantry daily workflow',
     'amplifier-scripts': '/generate-training Amplifier communication scripts',
     'general-scripts': '/generate-training General communication scripts',
