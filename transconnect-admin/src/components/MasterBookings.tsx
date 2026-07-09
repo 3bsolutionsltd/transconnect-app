@@ -91,7 +91,11 @@ export default function MasterBookings() {
     } catch {}
   }, [token]);
 
+  // Intentionally run once on mount; subsequent loads are user-triggered via Apply/Refresh.
+  // eslint-disable-next-line react-hooks/exhaustive-deps
   useEffect(() => { fetchBookings(); fetchOperators(); }, []);
+  // Intentionally fetch only when page changes to keep filter application explicit.
+  // eslint-disable-next-line react-hooks/exhaustive-deps
   useEffect(() => { fetchBookings(); }, [page]);
 
   const handleConfirm = async (bookingId: string) => {

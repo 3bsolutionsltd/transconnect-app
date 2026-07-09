@@ -26,7 +26,6 @@ import OperatorManagement from './components/OperatorManagement';
 import QRScannerPage from './components/QRScannerPage';
 import AgentManagement from './components/AgentManagement';
 import OperatorLayout from './components/operator/OperatorLayout';
-import OperatorBookings from './components/operator/OperatorBookings';
 import MasterBookings from './components/MasterBookings';
 
 // Dashboard Component
