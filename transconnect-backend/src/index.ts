@@ -103,6 +103,9 @@ app.use(cors({
       // Legacy Render URLs
       "https://transconnect-admin-staging.onrender.com",
       "https://transconnect-web-staging.onrender.com",
+      // PesaPal payment iframe (sandbox + production)
+      "https://cybqa.pesapal.com",
+      "https://pay.pesapal.com",
       // Allow env-configured extra origins
       ...( process.env.CORS_ORIGINS
             ? process.env.CORS_ORIGINS.split(',').map(o => o.trim()).filter(Boolean)

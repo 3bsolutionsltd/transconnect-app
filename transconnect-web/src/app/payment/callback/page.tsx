@@ -20,7 +20,9 @@ interface PaymentStatusResponse {
 function PaymentCallbackContent() {
   const searchParams = useSearchParams();
   const router = useRouter();
-  const ref = searchParams.get('ref');
+  const paymentId = searchParams.get('paymentId');
+  const ref = searchParams.get('ref'); // fallback
+  const lookupId = paymentId || ref;
   const [status, setStatus] = useState<Status>('loading');
   const [data, setData] = useState<PaymentStatusResponse | null>(null);
   const [errorMsg, setErrorMsg] = useState('');
@@ -28,7 +30,7 @@ function PaymentCallbackContent() {
   const maxPolls = 20; // 20 × 3s = 60s max
 
   useEffect(() => {
-    if (!ref) {
+    if (!lookupId) {
       setStatus('error');
       setErrorMsg('No payment reference found in URL.');
       return;
@@ -37,7 +39,7 @@ function PaymentCallbackContent() {
     const poll = async () => {
       try {
         const apiBase = process.env.NEXT_PUBLIC_API_URL || '/api';
-        const res = await fetch(`${apiBase}/payments/${encodeURIComponent(ref)}/status`, {
+        const res = await fetch(`${apiBase}/payments/${encodeURIComponent(lookupId)}/status`, {
           headers: { Authorization: `Bearer ${localStorage.getItem('token') ?? ''}` },
         });
 
