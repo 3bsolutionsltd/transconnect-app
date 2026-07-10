@@ -17,6 +17,8 @@ enum UserRole {
   OPERATOR
   MANAGER // NEW: Can manage bookings across operators
   ADMIN
+  MASTER_FIELD_OPERATOR
+  OPERATOR_FIELD_OPERATOR
 }
 
 enum BookingStatus {
@@ -81,6 +83,9 @@ model User {
   transferRequests        BookingTransfer[]           @relation("TransferRequests")
   transferReviews         BookingTransfer[]           @relation("TransferReviews")
   seatChanges             BookingSeatHistory[]        @relation("SeatChanges")
+  fieldOperatorScopes     FieldOperatorScope[]
+  bookingAssignmentsMade  BookingAssignment[]         @relation("BookingAssignmentsMade")
+  bookingLedgerEntries    BookingLedgerEntry[]        @relation("BookingLedgerActor")
 
   @@map("users")
 }
@@ -103,6 +108,9 @@ model Operator {
   routes           Route[]
   operatorUsers    OperatorUser[]
   agentOperatorRel AgentOperator[]
+  fieldOperatorScopes FieldOperatorScope[]
+  bookingAssignments  BookingAssignment[]
+  bookingLedgerEntries BookingLedgerEntry[]
 
   @@map("operators")
 }
@@ -242,8 +250,53 @@ model Booking {
   verification Verification?
   transfers    BookingTransfer[]    @relation("OriginalBooking")
   seatHistory  BookingSeatHistory[]
+  assignments  BookingAssignment[]
+  ledgerEntries BookingLedgerEntry[]
 
   @@map("bookings")
+}
+
+model BookingAssignment {
+  id               String                  @id @default(cuid())
+  bookingId        String
+  agentId          String
+  assignedByUserId String
+  operatorId       String
+  status           BookingAssignmentStatus @default(ASSIGNED)
+  note             String?
+  createdAt        DateTime                @default(now())
+  updatedAt        DateTime                @updatedAt
+  completedAt      DateTime?
+
+  booking    Booking  @relation(fields: [bookingId], references: [id], onDelete: Cascade)
+  agent      Agent    @relation(fields: [agentId], references: [id], onDelete: Cascade)
+  assignedBy User     @relation("BookingAssignmentsMade", fields: [assignedByUserId], references: [id], onDelete: Cascade)
+  operator   Operator @relation(fields: [operatorId], references: [id], onDelete: Cascade)
+
+  @@index([bookingId, createdAt])
+  @@index([agentId, status])
+  @@index([operatorId, status])
+  @@map("booking_assignments")
+}
+
+model BookingLedgerEntry {
+  id          String   @id @default(cuid())
+  bookingId   String
+  actorUserId String?
+  operatorId  String?
+  action      String
+  actorRole   String
+  note        String?
+  metadata    Json?
+  createdAt   DateTime @default(now())
+
+  booking   Booking   @relation(fields: [bookingId], references: [id], onDelete: Cascade)
+  actorUser User?     @relation("BookingLedgerActor", fields: [actorUserId], references: [id], onDelete: SetNull)
+  operator  Operator? @relation(fields: [operatorId], references: [id], onDelete: SetNull)
+
+  @@index([bookingId, createdAt])
+  @@index([operatorId, createdAt])
+  @@map("booking_ledger_entries")
 }
 
 model Payment {
@@ -495,6 +548,22 @@ model OperatorUser {
   @@map("operator_users")
 }
 
+model FieldOperatorScope {
+  id         String   @id @default(cuid())
+  userId     String
+  operatorId String
+  active     Boolean  @default(true)
+  createdAt  DateTime @default(now())
+  updatedAt  DateTime @updatedAt
+
+  user     User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  operator Operator @relation(fields: [operatorId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, operatorId])
+  @@index([operatorId, active])
+  @@map("field_operator_scopes")
+}
+
 // Enums for notifications
 enum NotificationType {
   BOOKING_CONFIRMATION
@@ -576,6 +645,13 @@ enum TransactionType {
   WITHDRAWAL_COMPLETED
 }
 
+enum BookingAssignmentStatus {
+  ASSIGNED
+  IN_PROGRESS
+  COMPLETED
+  CANCELLED
+}
+
 // Agent onboarding system models
 model Agent {
   id            String      @id @default(cuid())
@@ -608,6 +684,7 @@ model Agent {
   indirectReferrals   Referral[]       @relation("ReferredAgentReferrals")
   managedOperators    Operator[]       @relation("ManagedOperators")
   agentOperatorRels   AgentOperator[]
+  bookingAssignments  BookingAssignment[]
 
   @@map("agents")
 }

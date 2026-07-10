@@ -1,8 +1,124 @@
 import { Router, Request, Response } from 'express';
 import { prisma } from '../lib/prisma';
 import { authenticateToken } from '../middleware/auth';
+import bcrypt from 'bcryptjs';
 
 const router = Router();
+
+const PLATFORM_MANAGED_ROLES = ['ADMIN', 'OPERATOR', 'PASSENGER', 'MASTER_FIELD_OPERATOR', 'OPERATOR_FIELD_OPERATOR'];
+
+// Create user (Admin only)
+router.post('/', authenticateToken, async (req: Request, res: Response) => {
+  try {
+    const requestUser = (req as any).user;
+    if (requestUser.role !== 'ADMIN') {
+      return res.status(403).json({ error: 'Access denied. Admin privileges required.' });
+    }
+
+    const {
+      email,
+      password,
+      firstName,
+      lastName,
+      phone,
+      role,
+      verified = true,
+      operatorScopeIds = [],
+    } = req.body;
+
+    if (!email || !password || !firstName || !lastName || !phone || !role) {
+      return res.status(400).json({ error: 'email, password, firstName, lastName, phone, and role are required' });
+    }
+
+    if (!PLATFORM_MANAGED_ROLES.includes(role)) {
+      return res.status(400).json({ error: 'Invalid role provided' });
+    }
+
+    if (role === 'MASTER_FIELD_OPERATOR' && operatorScopeIds.length > 0) {
+      return res.status(400).json({ error: 'Master field operators should not have operator scopes' });
+    }
+
+    if (role === 'OPERATOR_FIELD_OPERATOR' && (!Array.isArray(operatorScopeIds) || operatorScopeIds.length === 0)) {
+      return res.status(400).json({ error: 'Operator field operators require at least one operator scope' });
+    }
+
+    const existingUser = await prisma.user.findFirst({
+      where: {
+        OR: [{ email }, { phone }],
+      },
+    });
+
+    if (existingUser) {
+      return res.status(400).json({ error: 'A user with this email or phone number already exists' });
+    }
+
+    const hashedPassword = await bcrypt.hash(password, 10);
+
+    const createdUser = await prisma.$transaction(async tx => {
+      const user = await tx.user.create({
+        data: {
+          email,
+          password: hashedPassword,
+          firstName,
+          lastName,
+          phone,
+          role,
+          verified,
+        },
+      });
+
+      if (role === 'OPERATOR_FIELD_OPERATOR') {
+        const operators = await tx.operator.findMany({
+          where: { id: { in: operatorScopeIds } },
+          select: { id: true },
+        });
+
+        if (operators.length !== operatorScopeIds.length) {
+          throw new Error('One or more operator scopes are invalid');
+        }
+
+        await tx.fieldOperatorScope.createMany({
+          data: operatorScopeIds.map((operatorId: string) => ({
+            userId: user.id,
+            operatorId,
+            active: true,
+          })),
+        });
+      }
+
+      return tx.user.findUnique({
+        where: { id: user.id },
+        select: {
+          id: true,
+          email: true,
+          firstName: true,
+          lastName: true,
+          phone: true,
+          role: true,
+          verified: true,
+          createdAt: true,
+          fieldOperatorScopes: {
+            where: { active: true },
+            select: {
+              operatorId: true,
+              operator: {
+                select: {
+                  id: true,
+                  companyName: true,
+                },
+              },
+            },
+          },
+        },
+      });
+    });
+
+    res.status(201).json(createdUser);
+  } catch (error: any) {
+    console.error('Error creating user:', error);
+    res.status(500).json({ error: error.message || 'Failed to create user' });
+  }
+});
 
 // Get all users (Admin only)
 router.get('/', authenticateToken, async (req: Request, res: Response) => {
@@ -25,6 +141,18 @@ router.get('/', authenticateToken, async (req: Request, res: Response) => {
         verified: true,
         createdAt: true,
         updatedAt: true,
+        fieldOperatorScopes: {
+          where: { active: true },
+          select: {
+            operatorId: true,
+            operator: {
+              select: {
+                id: true,
+                companyName: true,
+              },
+            },
+          },
+        },
         _count: {
           select: {
             bookings: true
@@ -73,6 +201,18 @@ router.get('/:id', authenticateToken, async (req: Request, res: Response) => {
         verified: true,
         createdAt: true,
         updatedAt: true,
+        fieldOperatorScopes: {
+          where: { active: true },
+          select: {
+            operatorId: true,
+            operator: {
+              select: {
+                id: true,
+                companyName: true,
+              },
+            },
+          },
+        },
         bookings: {
           select: {
             id: true,
@@ -115,34 +255,136 @@ router.put('/:id', authenticateToken, async (req: Request, res: Response) => {
     }
 
     const { id } = req.params;
-    const { firstName, lastName, phone, role, verified } = req.body;
+    const { firstName, lastName, phone, role, verified, operatorScopeIds } = req.body;
 
-    const updatedUser = await prisma.user.update({
-      where: { id },
-      data: {
-        firstName,
-        lastName,
-        phone,
-        role,
-        verified
-      },
-      select: {
-        id: true,
-        email: true,
-        firstName: true,
-        lastName: true,
-        phone: true,
-        role: true,
-        verified: true,
-        createdAt: true,
-        updatedAt: true
+    if (role && !PLATFORM_MANAGED_ROLES.includes(role)) {
+      return res.status(400).json({ error: 'Invalid role provided' });
+    }
+
+    const updatedUser = await prisma.$transaction(async tx => {
+      const user = await tx.user.update({
+        where: { id },
+        data: {
+          firstName,
+          lastName,
+          phone,
+          role,
+          verified
+        },
+      });
+
+      if (role === 'MASTER_FIELD_OPERATOR') {
+        await tx.fieldOperatorScope.deleteMany({ where: { userId: id } });
       }
+
+      if (role === 'OPERATOR_FIELD_OPERATOR' && Array.isArray(operatorScopeIds)) {
+        await tx.fieldOperatorScope.deleteMany({ where: { userId: id } });
+        if (operatorScopeIds.length > 0) {
+          await tx.fieldOperatorScope.createMany({
+            data: operatorScopeIds.map((operatorId: string) => ({
+              userId: id,
+              operatorId,
+              active: true,
+            })),
+          });
+        }
+      }
+
+      return tx.user.findUnique({
+        where: { id: user.id },
+        select: {
+          id: true,
+          email: true,
+          firstName: true,
+          lastName: true,
+          phone: true,
+          role: true,
+          verified: true,
+          createdAt: true,
+          updatedAt: true,
+          fieldOperatorScopes: {
+            where: { active: true },
+            select: {
+              operatorId: true,
+              operator: {
+                select: {
+                  id: true,
+                  companyName: true,
+                },
+              },
+            },
+          },
+        },
+      });
     });
 
     res.json(updatedUser);
   } catch (error) {
     console.error('Error updating user:', error);
     res.status(500).json({ error: 'Failed to update user' });
+  }
+});
+
+// Replace field operator scopes (Admin only)
+router.put('/:id/field-operator-scopes', authenticateToken, async (req: Request, res: Response) => {
+  try {
+    const requestUser = (req as any).user;
+    if (requestUser.role !== 'ADMIN') {
+      return res.status(403).json({ error: 'Access denied. Admin privileges required.' });
+    }
+
+    const { id } = req.params;
+    const { operatorScopeIds = [] } = req.body;
+
+    const user = await prisma.user.findUnique({ where: { id } });
+    if (!user) {
+      return res.status(404).json({ error: 'User not found' });
+    }
+
+    if (user.role !== 'OPERATOR_FIELD_OPERATOR') {
+      return res.status(400).json({ error: 'Only OPERATOR_FIELD_OPERATOR users can have scoped operators' });
+    }
+
+    if (!Array.isArray(operatorScopeIds) || operatorScopeIds.length === 0) {
+      return res.status(400).json({ error: 'At least one operator scope is required' });
+    }
+
+    const operators = await prisma.operator.findMany({
+      where: { id: { in: operatorScopeIds } },
+      select: { id: true },
+    });
+
+    if (operators.length !== operatorScopeIds.length) {
+      return res.status(400).json({ error: 'One or more operator scopes are invalid' });
+    }
+
+    await prisma.$transaction(async tx => {
+      await tx.fieldOperatorScope.deleteMany({ where: { userId: id } });
+      await tx.fieldOperatorScope.createMany({
+        data: operatorScopeIds.map((operatorId: string) => ({
+          userId: id,
+          operatorId,
+          active: true,
+        })),
+      });
+    });
+
+    const scopes = await prisma.fieldOperatorScope.findMany({
+      where: { userId: id, active: true },
+      include: {
+        operator: {
+          select: {
+            id: true,
+            companyName: true,
+          },
+        },
+      },
+    });
+
+    res.json({ scopes });
+  } catch (error: any) {
+    console.error('Error updating field operator scopes:', error);
+    res.status(500).json({ error: error.message || 'Failed to update field operator scopes' });
   }
 });
 

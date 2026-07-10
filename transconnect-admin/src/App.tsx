@@ -500,7 +500,7 @@ const AuthenticatedApp = () => {
     return <OperatorLayout />;
   }
 
-  // Default to admin interface for ADMIN role
+  // Default to shared operations/admin interface for platform roles
   return <AdminLayout />;
 };
 
@@ -509,19 +509,25 @@ const AdminLayout = () => {
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const { user, logout } = useAuth();
   const location = useLocation();
+  const isAdmin = user?.role === 'ADMIN';
 
   // Admin-only navigation - operators don't see these
-  const adminNavigation = [
-    { name: 'Dashboard', href: '/', icon: Home },
-    { name: 'Routes', href: '/routes', icon: MapPin },
-    { name: 'Operators', href: '/operators', icon: Building2 },
-    { name: 'Bookings', href: '/bookings', icon: Calendar },
-    { name: 'Agents', href: '/agents', icon: UserCheck },
-    { name: 'QR Scanner', href: '/qr-scanner', icon: QrCode },
-    { name: 'Analytics', href: '/analytics', icon: BarChart3 },
-    { name: 'Users', href: '/users', icon: Users },
-    { name: 'Settings', href: '/settings', icon: Settings },
-  ];
+  const adminNavigation = isAdmin
+    ? [
+        { name: 'Dashboard', href: '/', icon: Home },
+        { name: 'Routes', href: '/routes', icon: MapPin },
+        { name: 'Operators', href: '/operators', icon: Building2 },
+        { name: 'Bookings', href: '/bookings', icon: Calendar },
+        { name: 'Agents', href: '/agents', icon: UserCheck },
+        { name: 'QR Scanner', href: '/qr-scanner', icon: QrCode },
+        { name: 'Analytics', href: '/analytics', icon: BarChart3 },
+        { name: 'Users', href: '/users', icon: Users },
+        { name: 'Settings', href: '/settings', icon: Settings },
+      ]
+    : [
+        { name: 'Dashboard', href: '/', icon: Home },
+        { name: 'Bookings', href: '/bookings', icon: Calendar },
+      ];
 
   return (
     <div className="flex h-screen bg-gray-100">
@@ -591,7 +597,7 @@ const AdminLayout = () => {
                 {user?.firstName} {user?.lastName}
               </p>
               <p className="text-xs text-gray-500 truncate">
-                System Administrator • {user?.email}
+                {user?.role?.replace(/_/g, ' ')} • {user?.email}
               </p>
             </div>
           </div>
@@ -637,15 +643,15 @@ const AdminLayout = () => {
         <main className="flex-1 overflow-y-auto">
           <div className="p-4 sm:p-6 lg:p-8">
             <Routes>
-              <Route path="/" element={<Dashboard />} />
-              <Route path="/routes" element={<RouteManagement />} />
-              <Route path="/operators" element={<OperatorManagement />} />
+              <Route path="/" element={isAdmin ? <Dashboard /> : <MasterBookings />} />
+              <Route path="/routes" element={isAdmin ? <RouteManagement /> : <MasterBookings />} />
+              <Route path="/operators" element={isAdmin ? <OperatorManagement /> : <MasterBookings />} />
               <Route path="/bookings" element={<MasterBookings />} />
-              <Route path="/agents" element={<AgentManagement />} />
-              <Route path="/qr-scanner" element={<QRScannerPage />} />
-              <Route path="/analytics" element={<Analytics />} />
-              <Route path="/users" element={<UserManagement />} />
-              <Route path="/settings" element={<div>Settings page coming soon...</div>} />
+              <Route path="/agents" element={isAdmin ? <AgentManagement /> : <MasterBookings />} />
+              <Route path="/qr-scanner" element={isAdmin ? <QRScannerPage /> : <MasterBookings />} />
+              <Route path="/analytics" element={isAdmin ? <Analytics /> : <MasterBookings />} />
+              <Route path="/users" element={isAdmin ? <UserManagement /> : <MasterBookings />} />
+              <Route path="/settings" element={isAdmin ? <div>Settings page coming soon...</div> : <MasterBookings />} />
             </Routes>
           </div>
         </main>

@@ -5,7 +5,7 @@ interface User {
   email: string;
   firstName: string;
   lastName: string;
-  role: 'ADMIN' | 'OPERATOR' | 'PASSENGER';
+  role: 'ADMIN' | 'OPERATOR' | 'PASSENGER' | 'MASTER_FIELD_OPERATOR' | 'OPERATOR_FIELD_OPERATOR';
 }
 
 interface AuthContextType {
@@ -43,11 +43,11 @@ const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => 
     if (token && userData) {
       try {
         const parsedUser = JSON.parse(userData);
-        // Verify user has admin or operator role
-        if (parsedUser.role === 'ADMIN' || parsedUser.role === 'OPERATOR') {
+        // Verify user has portal access role
+        if (['ADMIN', 'OPERATOR', 'MASTER_FIELD_OPERATOR', 'OPERATOR_FIELD_OPERATOR'].includes(parsedUser.role)) {
           console.log(`🔍 Validating ${parsedUser.role} token for:`, parsedUser.email);
-          // Test token validity by making a quick API call
-          fetch(`${API_BASE_URL}/users`, {
+          // Test token validity with a role-agnostic profile endpoint
+          fetch(`${API_BASE_URL}/auth/me`, {
             headers: {
               'Authorization': `Bearer ${token}`,
               'Content-Type': 'application/json'
@@ -102,9 +102,9 @@ const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => 
 
       const data = await response.json();
       
-      // Check if user has admin or operator role
-      if (data.user.role !== 'ADMIN' && data.user.role !== 'OPERATOR') {
-        throw new Error('Access denied. Admin or operator privileges required.');
+      // Check if user has portal access role
+      if (!['ADMIN', 'OPERATOR', 'MASTER_FIELD_OPERATOR', 'OPERATOR_FIELD_OPERATOR'].includes(data.user.role)) {
+        throw new Error('Access denied. Portal privileges required.');
       }
       
       console.log(`✅ ${data.user.role} login successful:`, data.user.email);

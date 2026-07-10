@@ -22,11 +22,13 @@ const PAYMENT_COLORS: Record<string, string> = {
 
 export default function MasterBookings() {
   const token = localStorage.getItem('admin_token');
+  const currentUser = JSON.parse(localStorage.getItem('admin_user') || 'null');
 
   // Data
   const [bookings, setBookings]   = useState<any[]>([]);
   const [stats, setStats]         = useState<any>({});
   const [operators, setOperators] = useState<any[]>([]);
+  const [agents, setAgents]       = useState<any[]>([]);
   const [loading, setLoading]     = useState(true);
   const [error, setError]         = useState('');
 
@@ -45,6 +47,12 @@ export default function MasterBookings() {
   // Action state
   const [confirmingId, setConfirmingId] = useState<string | null>(null);
   const [expandedId, setExpandedId]     = useState<string | null>(null);
+  const [assigningId, setAssigningId]   = useState<string | null>(null);
+  const [ledgerLoadingId, setLedgerLoadingId] = useState<string | null>(null);
+  const [ledgerNotesSavingId, setLedgerNotesSavingId] = useState<string | null>(null);
+  const [assignmentDrafts, setAssignmentDrafts] = useState<Record<string, { agentId: string; note: string }>>({});
+  const [ledgerNotes, setLedgerNotes] = useState<Record<string, string>>({});
+  const [ledgerByBooking, setLedgerByBooking] = useState<Record<string, any[]>>({});
 
   const fetchBookings = useCallback(async (resetPage = false) => {
     const currentPage = resetPage ? 1 : page;
@@ -91,9 +99,21 @@ export default function MasterBookings() {
     } catch {}
   }, [token]);
 
+  const fetchAgents = useCallback(async () => {
+    try {
+      const res = await fetch(`${API_BASE_URL}/agents/admin/all`, {
+        headers: { Authorization: `Bearer ${token}` },
+      });
+      if (res.ok) {
+        const payload = await res.json();
+        setAgents(payload.agents || []);
+      }
+    } catch {}
+  }, [token]);
+
   // Intentionally run once on mount; subsequent loads are user-triggered via Apply/Refresh.
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  useEffect(() => { fetchBookings(); fetchOperators(); }, []);
+  useEffect(() => { fetchBookings(); fetchOperators(); fetchAgents(); }, []);
   // Intentionally fetch only when page changes to keep filter application explicit.
   // eslint-disable-next-line react-hooks/exhaustive-deps
   useEffect(() => { fetchBookings(); }, [page]);
@@ -111,6 +131,71 @@ export default function MasterBookings() {
       alert('Failed to confirm: ' + e.message);
     } finally {
       setConfirmingId(null);
+    }
+  };
+
+  const handleAssignAgent = async (bookingId: string) => {
+    const draft = assignmentDrafts[bookingId];
+    if (!draft?.agentId) {
+      alert('Select an agent first');
+      return;
+    }
+
+    setAssigningId(bookingId);
+    try {
+      const res = await fetch(`${API_BASE_URL}/bookings/${bookingId}/assign-agent`, {
+        method: 'POST',
+        headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' },
+        body: JSON.stringify(draft),
+      });
+      if (!res.ok) throw new Error(await res.text());
+      setAssignmentDrafts(prev => ({ ...prev, [bookingId]: { agentId: '', note: '' } }));
+      await fetchBookings();
+      await fetchLedger(bookingId);
+    } catch (e: any) {
+      alert('Failed to assign agent: ' + e.message);
+    } finally {
+      setAssigningId(null);
+    }
+  };
+
+  const fetchLedger = async (bookingId: string) => {
+    setLedgerLoadingId(bookingId);
+    try {
+      const res = await fetch(`${API_BASE_URL}/bookings/${bookingId}/ledger`, {
+        headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' },
+      });
+      if (!res.ok) throw new Error(await res.text());
+      const payload = await res.json();
+      setLedgerByBooking(prev => ({ ...prev, [bookingId]: payload.entries || [] }));
+    } catch (e: any) {
+      alert('Failed to load booking ledger: ' + e.message);
+    } finally {
+      setLedgerLoadingId(current => current === bookingId ? null : current);
+    }
+  };
+
+  const handleAddLedgerNote = async (bookingId: string) => {
+    const note = ledgerNotes[bookingId]?.trim();
+    if (!note) {
+      alert('Enter a note first');
+      return;
+    }
+
+    setLedgerNotesSavingId(bookingId);
+    try {
+      const res = await fetch(`${API_BASE_URL}/bookings/${bookingId}/ledger`, {
+        method: 'POST',
+        headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' },
+        body: JSON.stringify({ note }),
+      });
+      if (!res.ok) throw new Error(await res.text());
+      setLedgerNotes(prev => ({ ...prev, [bookingId]: '' }));
+      await fetchLedger(bookingId);
+    } catch (e: any) {
+      alert('Failed to add ledger note: ' + e.message);
+    } finally {
+      setLedgerNotesSavingId(null);
     }
   };
 
@@ -144,8 +229,12 @@ export default function MasterBookings() {
     <div className="space-y-6">
       <div className="flex justify-between items-center">
         <div>
-          <h1 className="text-2xl font-bold text-gray-900">Master Bookings</h1>
-          <p className="text-sm text-gray-500 mt-1">All bookings across all operators · Admin view</p>
+          <h1 className="text-2xl font-bold text-gray-900">Operations Bookings</h1>
+          <p className="text-sm text-gray-500 mt-1">
+            {currentUser?.role === 'OPERATOR_FIELD_OPERATOR'
+              ? 'Operator-scoped booking operations'
+              : 'All bookings across all operators · operations view'}
+          </p>
         </div>
         <div className="flex gap-2">
           <button
@@ -282,7 +371,7 @@ export default function MasterBookings() {
               <table className="w-full text-sm">
                 <thead className="bg-gray-50 border-b">
                   <tr>
-                    {['Booking','Passenger','Route','Travel Date','Seat','Status','Payment Method/Status','Amount','Operator','Actions'].map(h => (
+                    {['Booking','Passenger','Route','Travel Date','Seat','Status','Payment Method/Status','Amount','Operator','Assignment / Actions'].map(h => (
                       <th key={h} className="px-4 py-3 text-left text-xs font-semibold text-gray-500 uppercase tracking-wide whitespace-nowrap">
                         {h}
                       </th>
@@ -363,7 +452,15 @@ export default function MasterBookings() {
 
                         {/* Actions */}
                         <td className="px-4 py-3" onClick={e => e.stopPropagation()}>
-                          <div className="flex items-center gap-2">
+                          <div className="space-y-2">
+                            {booking.assignments?.[0] ? (
+                              <div className="text-xs text-gray-700">
+                                Assigned to <span className="font-medium">{booking.assignments[0].agent?.name}</span>
+                              </div>
+                            ) : (
+                              <div className="text-xs text-gray-400">Not assigned</div>
+                            )}
+                            <div className="flex items-center gap-2">
                             {booking.status === 'PENDING' && (
                               <button
                                 onClick={() => handleConfirm(booking.id)}
@@ -374,6 +471,7 @@ export default function MasterBookings() {
                                 {confirmingId === booking.id ? '…' : 'Confirm Cash'}
                               </button>
                             )}
+                            </div>
                           </div>
                         </td>
                       </tr>
@@ -408,6 +506,97 @@ export default function MasterBookings() {
                               <div>
                                 <span className="text-gray-500 block text-xs mb-1">Booked On</span>
                                 <span>{new Date(booking.createdAt).toLocaleString()}</span>
+                              </div>
+                              <div>
+                                <span className="text-gray-500 block text-xs mb-1">Current Assignment</span>
+                                <span>{booking.assignments?.[0]?.agent?.name || 'Unassigned'}</span>
+                              </div>
+                            </div>
+
+                            <div className="mt-5 grid grid-cols-1 lg:grid-cols-2 gap-6">
+                              <div className="bg-white rounded-lg border p-4">
+                                <h3 className="text-sm font-semibold text-gray-900 mb-3">Assign to Agent / Brand Ambassador</h3>
+                                <div className="space-y-3">
+                                  <select
+                                    value={assignmentDrafts[booking.id]?.agentId || ''}
+                                    onChange={(e) => setAssignmentDrafts(prev => ({
+                                      ...prev,
+                                      [booking.id]: { agentId: e.target.value, note: prev[booking.id]?.note || '' },
+                                    }))}
+                                    className="w-full px-3 py-2 border rounded-lg text-sm"
+                                  >
+                                    <option value="">Select agent</option>
+                                    {agents.map((agent: any) => (
+                                      <option key={agent.id} value={agent.id}>
+                                        {agent.name} · {agent.phone}
+                                      </option>
+                                    ))}
+                                  </select>
+                                  <textarea
+                                    rows={3}
+                                    value={assignmentDrafts[booking.id]?.note || ''}
+                                    onChange={(e) => setAssignmentDrafts(prev => ({
+                                      ...prev,
+                                      [booking.id]: { agentId: prev[booking.id]?.agentId || '', note: e.target.value },
+                                    }))}
+                                    placeholder="Optional assignment note"
+                                    className="w-full px-3 py-2 border rounded-lg text-sm"
+                                  />
+                                  <button
+                                    onClick={() => handleAssignAgent(booking.id)}
+                                    disabled={assigningId === booking.id}
+                                    className="px-3 py-2 text-sm bg-blue-600 text-white rounded-lg hover:bg-blue-700 disabled:opacity-50"
+                                  >
+                                    {assigningId === booking.id ? 'Assigning…' : 'Assign Agent'}
+                                  </button>
+                                </div>
+                              </div>
+
+                              <div className="bg-white rounded-lg border p-4">
+                                <div className="flex items-center justify-between mb-3">
+                                  <h3 className="text-sm font-semibold text-gray-900">Booking Ledger</h3>
+                                  <button
+                                    onClick={() => fetchLedger(booking.id)}
+                                    className="text-sm text-blue-600 hover:underline"
+                                  >
+                                    Refresh ledger
+                                  </button>
+                                </div>
+                                <div className="space-y-3">
+                                  <textarea
+                                    rows={3}
+                                    value={ledgerNotes[booking.id] || ''}
+                                    onChange={(e) => setLedgerNotes(prev => ({ ...prev, [booking.id]: e.target.value }))}
+                                    placeholder="Add follow-up note for this booking"
+                                    className="w-full px-3 py-2 border rounded-lg text-sm"
+                                  />
+                                  <button
+                                    onClick={() => handleAddLedgerNote(booking.id)}
+                                    disabled={ledgerNotesSavingId === booking.id}
+                                    className="px-3 py-2 text-sm bg-gray-900 text-white rounded-lg hover:bg-black disabled:opacity-50"
+                                  >
+                                    {ledgerNotesSavingId === booking.id ? 'Saving…' : 'Add Ledger Note'}
+                                  </button>
+
+                                  <div className="max-h-56 overflow-y-auto space-y-2">
+                                    {ledgerLoadingId === booking.id ? (
+                                      <div className="text-sm text-gray-500">Loading ledger…</div>
+                                    ) : (ledgerByBooking[booking.id] || []).length > 0 ? (
+                                      (ledgerByBooking[booking.id] || []).map((entry: any) => (
+                                        <div key={entry.id} className="border rounded-lg p-3 bg-gray-50">
+                                          <div className="flex items-center justify-between gap-2">
+                                            <span className="text-xs font-semibold text-gray-900">{entry.action.replace(/_/g, ' ')}</span>
+                                            <span className="text-xs text-gray-500">{new Date(entry.createdAt).toLocaleString()}</span>
+                                          </div>
+                                          <div className="text-xs text-gray-500 mt-1">{entry.actorUser ? `${entry.actorUser.firstName} ${entry.actorUser.lastName}` : entry.actorRole}</div>
+                                          {entry.note && <div className="text-sm text-gray-700 mt-2">{entry.note}</div>}
+                                        </div>
+                                      ))
+                                    ) : (
+                                      <div className="text-sm text-gray-500">No ledger entries yet.</div>
+                                    )}
+                                  </div>
+                                </div>
                               </div>
                             </div>
                           </td>
