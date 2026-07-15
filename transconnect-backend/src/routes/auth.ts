@@ -4,12 +4,32 @@ import jwt from 'jsonwebtoken';
 import { prisma } from '../lib/prisma';
 import { body, validationResult } from 'express-validator';
 import { EmailService } from '../services/email.service';
+import EmailOTPService from '../services/email-otp.service';
 import { authenticateToken } from '../middleware/auth';
-import { sendOtp, verifyOtpCode } from '../tools/agents/otp.tool';
+import { sendOtp, sendOtpForIdentifier, verifyOtpCode, verifyOtpCodeForIdentifier } from '../tools/agents/otp.tool';
 import MultiProviderSMSService from '../services/multi-provider-sms.service';
 import { PhoneNormalizer } from '../utils/phone-normalizer';
+import { validateAndNormalizeContact } from '../utils/contact-validation';
 
 const router = Router();
+
+async function issueEmailVerificationOtp(email: string, firstName?: string) {
+  const otpResult = await sendOtpForIdentifier(email, 'email');
+  const emailOtpService = EmailOTPService.getInstance();
+
+  const emailResult = await emailOtpService.sendOTP({
+    email,
+    otp: otpResult.otp,
+    agentName: firstName,
+    type: 'registration',
+  });
+
+  return {
+    otpExpiry: otpResult.expiry,
+    sent: emailResult.success,
+    error: emailResult.error,
+  };
+}
 
 // Register user
 router.post('/register', [
@@ -17,7 +37,7 @@ router.post('/register', [
   body('password').isLength({ min: 6 }),
   body('firstName').isLength({ min: 2 }),
   body('lastName').isLength({ min: 2 }),
-  body('phone').isLength({ min: 10 }).matches(/^[\+]?[0-9\-\(\)\s]+$/),
+  body('phone').isLength({ min: 10 }).matches(/^[\+0-9\-\(\)\s]+$/),
   body('role').optional().isIn(['PASSENGER', 'ADMIN', 'OPERATOR'])
 ], async (req: Request, res: Response) => {
   try {
@@ -28,10 +48,28 @@ router.post('/register', [
 
     const { email, password, firstName, lastName, phone, role } = req.body;
 
+    const contactValidation = validateAndNormalizeContact({ email, phone, defaultCountry: 'UG' });
+    if (!contactValidation.isValid) {
+      return res.status(400).json({
+        error: 'Invalid contact information',
+        details: contactValidation.errors,
+      });
+    }
+
+    const normalizedEmail = contactValidation.normalizedEmail!;
+    const normalizedPhone = contactValidation.normalizedPhone!;
+
     // Check if user exists
-    const existingUser = await prisma.user.findUnique({ where: { email } });
+    const existingUser = await prisma.user.findFirst({
+      where: {
+        OR: [
+          { email: normalizedEmail },
+          { phone: normalizedPhone },
+        ],
+      },
+    });
     if (existingUser) {
-      return res.status(400).json({ error: 'User already exists' });
+      return res.status(400).json({ error: 'A user with this email or phone number already exists' });
     }
 
     // Hash password
@@ -44,13 +82,13 @@ router.post('/register', [
     // Create user
     const user = await prisma.user.create({
       data: {
-        email,
+        email: normalizedEmail,
         password: hashedPassword,
         firstName,
         lastName,
-        phone,
+        phone: normalizedPhone,
         role: userRole,
-        verified: true // Set as verified for MVP
+        verified: false
       },
       select: {
         id: true,
@@ -63,26 +101,120 @@ router.post('/register', [
       }
     });
 
-    // Generate JWT token with 30-day expiry
-    const token = jwt.sign(
-      { userId: user.id, email: user.email, role: user.role },
-      process.env.JWT_SECRET!,
-      { expiresIn: '30d' }
-    );
-
-    // Calculate expiry timestamp
-    const expiresAt = new Date();
-    expiresAt.setDate(expiresAt.getDate() + 30);
+    const emailVerification = await issueEmailVerificationOtp(normalizedEmail, firstName);
 
     res.status(201).json({ 
       user, 
-      token,
-      expiresIn: process.env.JWT_EXPIRES_IN || '30d',
-      expiresAt: expiresAt.toISOString()
+      verificationRequired: true,
+      verificationChannel: 'email',
+      verificationDelivery: {
+        emailSent: emailVerification.sent,
+        message: emailVerification.sent
+          ? 'Verification code sent to your email address'
+          : 'Account created, but email delivery failed. Please use resend verification.',
+      },
     });
   } catch (error) {
     console.error('Registration error:', error);
     res.status(500).json({ error: 'Registration failed' });
+  }
+});
+
+// Verify email OTP and activate account
+router.post('/verify-email-otp', [
+  body('email').isEmail().normalizeEmail(),
+  body('otp').isLength({ min: 6, max: 6 }).withMessage('OTP must be 6 digits'),
+], async (req: Request, res: Response) => {
+  try {
+    const errors = validationResult(req);
+    if (!errors.isEmpty()) {
+      return res.status(400).json({ errors: errors.array() });
+    }
+
+    const { email, otp } = req.body;
+    const normalizedEmail = String(email).trim().toLowerCase();
+
+    const user = await prisma.user.findUnique({ where: { email: normalizedEmail } });
+    if (!user) {
+      return res.status(404).json({ error: 'User not found' });
+    }
+
+    if (user.verified) {
+      return res.status(200).json({ message: 'Email already verified' });
+    }
+
+    const otpValid = await verifyOtpCodeForIdentifier(normalizedEmail, otp, 'email');
+    if (!otpValid) {
+      return res.status(400).json({ error: 'Invalid or expired verification code' });
+    }
+
+    const verifiedUser = await prisma.user.update({
+      where: { id: user.id },
+      data: { verified: true },
+      select: {
+        id: true,
+        email: true,
+        firstName: true,
+        lastName: true,
+        phone: true,
+        role: true,
+        verified: true,
+      },
+    });
+
+    const token = jwt.sign(
+      { userId: verifiedUser.id, email: verifiedUser.email, role: verifiedUser.role },
+      process.env.JWT_SECRET!,
+      { expiresIn: '30d' }
+    );
+
+    const expiresAt = new Date();
+    expiresAt.setDate(expiresAt.getDate() + 30);
+
+    return res.status(200).json({
+      message: 'Email verified successfully',
+      user: verifiedUser,
+      token,
+      expiresIn: process.env.JWT_EXPIRES_IN || '30d',
+      expiresAt: expiresAt.toISOString(),
+    });
+  } catch (error) {
+    console.error('Verify email OTP error:', error);
+    return res.status(500).json({ error: 'Failed to verify email' });
+  }
+});
+
+// Resend verification email OTP
+router.post('/resend-email-verification', [
+  body('email').isEmail().normalizeEmail(),
+], async (req: Request, res: Response) => {
+  try {
+    const errors = validationResult(req);
+    if (!errors.isEmpty()) {
+      return res.status(400).json({ errors: errors.array() });
+    }
+
+    const normalizedEmail = String(req.body.email).trim().toLowerCase();
+    const user = await prisma.user.findUnique({ where: { email: normalizedEmail } });
+
+    if (!user) {
+      return res.status(200).json({ message: 'If the account exists, a verification code has been sent.' });
+    }
+
+    if (user.verified) {
+      return res.status(200).json({ message: 'This account is already verified.' });
+    }
+
+    const emailVerification = await issueEmailVerificationOtp(normalizedEmail, user.firstName);
+
+    return res.status(200).json({
+      message: emailVerification.sent
+        ? 'Verification code sent successfully.'
+        : 'Unable to deliver verification email right now. Please try again later.',
+    });
+  } catch (error) {
+    console.error('Resend verification OTP error:', error);
+    return res.status(500).json({ error: 'Failed to resend verification code' });
   }
 });
 
@@ -109,6 +241,14 @@ router.post('/login', [
     const isValidPassword = await bcrypt.compare(password, user.password);
     if (!isValidPassword) {
       return res.status(401).json({ error: 'Invalid credentials' });
+    }
+
+    if (!user.verified) {
+      return res.status(403).json({
+        error: 'Account not verified. Please verify your email before logging in.',
+        code: 'EMAIL_VERIFICATION_REQUIRED',
+        verificationRequired: true,
+      });
     }
 
     // Generate JWT with 30-day expiry
@@ -286,12 +426,24 @@ router.put('/profile', [
 
     const { firstName, lastName, phone } = req.body;
 
+    let normalizedPhone: string | undefined;
+    if (typeof phone === 'string') {
+      const contactValidation = validateAndNormalizeContact({ phone, defaultCountry: 'UG' });
+      if (!contactValidation.isValid) {
+        return res.status(400).json({
+          error: 'Invalid contact information',
+          details: contactValidation.errors,
+        });
+      }
+      normalizedPhone = contactValidation.normalizedPhone;
+    }
+
     const updatedUser = await prisma.user.update({
       where: { id: decoded.userId },
       data: {
         ...(firstName && { firstName }),
         ...(lastName && { lastName }),
-        ...(phone && { phone })
+        ...(normalizedPhone && { phone: normalizedPhone })
       },
       select: {
         id: true,

@@ -11,6 +11,7 @@ import LoginScreen from '../screens/auth/LoginScreen';
 import RegisterScreen from '../screens/auth/RegisterScreen';
 import ForgotPasswordScreen from '../screens/auth/ForgotPasswordScreen';
 import PhoneLoginScreen from '../screens/auth/PhoneLoginScreen';
+import EmailVerificationScreen from '../screens/auth/EmailVerificationScreen';
 
 // Main App Screens
 import HomeScreen from '../screens/home/HomeScreen';
@@ -43,6 +44,7 @@ const AuthStack = () => (
     <Stack.Screen name="Register" component={RegisterScreen} />
     <Stack.Screen name="ForgotPassword" component={ForgotPasswordScreen} />
     <Stack.Screen name="PhoneLogin" component={PhoneLoginScreen} />
+    <Stack.Screen name="EmailVerification" component={EmailVerificationScreen} />
   </Stack.Navigator>
 );
 

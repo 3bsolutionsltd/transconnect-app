@@ -73,6 +73,29 @@ const PLATFORM_ROLE_OPTIONS = [
   'PASSENGER',
 ] as const;
 
+const normalizeEmail = (email: string) => email.trim().toLowerCase();
+
+const sanitizePhone = (phone: string) => phone.trim();
+
+const validateEmailContent = (email: string): string | null => {
+  const normalized = normalizeEmail(email);
+  if (!normalized) return 'Email is required';
+  if (!/^[^\s@]+@[^\s@]+\.[^\s@]{2,}$/.test(normalized)) return 'Please enter a valid email address';
+  if (normalized.includes('..')) return 'Email cannot contain consecutive dots';
+  return null;
+};
+
+const validatePhoneContent = (phone: string): string | null => {
+  const sanitized = sanitizePhone(phone);
+  if (!sanitized) return 'Phone number is required';
+  if (!/^[+\d\s()-]+$/.test(sanitized)) return 'Phone number contains invalid characters';
+  if ((sanitized.match(/\+/g) || []).length > 1) return 'Phone number format is invalid';
+  if (sanitized.includes(',') || sanitized.includes('/') || sanitized.includes(';')) return 'Please enter only one phone number';
+  const digits = sanitized.replace(/\D/g, '');
+  if (digits.length < 9 || digits.length > 15) return 'Phone number must have between 9 and 15 digits';
+  return null;
+};
+
 const UserManagement: React.FC = () => {
   const [activeTab, setActiveTab] = useState<'users' | 'operator-users'>('users');
   const [users, setUsers] = useState<User[]>([]);
@@ -225,9 +248,27 @@ const UserManagement: React.FC = () => {
   };
 
   const handleCreateOperatorUser = async () => {
+    const emailError = validateEmailContent(createOperatorUserForm.email);
+    if (emailError) {
+      alert(emailError);
+      return;
+    }
+
+    const phoneError = validatePhoneContent(createOperatorUserForm.phone);
+    if (phoneError) {
+      alert(phoneError);
+      return;
+    }
+
+    const payload = {
+      ...createOperatorUserForm,
+      email: normalizeEmail(createOperatorUserForm.email),
+      phone: sanitizePhone(createOperatorUserForm.phone),
+    };
+
     try {
       setCreateLoading(true);
-      await api.post('/admin/operator-users/create', createOperatorUserForm);
+      await api.post('/admin/operator-users/create', payload);
       
       // Reset form
       setCreateOperatorUserForm({
@@ -252,9 +293,27 @@ const UserManagement: React.FC = () => {
   };
 
   const handleCreatePlatformUser = async () => {
+    const emailError = validateEmailContent(createPlatformUserForm.email);
+    if (emailError) {
+      alert(emailError);
+      return;
+    }
+
+    const phoneError = validatePhoneContent(createPlatformUserForm.phone);
+    if (phoneError) {
+      alert(phoneError);
+      return;
+    }
+
+    const payload = {
+      ...createPlatformUserForm,
+      email: normalizeEmail(createPlatformUserForm.email),
+      phone: sanitizePhone(createPlatformUserForm.phone),
+    };
+
     try {
       setCreatePlatformUserLoading(true);
-      await api.post('/users', createPlatformUserForm);
+      await api.post('/users', payload);
 
       setCreatePlatformUserForm({
         firstName: '',
@@ -307,11 +366,28 @@ const UserManagement: React.FC = () => {
 
   const handleEditOperatorUser = async () => {
     if (!editOperatorUserForm) return;
+
+    const emailError = validateEmailContent(editOperatorUserForm.email);
+    if (emailError) {
+      alert(emailError);
+      return;
+    }
+
+    const phoneError = validatePhoneContent(editOperatorUserForm.phone);
+    if (phoneError) {
+      alert(phoneError);
+      return;
+    }
     
     try {
       setEditLoading(true);
       const { id, ...updateData } = editOperatorUserForm;
-      await api.put(`/admin/operator-users/${id}`, updateData);
+      const payload = {
+        ...updateData,
+        email: normalizeEmail(updateData.email),
+        phone: sanitizePhone(updateData.phone),
+      };
+      await api.put(`/admin/operator-users/${id}`, payload);
       
       setShowEditOperatorUserModal(false);
       setEditOperatorUserForm(null);
@@ -1271,9 +1347,11 @@ const UserManagement: React.FC = () => {
                 value={createPlatformUserForm.lastName}
                 onChange={(e) => setCreatePlatformUserForm({ ...createPlatformUserForm, lastName: e.target.value })} />
               <input className="px-3 py-2 border rounded-lg" placeholder="Email"
+                type="email"
                 value={createPlatformUserForm.email}
                 onChange={(e) => setCreatePlatformUserForm({ ...createPlatformUserForm, email: e.target.value })} />
               <input className="px-3 py-2 border rounded-lg" placeholder="Phone"
+                type="tel"
                 value={createPlatformUserForm.phone}
                 onChange={(e) => setCreatePlatformUserForm({ ...createPlatformUserForm, phone: e.target.value })} />
               <input className="px-3 py-2 border rounded-lg" type="password" placeholder="Password"

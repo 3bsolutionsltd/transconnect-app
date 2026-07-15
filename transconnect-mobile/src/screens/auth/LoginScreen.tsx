@@ -34,6 +34,24 @@ export default function LoginScreen({ navigation }: any) {
       // If we reach here, login was successful
     } catch (error: any) {
       console.error('Login screen error:', error);
+
+      if (error?.response?.data?.code === 'EMAIL_VERIFICATION_REQUIRED') {
+        Alert.alert(
+          'Email Verification Required',
+          'Please verify your email to continue.',
+          [
+            {
+              text: 'Verify Email',
+              onPress: () => navigation.navigate('EmailVerification', { email }),
+            },
+            {
+              text: 'Cancel',
+              style: 'cancel',
+            },
+          ]
+        );
+        return;
+      }
       
       // Show actual API error or generic message
       let errorMessage = 'Invalid credentials. Please check your email and password.';

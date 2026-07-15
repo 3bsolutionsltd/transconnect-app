@@ -16,7 +16,8 @@ interface AuthContextType {
   token: string | null;
   isLoading: boolean;
   login: (credentials: LoginCredentials) => Promise<void>;
-  register: (userData: RegisterData) => Promise<void>;
+  register: (userData: RegisterData) => Promise<{ verificationRequired: boolean; email?: string }>;
+  setAuthSession: (session: { user: User; token: string; expiresAt?: string; expiresIn?: string }) => Promise<void>;
   logout: () => Promise<void>;
   updateUser: (userData: Partial<User>) => Promise<void>;
   isAuthenticated: boolean;
@@ -46,6 +47,24 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   useEffect(() => {
     checkAuthState();
   }, []);
+
+  const setAuthSession = async (session: { user: User; token: string; expiresAt?: string; expiresIn?: string }) => {
+    const { user: userData, token: authToken, expiresAt, expiresIn } = session;
+
+    await secureStorage.setItem('auth_token', authToken);
+    await secureStorage.setItem('user_data', JSON.stringify(userData));
+
+    if (expiresAt) {
+      await secureStorage.setItem('token_expires_at', expiresAt);
+      console.log('\u2705 Token expires at:', expiresAt);
+    }
+    if (expiresIn) {
+      console.log('\u2705 Token valid for:', expiresIn);
+    }
+
+    setUser(userData);
+    setToken(authToken);
+  };
 
   const checkAuthState = async () => {
     try {
@@ -91,21 +110,8 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       console.log('Login response received:', response.data);
       
       const { user: userData, token: authToken, expiresAt, expiresIn } = response.data;
-      
-      await secureStorage.setItem('auth_token', authToken);
-      await secureStorage.setItem('user_data', JSON.stringify(userData));
-      
-      // Store token expiry information
-      if (expiresAt) {
-        await secureStorage.setItem('token_expires_at', expiresAt);
-        console.log('\u2705 Token expires at:', expiresAt);
-      }
-      if (expiresIn) {
-        console.log('\u2705 Token valid for:', expiresIn);
-      }
-      
-      setUser(userData);
-      setToken(authToken);
+
+      await setAuthSession({ user: userData, token: authToken, expiresAt, expiresIn });
       console.log('✅ Login successful');
     } catch (error: any) {
       console.error('❌ Login error:', error.response?.data || error.message);
@@ -132,12 +138,8 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         if (demoUser) {
           const { password, ...userData } = demoUser;
           const demoToken = 'demo-token-' + Date.now();
-          
-          await secureStorage.setItem('auth_token', demoToken);
-          await secureStorage.setItem('user_data', JSON.stringify(userData));
-          
-          setUser(userData as User);
-          setToken(demoToken);
+
+          await setAuthSession({ user: userData as User, token: demoToken });
           console.log('✅ Demo mode login successful for:', demoUser.email);
           return;
         } else {
@@ -152,26 +154,27 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     }
   };
 
-  const register = async (userData: RegisterData) => {
+  const register = async (userData: RegisterData): Promise<{ verificationRequired: boolean; email?: string }> => {
     try {
       setIsLoading(true);
       const response = await authApi.register(userData);
-      const { user: newUser, token: authToken, expiresAt, expiresIn } = response.data;
-      
-      await secureStorage.setItem('auth_token', authToken);
-      await secureStorage.setItem('user_data', JSON.stringify(newUser));
-      
-      // Store token expiry information
-      if (expiresAt) {
-        await secureStorage.setItem('token_expires_at', expiresAt);
-        console.log('\u2705 Token expires at:', expiresAt);
+      const {
+        user: newUser,
+        token: authToken,
+        expiresAt,
+        expiresIn,
+        verificationRequired,
+      } = response.data;
+
+      if (verificationRequired || !authToken) {
+        return {
+          verificationRequired: true,
+          email: newUser?.email || userData.email,
+        };
       }
-      if (expiresIn) {
-        console.log('\u2705 Token valid for:', expiresIn);
-      }
-      
-      setUser(newUser);
-      setToken(authToken);
+
+      await setAuthSession({ user: newUser, token: authToken, expiresAt, expiresIn });
+      return { verificationRequired: false };
     } catch (error) {
       throw error;
     } finally {
@@ -209,6 +212,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     isLoading,
     login,
     register,
+    setAuthSession,
     logout,
     updateUser,
     isAuthenticated: !!user && !!token,

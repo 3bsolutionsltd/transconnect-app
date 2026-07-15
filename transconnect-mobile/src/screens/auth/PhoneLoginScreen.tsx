@@ -19,7 +19,7 @@ import { useAuth } from '../../contexts/AuthContext';
 const OTP_LENGTH = 6;
 
 export default function PhoneLoginScreen({ navigation }: any) {
-  const { login } = useAuth();
+  const { setAuthSession } = useAuth();
 
   // Step 1: phone entry  |  Step 2: OTP verification
   const [step, setStep] = useState<'phone' | 'otp'>('phone');
@@ -108,19 +108,7 @@ export default function PhoneLoginScreen({ navigation }: any) {
       // Backend returns: { user, token, expiresIn, expiresAt, isNewUser, message }
       const { token, user, expiresAt, expiresIn, isNewUser } = response.data;
       
-      // Store token and user data
-      const SecureStore = require('expo-secure-store');
-      await SecureStore.setItemAsync('auth_token', token);
-      await SecureStore.setItemAsync('user_data', JSON.stringify(user));
-      if (expiresAt) {
-        await SecureStore.setItemAsync('token_expires_at', expiresAt);
-      }
-      
-      // Navigate using login context or direct navigation
-      if (login && typeof login === 'function') {
-        // If login function is available from AuthContext, use it
-        await login({ email: user.email, password: '' }, token, user);
-      }
+      await setAuthSession({ user, token, expiresAt, expiresIn });
       
       // Show welcome message for new users
       if (isNewUser) {

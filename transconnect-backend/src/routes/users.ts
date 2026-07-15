@@ -2,6 +2,7 @@ import { Router, Request, Response } from 'express';
 import { prisma } from '../lib/prisma';
 import { authenticateToken } from '../middleware/auth';
 import bcrypt from 'bcryptjs';
+import { validateAndNormalizeContact } from '../utils/contact-validation';
 
 const router = Router();
 
@@ -30,6 +31,17 @@ router.post('/', authenticateToken, async (req: Request, res: Response) => {
       return res.status(400).json({ error: 'email, password, firstName, lastName, phone, and role are required' });
     }
 
+    const contactValidation = validateAndNormalizeContact({ email, phone, defaultCountry: 'UG' });
+    if (!contactValidation.isValid) {
+      return res.status(400).json({
+        error: 'Invalid contact information',
+        details: contactValidation.errors,
+      });
+    }
+
+    const normalizedEmail = contactValidation.normalizedEmail!;
+    const normalizedPhone = contactValidation.normalizedPhone!;
+
     if (!PLATFORM_MANAGED_ROLES.includes(role)) {
       return res.status(400).json({ error: 'Invalid role provided' });
     }
@@ -44,7 +56,7 @@ router.post('/', authenticateToken, async (req: Request, res: Response) => {
 
     const existingUser = await prisma.user.findFirst({
       where: {
-        OR: [{ email }, { phone }],
+        OR: [{ email: normalizedEmail }, { phone: normalizedPhone }],
       },
     });
 
@@ -57,11 +69,11 @@ router.post('/', authenticateToken, async (req: Request, res: Response) => {
     const createdUser = await prisma.$transaction(async tx => {
       const user = await tx.user.create({
         data: {
-          email,
+          email: normalizedEmail,
           password: hashedPassword,
           firstName,
           lastName,
-          phone,
+          phone: normalizedPhone,
           role,
           verified,
         },
@@ -261,13 +273,57 @@ router.put('/:id', authenticateToken, async (req: Request, res: Response) => {
       return res.status(400).json({ error: 'Invalid role provided' });
     }
 
+    const emailInRequest = typeof req.body.email === 'string' ? req.body.email : undefined;
+    const phoneInRequest = typeof phone === 'string' ? phone : undefined;
+
+    let normalizedEmail = emailInRequest;
+    let normalizedPhone = phoneInRequest;
+    if (emailInRequest !== undefined || phoneInRequest !== undefined) {
+      const contactValidation = validateAndNormalizeContact({
+        email: emailInRequest,
+        phone: phoneInRequest,
+        defaultCountry: 'UG',
+      });
+
+      if (!contactValidation.isValid) {
+        return res.status(400).json({
+          error: 'Invalid contact information',
+          details: contactValidation.errors,
+        });
+      }
+
+      normalizedEmail = contactValidation.normalizedEmail ?? emailInRequest;
+      normalizedPhone = contactValidation.normalizedPhone ?? phoneInRequest;
+    }
+
+    if (normalizedEmail || normalizedPhone) {
+      const conflictingUser = await prisma.user.findFirst({
+        where: {
+          AND: [
+            { id: { not: id } },
+            {
+              OR: [
+                ...(normalizedEmail ? [{ email: normalizedEmail }] : []),
+                ...(normalizedPhone ? [{ phone: normalizedPhone }] : []),
+              ],
+            },
+          ],
+        },
+      });
+
+      if (conflictingUser) {
+        return res.status(400).json({ error: 'A user with this email or phone number already exists' });
+      }
+    }
+
     const updatedUser = await prisma.$transaction(async tx => {
       const user = await tx.user.update({
         where: { id },
         data: {
           firstName,
           lastName,
-          phone,
+          ...(normalizedEmail && { email: normalizedEmail }),
+          ...(normalizedPhone && { phone: normalizedPhone }),
           role,
           verified
         },

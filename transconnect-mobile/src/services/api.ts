@@ -150,6 +150,12 @@ export const authApi = {
   
   register: (userData: any) =>
     apiClient.post('/auth/register', userData),
+
+  verifyEmailOtp: (payload: { email: string; otp: string }) =>
+    apiClient.post('/auth/verify-email-otp', payload),
+
+  resendEmailVerification: (email: string) =>
+    apiClient.post('/auth/resend-email-verification', { email }),
   
   getCurrentUser: () =>
     apiClient.get('/auth/me'),
