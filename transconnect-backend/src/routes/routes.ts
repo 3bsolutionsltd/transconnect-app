@@ -84,15 +84,46 @@ router.get('/', async (req: Request, res: Response) => {
       const directRoutes = await prisma.route.findMany({
         where: {
           active: true,
-          origin: { contains: origin as string, mode: 'insensitive' },
-          destination: { contains: destination as string, mode: 'insensitive' }
+          OR: [
+            // Exact or partial match
+            {
+              AND: [
+                { origin: { contains: origin as string, mode: 'insensitive' } },
+                { destination: { contains: destination as string, mode: 'insensitive' } }
+              ]
+            },
+            // If no exact matches, just return all active routes (user can filter manually)
+            {}
+          ]
         },
         include: {
           operator: { select: { id: true, companyName: true, approved: true } },
-          bus: { select: { id: true, plateNumber: true, model: true, capacity: true } }
-        }
+          bus: { select: { id: true, plateNumber: true, model: true, capacity: true, amenities: true } },
+          stops: { orderBy: { order: 'asc' } }
+        },
+        take: 50 // Limit to prevent overwhelming results
       });
       console.log('Direct route search found:', directRoutes.length, 'routes');
+      
+      // If still no results, return all active routes with a message
+      if (directRoutes.length === 0) {
+        console.log('No routes found for criteria, returning all active routes');
+        const allActiveRoutes = await prisma.route.findMany({
+          where: { active: true },
+          include: {
+            operator: { select: { id: true, companyName: true, approved: true } },
+            bus: { select: { id: true, plateNumber: true, model: true, capacity: true, amenities: true } },
+            stops: { orderBy: { order: 'asc' } }
+          },
+          take: 50
+        });
+        return res.json({
+          routes: allActiveRoutes,
+          message: `No routes found for ${origin} to ${destination}. Showing all active routes.`,
+          showingAll: true
+        });
+      }
+      
       return res.json(directRoutes);
     }
 
