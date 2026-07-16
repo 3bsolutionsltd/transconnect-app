@@ -35,6 +35,21 @@ const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => 
   const [user, setUser] = useState<User | null>(null);
   const [loading, setLoading] = useState(true);
 
+  const readResponseError = async (response: Response): Promise<string> => {
+    const rawBody = await response.text();
+
+    if (!rawBody) {
+      return `Request failed with status ${response.status}`;
+    }
+
+    try {
+      const parsed = JSON.parse(rawBody);
+      return parsed.error || parsed.message || rawBody;
+    } catch {
+      return rawBody;
+    }
+  };
+
   useEffect(() => {
     // Check for stored auth token on app load
     const token = localStorage.getItem('admin_token');
@@ -58,6 +73,9 @@ const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => 
               localStorage.removeItem('admin_token');
               localStorage.removeItem('admin_user');
               setUser(null);
+            } else if (response.status === 429) {
+              console.warn('⚠️ Auth validation rate-limited; keeping stored session for now');
+              setUser(parsedUser);
             } else if (response.ok) {
               console.log(`✅ ${parsedUser.role} token valid, setting user:`, parsedUser.email);
               setUser(parsedUser);
@@ -96,8 +114,8 @@ const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => 
       });
 
       if (!response.ok) {
-        const errorData = await response.json();
-        throw new Error(errorData.error || 'Login failed');
+        const errorMessage = await readResponseError(response);
+        throw new Error(errorMessage || 'Login failed');
       }
 
       const data = await response.json();
