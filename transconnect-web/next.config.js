@@ -1,19 +1,24 @@
 /** @type {import('next').NextConfig} */
 const nextConfig = {
   images: {
+    // Use remotePatterns for more flexible domain matching
+    remotePatterns: [
+      {
+        protocol: 'https',
+        hostname: '**', // Allow all HTTPS domains for operator branding images
+      },
+      {
+        protocol: 'http',
+        hostname: 'localhost', // Allow localhost for development
+      },
+    ],
+    // Fallback domains list (deprecated but kept for compatibility)
     domains: [
       'localhost', 
       'transconnect.app', 
       'www.transconnect.app',
       'admin.transconnect.app',
       'operators.transconnect.app',
-      // External image hosting services for operator branding
-      'storage.googleapis.com', // Google Cloud Storage
-      'res.cloudinary.com',      // Cloudinary
-      'images.unsplash.com',     // Unsplash
-      'source.unsplash.com',     // Unsplash source
-      'cdn.pixabay.com',         // Pixabay
-      'images.pexels.com',       // Pexels
     ],
   },
   env: {
