@@ -47,15 +47,24 @@ app.use('/routes', routeRoutes);
 describe('Complete Booking Flow Integration', () => {
   const testUser = createTestUser();
   const testRoute = createTestRoute();
+  const token = 'test-token';
 
   beforeEach(() => {
     jest.clearAllMocks();
+    mockPrisma.user.findUnique.mockReset();
+    mockPrisma.user.findFirst.mockReset();
+    mockPrisma.route.findUnique.mockReset();
+    mockPrisma.booking.findFirst.mockReset();
+    mockPrisma.booking.findUnique.mockReset();
+    mockPrisma.booking.findMany.mockReset();
+    mockPrisma.booking.create.mockReset();
+    mockPrisma.booking.update.mockReset();
   });
 
   describe('End-to-End Booking Process', () => {
     it('should complete full user journey: register -> login -> search routes -> book -> view booking', async () => {
       // Step 1: User Registration
-      mockPrisma.user.findUnique.mockResolvedValueOnce(null); // No existing user
+      mockPrisma.user.findFirst.mockResolvedValueOnce(null); // No existing user
       mockPrisma.user.create.mockResolvedValueOnce(testUser);
 
       const registerResponse = await request(app)
@@ -70,10 +79,9 @@ describe('Complete Booking Flow Integration', () => {
         });
 
       expect(registerResponse.status).toBe(201);
-      expect(registerResponse.body).toHaveProperty('token');
       expect(registerResponse.body).toHaveProperty('user');
-
-      const token = registerResponse.body.token;
+      expect(registerResponse.body).toHaveProperty('verificationRequired', true);
+      expect(registerResponse.body).toHaveProperty('verificationChannel', 'email');
 
       // Step 2: Search for routes (origin+destination triggers segment-based search)
       const mockSegmentResult = [{
@@ -238,7 +246,7 @@ describe('Complete Booking Flow Integration', () => {
 
       const firstResponse = await request(app)
         .post('/bookings')
-        .set('Authorization', `Bearer test-token`)
+        .set('Authorization', `Bearer ${token}`)
         .send({
           routeId: testRoute.id,
           seatNumbers: ['5'],
@@ -254,7 +262,7 @@ describe('Complete Booking Flow Integration', () => {
 
       const secondResponse = await request(app)
         .post('/bookings')
-        .set('Authorization', `Bearer test-token`)
+        .set('Authorization', `Bearer ${token}`)
         .send({
           routeId: testRoute.id,
           seatNumbers: ['5'],
@@ -294,7 +302,7 @@ describe('Complete Booking Flow Integration', () => {
 
       const bookingDetailResponse = await request(app)
         .get(`/bookings/${cancellableBooking.id}`)
-        .set('Authorization', `Bearer test-token`);
+        .set('Authorization', `Bearer ${token}`);
 
       expect(bookingDetailResponse.status).toBe(200);
       expect(bookingDetailResponse.body.status).toBe('CONFIRMED');
@@ -308,7 +316,7 @@ describe('Complete Booking Flow Integration', () => {
 
       const cancelResponse = await request(app)
         .put(`/bookings/${cancellableBooking.id}/cancel`)
-        .set('Authorization', `Bearer test-token`);
+        .set('Authorization', `Bearer ${token}`);
 
       expect(cancelResponse.status).toBe(200);
       expect(cancelResponse.body.status).toBe('CANCELLED');
@@ -363,7 +371,7 @@ describe('Complete Booking Flow Integration', () => {
 
       const response = await request(app)
         .post('/bookings')
-        .set('Authorization', `Bearer test-token`)
+        .set('Authorization', `Bearer ${token}`)
         .send({
           routeId: testRoute.id,
           seatNumbers: ['5'],
