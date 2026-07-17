@@ -6,7 +6,14 @@ const nextConfig = {
       'transconnect.app', 
       'www.transconnect.app',
       'admin.transconnect.app',
-      'operators.transconnect.app'
+      'operators.transconnect.app',
+      // External image hosting services for operator branding
+      'storage.googleapis.com', // Google Cloud Storage
+      'res.cloudinary.com',      // Cloudinary
+      'images.unsplash.com',     // Unsplash
+      'source.unsplash.com',     // Unsplash source
+      'cdn.pixabay.com',         // Pixabay
+      'images.pexels.com',       // Pexels
     ],
   },
   env: {
