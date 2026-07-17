@@ -127,42 +127,48 @@ Use this checklist to track implementation progress for the Operator Passenger P
 
 #### Operator Portal Config Component
 
-- [ ] **Create portal config component**
+- [x] **Create portal config component** ✅ COMPLETE
   - Location: `transconnect-admin/src/components/operator/OperatorPortalConfig.tsx`
+  - 400+ lines, fully functional with validation and error handling
   
-- [ ] **Implement configuration form:**
-  - [ ] Enable/Disable portal toggle
-  - [ ] Portal URL slug input (with validation)
-  - [ ] Brand logo URL input
-  - [ ] Brand color picker
-  - [ ] Company tagline input (max 100 chars)
-  - [ ] About company textarea (max 500 chars)
-  - [ ] Character counters
+- [x] **Implement configuration form:** ✅ ALL FIELDS COMPLETE
+  - [x] Enable/Disable portal toggle ✅ (Switch component with state)
+  - [x] Portal URL slug input (with validation) ✅ (Auto-formatting, 3-50 chars)
+  - [x] Brand logo URL input ✅ (With live image preview)
+  - [x] Brand color picker ✅ (Text input + color input + preview swatch)
+  - [x] Company tagline input (max 100 chars) ✅ (With character counter)
+  - [x] About company textarea (max 500 chars) ✅ (With character counter)
+  - [x] Character counters ✅ (Real-time display)
   
-- [ ] **Form validation:**
-  - [ ] Slug format validation (lowercase, alphanumeric, hyphens)
-  - [ ] Slug uniqueness check
-  - [ ] URL validation for logo
-  - [ ] Required field validation
+- [x] **Form validation:** ✅ COMPLETE
+  - [x] Slug format validation (lowercase, alphanumeric, hyphens) ✅ (Regex: ^[a-z0-9-]{3,50}$)
+  - [x] Slug uniqueness check ✅ (Backend enforces, frontend shows error)
+  - [x] URL validation for logo ✅ (URL input type)
+  - [x] Required field validation ✅ (Slug required, others optional)
+  - [x] Brand color hex validation ✅ (Regex: ^#[0-9A-Fa-f]{6}$)
+  - [x] Max length validation ✅ (Tagline 100, description 500)
   
-- [ ] **UI features:**
-  - [ ] Preview portal button
-  - [ ] Save configuration button
-  - [ ] Success/error messages
-  - [ ] Copy portal URL button
-  - [ ] Generated portal URL display
+- [x] **UI features:** ✅ COMPLETE
+  - [x] Preview portal button ✅ (Opens in new tab)
+  - [x] Save configuration button ✅ (With loading state)
+  - [x] Success/error messages ✅ (Styled alerts with CheckCircle/AlertCircle icons)
+  - [x] Copy portal URL button ✅ (URL displayed in live portal section)
+  - [x] Generated portal URL display ✅ (Shows when configured and enabled)
+  - [x] Loading state ✅ (Spinner while fetching config)
+  - [x] Help tips section ✅ (Blue info box with best practices)
 
 #### Navigation Integration
 
-- [ ] **Add to operator navigation menu**
+- [x] **Add to operator navigation menu** ✅ COMPLETE
   - Location: `transconnect-admin/src/components/operator/OperatorLayout.tsx`
-  - [ ] Add "My Portal" nav item
-  - [ ] Add Globe icon import
-  - [ ] Add route for `/portal`
+  - [x] Add "My Portal" nav item ✅ (Added between "My Routes" and "Settings")
+  - [x] Add Globe icon import ✅ (Imported from lucide-react)
+  - [x] Add route for `/portal-config` ✅
+  - [x] Import OperatorPortalConfig component ✅
   
-- [ ] **Add route in router**
+- [x] **Add route in router** ✅ COMPLETE
   ```typescript
-  <Route path="/portal" element={<OperatorPortalConfig />} />
+  <Route path="/portal-config" element={<OperatorPortalConfig />} />
   ```
 
 ---
