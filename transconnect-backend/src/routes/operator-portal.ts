@@ -90,6 +90,7 @@ router.get('/slug/:slug', requireFeature('OPERATOR_PORTAL'), async (req: Request
         slug: operator.slug,
         brandLogoUrl: operator.brandLogoUrl,
         brandColor: operator.brandColor,
+        heroImageUrl: operator.heroImageUrl,
         tagline: operator.tagline,
         description: operator.description,
         contact: {

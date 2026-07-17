@@ -857,6 +857,7 @@ router.get('/portal-config', [
         slug: true,
         brandLogoUrl: true,
         brandColor: true,
+        heroImageUrl: true,
         tagline: true,
         description: true,
         portalEnabled: true,
@@ -896,6 +897,7 @@ router.patch('/portal-config', [
     .matches(/^[a-z0-9-]+$/).withMessage('Slug must be lowercase alphanumeric with hyphens'),
   body('brandLogoUrl').optional().isURL().withMessage('Brand logo must be a valid URL'),
   body('brandColor').optional().matches(/^#[0-9A-Fa-f]{6}$/).withMessage('Brand color must be a valid hex color'),
+  body('heroImageUrl').optional().isURL().withMessage('Hero image must be a valid URL'),
   body('tagline').optional().isString().isLength({ max: 100 }).withMessage('Tagline must be 100 characters or less'),
   body('description').optional().isString().isLength({ max: 500 }).withMessage('Description must be 500 characters or less'),
   body('portalEnabled').optional().isBoolean().withMessage('Portal enabled must be a boolean')
@@ -913,7 +915,7 @@ router.patch('/portal-config', [
       return res.status(403).json({ error: 'Only operators can update portal configuration' });
     }
 
-    const { slug, brandLogoUrl, brandColor, tagline, description, portalEnabled } = req.body;
+    const { slug, brandLogoUrl, brandColor, heroImageUrl, tagline, description, portalEnabled } = req.body;
 
     // Find operator by user ID
     const operator = await prisma.operator.findUnique({
@@ -940,6 +942,7 @@ router.patch('/portal-config', [
     if (slug !== undefined) updateData.slug = slug.toLowerCase();
     if (brandLogoUrl !== undefined) updateData.brandLogoUrl = brandLogoUrl;
     if (brandColor !== undefined) updateData.brandColor = brandColor;
+    if (heroImageUrl !== undefined) updateData.heroImageUrl = heroImageUrl;
     if (tagline !== undefined) updateData.tagline = tagline;
     if (description !== undefined) updateData.description = description;
     if (portalEnabled !== undefined) updateData.portalEnabled = portalEnabled;
@@ -954,6 +957,7 @@ router.patch('/portal-config', [
         slug: true,
         brandLogoUrl: true,
         brandColor: true,
+        heroImageUrl: true,
         tagline: true,
         description: true,
         portalEnabled: true,

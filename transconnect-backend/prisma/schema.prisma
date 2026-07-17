@@ -105,6 +105,7 @@ model Operator {
   slug          String?  @unique // URL-friendly identifier (e.g., "swift-safaris")
   brandLogoUrl  String? // URL to operator's logo
   brandColor    String? // Hex color code (e.g., "#FF5733")
+  heroImageUrl  String? // Hero background image for portal landing page
   tagline       String? // Short marketing tagline
   description   String?  @db.Text // Detailed operator description
   portalEnabled Boolean  @default(false) // Whether operator portal is active

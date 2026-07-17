@@ -1,30 +1,68 @@
-'use client';
+"use client";
 
-import { useEffect, useState } from 'react';
-import { useParams, useRouter } from 'next/navigation';
-import { Bus, MapPin, Clock, Users, Building, Phone, Mail, AlertCircle } from 'lucide-react';
-import { Button } from '@/components/ui/button';
-import { Card, CardContent } from '@/components/ui/card';
-import { config } from '@/lib/config';
+import { useEffect, useState } from "react";
+import { useParams } from "next/navigation";
+import Link from "next/link";
+import Image from "next/image";
+import { Button } from "@/components/ui/button";
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import {
+  Phone,
+  Mail,
+  MapPin,
+  Calendar,
+  Clock,
+  Users,
+  Bus,
+  TrendingUp,
+  Award,
+  Star,
+  Search,
+  CheckCircle2,
+  Shield,
+  CreditCard,
+  Headphones,
+} from "lucide-react";
+
+// Fixed teal color for all operators
+const TEAL_COLOR = "#00D9A3";
 
 // Types
-interface Bus {
+interface Operator {
   id: string;
-  plateNumber: string;
-  model: string;
-  capacity: number;
-  createdAt: string;
+  companyName: string;
+  license: string;
+  approved: boolean;
+  slug: string;
+  brandLogoUrl: string | null;
+  brandColor: string | null;
+  heroImageUrl: string | null;
+  tagline: string | null;
+  description: string | null;
+  portalEnabled: boolean;
+  contact: {
+    name: string;
+    phone: string | null;
+    email: string | null;
+  };
+  stats: {
+    totalBuses: number;
+    activeRoutes: number;
+    totalTripsCompleted: number;
+    yearsInOperation: number;
+  };
+  routes: Route[];
+  buses: BusData[];
 }
 
 interface Route {
   id: string;
   origin: string;
   destination: string;
+  duration: number;
   price: number;
   departureTime: string;
-  duration: number;
   active: boolean;
-  busId: string;
   bus: {
     plateNumber: string;
     model: string;
@@ -32,138 +70,63 @@ interface Route {
   };
 }
 
-interface OperatorContact {
-  name: string;
-  email: string;
-  phone: string;
-}
-
-interface OperatorStats {
-  totalBuses: number;
-  activeRoutes: number;
-  totalTripsCompleted?: number;
-  yearsInOperation?: string;
-}
-
-interface OperatorPortalData {
+interface BusData {
   id: string;
-  companyName: string;
-  slug: string;
-  brandLogoUrl?: string;
-  brandColor?: string;
-  tagline?: string;
-  description?: string;
-  contact: OperatorContact;
-  buses: Bus[];
-  routes: Route[];
-  stats: OperatorStats;
+  plateNumber: string;
+  model: string;
+  capacity: number;
+  createdAt: string;
 }
 
-interface OperatorResponse {
+interface ApiResponse {
   success: boolean;
-  operator: OperatorPortalData;
+  operator: Operator;
 }
 
 export default function OperatorPortalPage() {
   const params = useParams();
-  const router = useRouter();
-  const slug = params.slug as string;
+  const slug = params?.slug as string;
 
-  const [operator, setOperator] = useState<OperatorPortalData | null>(null);
+  const [operator, setOperator] = useState<Operator | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
-  const [selectedOrigin, setSelectedOrigin] = useState<string>('');
-  const [selectedDestination, setSelectedDestination] = useState<string>('');
+  const [searchFrom, setSearchFrom] = useState("");
+  const [searchTo, setSearchTo] = useState("");
+  const [searchDate, setSearchDate] = useState("");
 
-  // Fetch operator data
   useEffect(() => {
-    const fetchOperatorData = async () => {
+    if (!slug) return;
+
+    async function fetchOperatorData() {
       try {
         setLoading(true);
-        setError(null);
-
-        const response = await fetch(
-          `${config.api.baseURL}/operator-portal/slug/${slug}`,
-          {
-            headers: {
-              'Content-Type': 'application/json',
-            },
-          }
-        );
+        const apiBaseUrl = process.env.NEXT_PUBLIC_API_URL || "http://localhost:5000/api";
+        const response = await fetch(`${apiBaseUrl}/operator-portal/slug/${slug}`);
 
         if (!response.ok) {
           if (response.status === 404) {
-            throw new Error('Operator portal not found or not enabled');
+            throw new Error("Operator not found or portal not enabled");
           }
-          throw new Error('Failed to load operator portal');
+          throw new Error("Failed to load operator data");
         }
 
-        const data: OperatorResponse = await response.json();
-        
-        if (data.success && data.operator) {
-          setOperator(data.operator);
-        } else {
-          throw new Error('Invalid response from server');
-        }
+        const data: ApiResponse = await response.json();
+        setOperator(data.operator);
       } catch (err) {
-        console.error('Error fetching operator data:', err);
-        setError(err instanceof Error ? err.message : 'An error occurred');
+        setError(err instanceof Error ? err.message : "An error occurred");
       } finally {
         setLoading(false);
       }
-    };
-
-    if (slug) {
-      fetchOperatorData();
     }
+
+    fetchOperatorData();
   }, [slug]);
-
-  // Get unique origins and destinations from routes
-  const origins = operator?.routes
-    ? Array.from(new Set(operator.routes.map((r) => r.origin))).sort()
-    : [];
-  const destinations = operator?.routes
-    ? Array.from(new Set(operator.routes.map((r) => r.destination))).sort()
-    : [];
-
-  // Filter routes based on selection
-  const filteredRoutes = operator?.routes.filter((route) => {
-    const matchesOrigin = !selectedOrigin || route.origin === selectedOrigin;
-    const matchesDestination = !selectedDestination || route.destination === selectedDestination;
-    return matchesOrigin && matchesDestination && route.active;
-  }) || [];
-
-  // Handle route booking
-  const handleBookRoute = (routeId: string) => {
-    router.push(`/search?routeId=${routeId}`);
-  };
-
-  // Format duration (minutes to hours/minutes)
-  const formatDuration = (minutes: number) => {
-    const hours = Math.floor(minutes / 60);
-    const mins = minutes % 60;
-    if (hours === 0) return `${mins}m`;
-    if (mins === 0) return `${hours}h`;
-    return `${hours}h ${mins}m`;
-  };
-
-  // Format price
-  const formatPrice = (price: number) => {
-    return new Intl.NumberFormat('en-UG', {
-      style: 'currency',
-      currency: 'UGX',
-      minimumFractionDigits: 0,
-    }).format(price);
-  };
 
   // Loading state
   if (loading) {
     return (
-      <div className="min-h-screen flex items-center justify-center bg-gray-50">
-        <div className="text-center">
-          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600 mx-auto mb-4"></div>
-          <p className="text-gray-600">Loading operator portal...</p>
-        </div>
+      <div className="min-h-screen flex items-center justify-center bg-white">
+        <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-[#00D9A3]"></div>
       </div>
     );
   }
@@ -171,307 +134,378 @@ export default function OperatorPortalPage() {
   // Error state
   if (error || !operator) {
     return (
-      <div className="min-h-screen flex items-center justify-center bg-gray-50 p-4">
-        <Card className="max-w-md w-full">
-          <CardContent className="pt-6">
-            <div className="text-center">
-              <AlertCircle className="h-12 w-12 text-red-500 mx-auto mb-4" />
-              <h2 className="text-2xl font-bold text-gray-800 mb-2">Portal Not Found</h2>
-              <p className="text-gray-600 mb-6">
-                {error || 'This operator portal does not exist or is not available.'}
-              </p>
-              <Button
-                onClick={() => router.push('/')}
-                className="w-full"
-              >
-                Return to Home
-              </Button>
-            </div>
-          </CardContent>
-        </Card>
+      <div className="min-h-screen flex items-center justify-center bg-white">
+        <div className="text-center">
+          <h1 className="text-4xl font-bold text-gray-900 mb-4">Oops!</h1>
+          <p className="text-gray-600 mb-6">{error || "Operator not found"}</p>
+          <Link href="/">
+            <Button style={{ backgroundColor: TEAL_COLOR }}>Go to TransConnect Home</Button>
+          </Link>
+        </div>
       </div>
     );
   }
 
-  // Get brand color or default
-  const brandColor = operator.brandColor || '#2563EB';
+  // Get popular routes (first 6)
+  const popularRoutes = operator.routes.filter(r => r.active).slice(0, 6);
+
+  // Get hero image or default
+  const heroImage = operator.heroImageUrl || "/images/default-hero.jpg";
 
   return (
-    <div className="min-h-screen bg-gray-50">
-      {/* Branded Header */}
-      <div
-        className="text-white py-12"
-        style={{ backgroundColor: brandColor }}
-      >
+    <div className="min-h-screen bg-white">
+      {/* Navigation Bar */}
+      <nav className="bg-white border-b border-gray-200 py-4 shadow-sm">
         <div className="container mx-auto px-4">
-          <div className="flex flex-col md:flex-row items-center gap-6">
-            {/* Logo */}
-            {operator.brandLogoUrl && (
-              <div className="bg-white rounded-lg p-4 shadow-lg">
-                <img
+          <div className="flex items-center justify-between">
+            <div className="flex items-center gap-3">
+              {operator.brandLogoUrl && (
+                <Image
                   src={operator.brandLogoUrl}
-                  alt={`${operator.companyName} Logo`}
-                  className="h-16 w-auto object-contain"
+                  alt={`${operator.companyName} logo`}
+                  width={50}
+                  height={50}
+                  className="rounded-lg"
+                />
+              )}
+              <h1 className="text-2xl font-bold text-gray-900">{operator.companyName}</h1>
+            </div>
+            <Link href="/">
+              <Button variant="outline" className="border-gray-300">
+                All Operators
+              </Button>
+            </Link>
+          </div>
+        </div>
+      </nav>
+
+      {/* Hero Section with Background Image */}
+      <section
+        className="relative h-[500px] bg-cover bg-center"
+        style={{
+          backgroundImage: `linear-gradient(rgba(0, 0, 0, 0.4), rgba(0, 0, 0, 0.4)), url(${heroImage})`,
+        }}
+      >
+        <div className="container mx-auto px-4 h-full flex flex-col justify-center items-center text-center">
+          <h2 className="text-5xl font-bold text-white mb-4">{operator.companyName}</h2>
+          {operator.tagline && <p className="text-2xl text-white mb-8 opacity-90">{operator.tagline}</p>}
+
+          {/* Search Box */}
+          <div className="bg-white rounded-lg shadow-2xl p-6 max-w-4xl w-full">
+            <div className="grid md:grid-cols-4 gap-4">
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-2">From</label>
+                <input
+                  type="text"
+                  placeholder="Departure city"
+                  value={searchFrom}
+                  onChange={(e) => setSearchFrom(e.target.value)}
+                  className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-[#00D9A3] focus:border-transparent"
                 />
               </div>
-            )}
-
-            {/* Company Info */}
-            <div className="flex-1 text-center md:text-left">
-              <h1 className="text-4xl font-bold mb-2">{operator.companyName}</h1>
-              {operator.tagline && (
-                <p className="text-xl opacity-90">{operator.tagline}</p>
-              )}
-            </div>
-
-            {/* Quick Contact */}
-            <div className="flex gap-4">
-              {operator.contact.phone && (
-                <a
-                  href={`tel:${operator.contact.phone}`}
-                  className="bg-white text-gray-800 px-6 py-3 rounded-lg font-semibold hover:bg-gray-100 transition flex items-center gap-2"
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-2">To</label>
+                <input
+                  type="text"
+                  placeholder="Arrival city"
+                  value={searchTo}
+                  onChange={(e) => setSearchTo(e.target.value)}
+                  className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-[#00D9A3] focus:border-transparent"
+                />
+              </div>
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-2">Date</label>
+                <input
+                  type="date"
+                  value={searchDate}
+                  onChange={(e) => setSearchDate(e.target.value)}
+                  className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-[#00D9A3] focus:border-transparent"
+                />
+              </div>
+              <div className="flex items-end">
+                <Button
+                  className="w-full py-3 text-white font-semibold"
+                  style={{ backgroundColor: TEAL_COLOR }}
+                  onClick={() => {
+                    if (searchFrom && searchTo) {
+                      window.location.href = `/?origin=${encodeURIComponent(searchFrom)}&destination=${encodeURIComponent(
+                        searchTo
+                      )}&date=${searchDate}`;
+                    }
+                  }}
                 >
-                  <Phone className="h-5 w-5" />
-                  Call Us
-                </a>
-              )}
+                  <Search className="w-5 h-5 mr-2" />
+                  Search Buses
+                </Button>
+              </div>
             </div>
           </div>
         </div>
-      </div>
+      </section>
 
       {/* Stats Bar */}
-      <div className="bg-white shadow-sm border-b">
-        <div className="container mx-auto px-4 py-6">
-          <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+      <section className="bg-gray-50 border-b border-gray-200 py-12">
+        <div className="container mx-auto px-4">
+          <div className="grid grid-cols-2 md:grid-cols-4 gap-8">
             <div className="text-center">
-              <Bus className="h-8 w-8 mx-auto mb-2 text-gray-600" />
-              <p className="text-2xl font-bold text-gray-800">{operator.stats.totalBuses}</p>
-              <p className="text-sm text-gray-600">Buses</p>
+              <div className="flex items-center justify-center mb-3">
+                <MapPin className="w-8 h-8" style={{ color: TEAL_COLOR }} />
+              </div>
+              <div className="text-4xl font-bold text-gray-900 mb-1">{operator.stats.activeRoutes}</div>
+              <div className="text-sm text-gray-600 uppercase tracking-wide">Routes Served</div>
             </div>
             <div className="text-center">
-              <MapPin className="h-8 w-8 mx-auto mb-2 text-gray-600" />
-              <p className="text-2xl font-bold text-gray-800">{operator.stats.activeRoutes}</p>
-              <p className="text-sm text-gray-600">Active Routes</p>
+              <div className="flex items-center justify-center mb-3">
+                <Bus className="w-8 h-8" style={{ color: TEAL_COLOR }} />
+              </div>
+              <div className="text-4xl font-bold text-gray-900 mb-1">{operator.stats.totalBuses}</div>
+              <div className="text-sm text-gray-600 uppercase tracking-wide">Modern Buses</div>
             </div>
-            {operator.stats.totalTripsCompleted !== undefined && (
-              <div className="text-center">
-                <Clock className="h-8 w-8 mx-auto mb-2 text-gray-600" />
-                <p className="text-2xl font-bold text-gray-800">{operator.stats.totalTripsCompleted}</p>
-                <p className="text-sm text-gray-600">Trips Completed</p>
+            <div className="text-center">
+              <div className="flex items-center justify-center mb-3">
+                <Users className="w-8 h-8" style={{ color: TEAL_COLOR }} />
               </div>
-            )}
-            {operator.stats.yearsInOperation && (
-              <div className="text-center">
-                <Building className="h-8 w-8 mx-auto mb-2 text-gray-600" />
-                <p className="text-2xl font-bold text-gray-800">{operator.stats.yearsInOperation}</p>
-                <p className="text-sm text-gray-600">Years in Operation</p>
+              <div className="text-4xl font-bold text-gray-900 mb-1">{operator.stats.totalTripsCompleted}K+</div>
+              <div className="text-sm text-gray-600 uppercase tracking-wide">Happy Passengers</div>
+            </div>
+            <div className="text-center">
+              <div className="flex items-center justify-center mb-3">
+                <Star className="w-8 h-8" style={{ color: TEAL_COLOR }} />
               </div>
-            )}
+              <div className="text-4xl font-bold text-gray-900 mb-1">4.8</div>
+              <div className="text-sm text-gray-600 uppercase tracking-wide">Customer Rating</div>
+            </div>
           </div>
         </div>
-      </div>
+      </section>
 
-      {/* Main Content */}
-      <div className="container mx-auto px-4 py-8">
-        {/* About Section */}
-        {operator.description && (
-          <Card className="mb-8">
-            <CardContent className="pt-6">
-              <h2 className="text-2xl font-bold text-gray-800 mb-4">About Us</h2>
-              <p className="text-gray-600 leading-relaxed">{operator.description}</p>
-            </CardContent>
-          </Card>
-        )}
+      {/* Popular Routes Section */}
+      <section className="py-16 bg-white">
+        <div className="container mx-auto px-4">
+          <div className="text-center mb-12">
+            <h2 className="text-3xl font-bold text-gray-900 mb-3">Popular Routes</h2>
+            <p className="text-gray-600">Explore our most traveled destinations</p>
+          </div>
 
-        {/* Routes Section */}
-        <Card className="mb-8">
-          <CardContent className="pt-6">
-            <h2 className="text-2xl font-bold text-gray-800 mb-6">Available Routes</h2>
+          <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-6">
+            {popularRoutes.map((route) => (
+              <Card key={route.id} className="hover:shadow-xl transition-shadow border-gray-200">
+                <CardHeader className="pb-4">
+                  <div className="flex items-center justify-between">
+                    <CardTitle className="text-xl font-bold text-gray-900">
+                      {route.origin} → {route.destination}
+                    </CardTitle>
+                    <div className="px-3 py-1 rounded-full text-sm font-semibold text-white" style={{ backgroundColor: TEAL_COLOR }}>
+                      UGX {route.price.toLocaleString()}
+                    </div>
+                  </div>
+                </CardHeader>
+                <CardContent>
+                  <div className="space-y-3 mb-4">
+                    <div className="flex items-center text-gray-600">
+                      <Clock className="w-4 h-4 mr-2" style={{ color: TEAL_COLOR }} />
+                      <span className="text-sm">{route.duration} hours journey</span>
+                    </div>
+                    <div className="flex items-center text-gray-600">
+                      <Calendar className="w-4 h-4 mr-2" style={{ color: TEAL_COLOR }} />
+                      <span className="text-sm">Departs: {route.departureTime}</span>
+                    </div>
+                    <div className="flex items-center text-gray-600">
+                      <Bus className="w-4 h-4 mr-2" style={{ color: TEAL_COLOR }} />
+                      <span className="text-sm">{route.bus.model} ({route.bus.capacity} seats)</span>
+                    </div>
+                  </div>
+                  <Link
+                    href={`/?origin=${encodeURIComponent(route.origin)}&destination=${encodeURIComponent(
+                      route.destination
+                    )}`}
+                  >
+                    <Button className="w-full text-white font-semibold" style={{ backgroundColor: TEAL_COLOR }}>
+                      Book Now
+                    </Button>
+                  </Link>
+                </CardContent>
+              </Card>
+            ))}
+          </div>
 
-            {/* Route Filters */}
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-6">
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-2">
-                  From
-                </label>
-                <select
-                  value={selectedOrigin}
-                  onChange={(e) => setSelectedOrigin(e.target.value)}
-                  className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-                >
-                  <option value="">All Origins</option>
-                  {origins.map((origin) => (
-                    <option key={origin} value={origin}>
-                      {origin}
-                    </option>
-                  ))}
-                </select>
+          {operator.routes.length > 6 && (
+            <div className="text-center mt-8">
+              <Link href={`/?operator=${operator.companyName}`}>
+                <Button variant="outline" className="border-2" style={{ borderColor: TEAL_COLOR, color: TEAL_COLOR }}>
+                  View All {operator.routes.length} Routes
+                </Button>
+              </Link>
+            </div>
+          )}
+        </div>
+      </section>
+
+      {/* Why Book Direct Section */}
+      <section className="py-16 bg-gray-50">
+        <div className="container mx-auto px-4">
+          <div className="text-center mb-12">
+            <h2 className="text-3xl font-bold text-gray-900 mb-3">Why Book Direct with {operator.companyName}?</h2>
+            <p className="text-gray-600">Experience the best in bus travel</p>
+          </div>
+
+          <div className="grid md:grid-cols-2 lg:grid-cols-4 gap-8">
+            <div className="text-center">
+              <div
+                className="w-16 h-16 rounded-full flex items-center justify-center mx-auto mb-4"
+                style={{ backgroundColor: `${TEAL_COLOR}20` }}
+              >
+                <CheckCircle2 className="w-8 h-8" style={{ color: TEAL_COLOR }} />
               </div>
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-2">
-                  To
-                </label>
-                <select
-                  value={selectedDestination}
-                  onChange={(e) => setSelectedDestination(e.target.value)}
-                  className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-                >
-                  <option value="">All Destinations</option>
-                  {destinations.map((destination) => (
-                    <option key={destination} value={destination}>
-                      {destination}
-                    </option>
-                  ))}
-                </select>
+              <h3 className="text-lg font-semibold text-gray-900 mb-2">Guaranteed Seats</h3>
+              <p className="text-sm text-gray-600">Your seat is reserved and confirmed</p>
+            </div>
+            <div className="text-center">
+              <div
+                className="w-16 h-16 rounded-full flex items-center justify-center mx-auto mb-4"
+                style={{ backgroundColor: `${TEAL_COLOR}20` }}
+              >
+                <CreditCard className="w-8 h-8" style={{ color: TEAL_COLOR }} />
+              </div>
+              <h3 className="text-lg font-semibold text-gray-900 mb-2">Secure Payment</h3>
+              <p className="text-sm text-gray-600">Multiple payment options available</p>
+            </div>
+            <div className="text-center">
+              <div
+                className="w-16 h-16 rounded-full flex items-center justify-center mx-auto mb-4"
+                style={{ backgroundColor: `${TEAL_COLOR}20` }}
+              >
+                <Shield className="w-8 h-8" style={{ color: TEAL_COLOR }} />
+              </div>
+              <h3 className="text-lg font-semibold text-gray-900 mb-2">Safety First</h3>
+              <p className="text-sm text-gray-600">Licensed drivers and insured vehicles</p>
+            </div>
+            <div className="text-center">
+              <div
+                className="w-16 h-16 rounded-full flex items-center justify-center mx-auto mb-4"
+                style={{ backgroundColor: `${TEAL_COLOR}20` }}
+              >
+                <Headphones className="w-8 h-8" style={{ color: TEAL_COLOR }} />
+              </div>
+              <h3 className="text-lg font-semibold text-gray-900 mb-2">24/7 Support</h3>
+              <p className="text-sm text-gray-600">We're here to help anytime</p>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      {/* About Section */}
+      {operator.description && (
+        <section className="py-16 bg-white">
+          <div className="container mx-auto px-4">
+            <div className="max-w-4xl mx-auto">
+              <div className="text-center mb-8">
+                <h2 className="text-3xl font-bold text-gray-900 mb-3">About {operator.companyName}</h2>
+                <div className="w-20 h-1 mx-auto rounded-full" style={{ backgroundColor: TEAL_COLOR }}></div>
+              </div>
+              <p className="text-gray-700 leading-relaxed text-lg text-center">{operator.description}</p>
+              <div className="mt-8 flex items-center justify-center gap-4 text-sm text-gray-600">
+                <div className="flex items-center">
+                  <Award className="w-5 h-5 mr-2" style={{ color: TEAL_COLOR }} />
+                  <span>Licensed Operator</span>
+                </div>
+                <div className="flex items-center">
+                  <TrendingUp className="w-5 h-5 mr-2" style={{ color: TEAL_COLOR }} />
+                  <span>{operator.stats.yearsInOperation}+ Years Experience</span>
+                </div>
               </div>
             </div>
+          </div>
+        </section>
+      )}
 
-            {/* Routes Grid */}
-            {filteredRoutes.length > 0 ? (
-              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-                {filteredRoutes.map((route) => (
-                  <Card key={route.id} className="hover:shadow-lg transition">
-                    <CardContent className="pt-6">
-                      <div className="flex items-start justify-between mb-4">
-                        <div className="flex-1">
-                          <div className="flex items-center gap-2 mb-2">
-                            <MapPin className="h-5 w-5 text-gray-500" />
-                            <span className="font-semibold text-gray-800">
-                              {route.origin}
-                            </span>
-                          </div>
-                          <div className="flex items-center gap-2 text-gray-600">
-                            <span>→</span>
-                            <span>{route.destination}</span>
-                          </div>
-                        </div>
-                        <div className="text-right">
-                          <p className="text-2xl font-bold" style={{ color: brandColor }}>
-                            {formatPrice(route.price)}
-                          </p>
-                        </div>
-                      </div>
-
-                      <div className="space-y-2 text-sm text-gray-600 mb-4">
-                        <div className="flex items-center gap-2">
-                          <Clock className="h-4 w-4" />
-                          <span>Departs: {route.departureTime}</span>
-                        </div>
-                        <div className="flex items-center gap-2">
-                          <Clock className="h-4 w-4" />
-                          <span>Duration: {formatDuration(route.duration)}</span>
-                        </div>
-                        <div className="flex items-center gap-2">
-                          <Bus className="h-4 w-4" />
-                          <span>{route.bus.model} ({route.bus.capacity} seats)</span>
-                        </div>
-                      </div>
-
-                      <Button
-                        onClick={() => handleBookRoute(route.id)}
-                        className="w-full"
-                        style={{ backgroundColor: brandColor }}
-                      >
-                        Book Now
-                      </Button>
-                    </CardContent>
-                  </Card>
-                ))}
-              </div>
-            ) : (
-              <div className="text-center py-12">
-                <MapPin className="h-12 w-12 text-gray-400 mx-auto mb-4" />
-                <p className="text-gray-600">No routes match your selected filters.</p>
-              </div>
-            )}
-          </CardContent>
-        </Card>
-
-        {/* Fleet Section */}
-        {operator.buses.length > 0 && (
-          <Card className="mb-8">
-            <CardContent className="pt-6">
-              <h2 className="text-2xl font-bold text-gray-800 mb-6">Our Fleet</h2>
-              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-                {operator.buses.map((bus) => (
-                  <Card key={bus.id} className="bg-gray-50">
-                    <CardContent className="pt-6">
-                      <Bus className="h-8 w-8 mb-3" style={{ color: brandColor }} />
-                      <p className="font-semibold text-gray-800 mb-1">{bus.model}</p>
-                      <p className="text-sm text-gray-600 mb-1">{bus.plateNumber}</p>
-                      <div className="flex items-center gap-2 text-sm text-gray-600">
-                        <Users className="h-4 w-4" />
-                        <span>{bus.capacity} seats</span>
-                      </div>
-                    </CardContent>
-                  </Card>
-                ))}
-              </div>
-            </CardContent>
-          </Card>
-        )}
-
-        {/* Contact Section */}
-        <Card>
-          <CardContent className="pt-6">
-            <h2 className="text-2xl font-bold text-gray-800 mb-6">Contact Us</h2>
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-              {operator.contact.phone && (
-                <div className="flex items-start gap-4">
-                  <div
-                    className="p-3 rounded-lg"
-                    style={{ backgroundColor: `${brandColor}20` }}
-                  >
-                    <Phone className="h-6 w-6" style={{ color: brandColor }} />
-                  </div>
-                  <div>
-                    <p className="font-semibold text-gray-800 mb-1">Phone</p>
-                    <a
-                      href={`tel:${operator.contact.phone}`}
-                      className="text-gray-600 hover:underline"
-                    >
-                      {operator.contact.phone}
-                    </a>
-                  </div>
-                </div>
-              )}
-              {operator.contact.email && (
-                <div className="flex items-start gap-4">
-                  <div
-                    className="p-3 rounded-lg"
-                    style={{ backgroundColor: `${brandColor}20` }}
-                  >
-                    <Mail className="h-6 w-6" style={{ color: brandColor }} />
-                  </div>
-                  <div>
-                    <p className="font-semibold text-gray-800 mb-1">Email</p>
-                    <a
-                      href={`mailto:${operator.contact.email}`}
-                      className="text-gray-600 hover:underline"
-                    >
-                      {operator.contact.email}
-                    </a>
-                  </div>
-                </div>
-              )}
+      {/* Fleet Section */}
+      {operator.buses && operator.buses.length > 0 && (
+        <section className="py-16 bg-gray-50">
+          <div className="container mx-auto px-4">
+            <div className="text-center mb-12">
+              <h2 className="text-3xl font-bold text-gray-900 mb-3">Our Fleet</h2>
+              <p className="text-gray-600">Modern, comfortable buses for your journey</p>
             </div>
-          </CardContent>
-        </Card>
-      </div>
+
+            <div className="grid md:grid-cols-2 lg:grid-cols-4 gap-6">
+              {operator.buses.slice(0, 8).map((bus) => (
+                <Card key={bus.id} className="text-center border-gray-200">
+                  <CardContent className="pt-8 pb-8">
+                    <div
+                      className="w-16 h-16 rounded-full flex items-center justify-center mx-auto mb-4"
+                      style={{ backgroundColor: `${TEAL_COLOR}20` }}
+                    >
+                      <Bus className="w-8 h-8" style={{ color: TEAL_COLOR }} />
+                    </div>
+                    <h3 className="font-semibold text-gray-900 mb-1">{bus.model}</h3>
+                    <p className="text-sm text-gray-600 mb-2">{bus.plateNumber}</p>
+                    <div className="flex items-center justify-center gap-1 text-sm text-gray-600">
+                      <Users className="w-4 h-4" />
+                      <span>{bus.capacity} seats</span>
+                    </div>
+                  </CardContent>
+                </Card>
+              ))}
+            </div>
+          </div>
+        </section>
+      )}
+
+      {/* Contact Section */}
+      <section className="py-16 bg-white">
+        <div className="container mx-auto px-4">
+          <div className="text-center mb-12">
+            <h2 className="text-3xl font-bold text-gray-900 mb-3">Get In Touch</h2>
+            <p className="text-gray-600">Have questions? We're here to help</p>
+          </div>
+
+          <div className="grid md:grid-cols-3 gap-6 max-w-4xl mx-auto">
+            <Card className="text-center border-gray-200">
+              <CardContent className="pt-8 pb-8">
+                <div className="w-14 h-14 rounded-full flex items-center justify-center mx-auto mb-4" style={{ backgroundColor: `${TEAL_COLOR}20` }}>
+                  <Phone className="w-7 h-7" style={{ color: TEAL_COLOR }} />
+                </div>
+                <h3 className="font-semibold text-gray-900 mb-2">Phone</h3>
+                <p className="text-gray-600">{operator.contact.phone || "Not available"}</p>
+              </CardContent>
+            </Card>
+            <Card className="text-center border-gray-200">
+              <CardContent className="pt-8 pb-8">
+                <div className="w-14 h-14 rounded-full flex items-center justify-center mx-auto mb-4" style={{ backgroundColor: `${TEAL_COLOR}20` }}>
+                  <Mail className="w-7 h-7" style={{ color: TEAL_COLOR }} />
+                </div>
+                <h3 className="font-semibold text-gray-900 mb-2">Email</h3>
+                <p className="text-gray-600 break-all">{operator.contact.email || "Not available"}</p>
+              </CardContent>
+            </Card>
+            <Card className="text-center border-gray-200">
+              <CardContent className="pt-8 pb-8">
+                <div className="w-14 h-14 rounded-full flex items-center justify-center mx-auto mb-4" style={{ backgroundColor: `${TEAL_COLOR}20` }}>
+                  <Users className="w-7 h-7" style={{ color: TEAL_COLOR }} />
+                </div>
+                <h3 className="font-semibold text-gray-900 mb-2">Manager</h3>
+                <p className="text-gray-600">{operator.contact.name}</p>
+              </CardContent>
+            </Card>
+          </div>
+        </div>
+      </section>
 
       {/* Footer */}
-      <footer className="bg-gray-800 text-white py-8 mt-12">
-        <div className="container mx-auto px-4 text-center">
-          <p className="mb-2">
-            Powered by{' '}
-            <a href="/" className="font-semibold hover:underline">
-              TransConnect
-            </a>
-          </p>
-          <p className="text-sm text-gray-400">
-            Uganda's Premier Bus Booking Platform
-          </p>
+      <footer className="bg-gray-900 text-white py-12">
+        <div className="container mx-auto px-4">
+          <div className="text-center">
+            <div className="mb-4">
+              <span className="text-gray-400">Powered by </span>
+              <span className="font-bold" style={{ color: TEAL_COLOR }}>
+                TransConnect
+              </span>
+            </div>
+            <p className="text-sm text-gray-400">
+              © {new Date().getFullYear()} {operator.companyName}. All rights reserved.
+            </p>
+          </div>
         </div>
       </footer>
     </div>

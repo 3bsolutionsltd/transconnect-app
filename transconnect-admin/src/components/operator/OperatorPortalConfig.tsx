@@ -15,6 +15,7 @@ import { useAuth } from '../../contexts/AuthContext';
 interface PortalConfig {
   slug: string;
   brandLogoUrl: string;
+  heroImageUrl: string;
   brandColor: string;
   tagline: string;
   description: string;
@@ -25,6 +26,7 @@ interface PortalConfigResponse {
   success: boolean;
   slug?: string;
   brandLogoUrl?: string;
+  heroImageUrl?: string;
   brandColor?: string;
   tagline?: string;
   description?: string;
@@ -38,6 +40,7 @@ const OperatorPortalConfig = () => {
   const [config, setConfig] = useState<PortalConfig>({
     slug: '',
     brandLogoUrl: '',
+    heroImageUrl: '',
     brandColor: '#16a34a',
     tagline: '',
     description: '',
@@ -74,6 +77,7 @@ const OperatorPortalConfig = () => {
         const loadedConfig = {
           slug: data.slug || '',
           brandLogoUrl: data.brandLogoUrl || '',
+          heroImageUrl: data.heroImageUrl || '',
           brandColor: data.brandColor || '#16a34a',
           tagline: data.tagline || '',
           description: data.description || '',
@@ -316,6 +320,39 @@ const OperatorPortalConfig = () => {
             </div>
             <p className="text-xs text-gray-500">
               URL to your company logo (PNG, JPG, SVG). Recommended size: 200x80px. Leave blank for no logo.
+            </p>
+          </div>
+        </div>
+
+        {/* Hero Background Image */}
+        <div>
+          <label className="block text-sm font-medium text-gray-700 mb-2">
+            Hero Background Image
+          </label>
+          <div className="space-y-2">
+            <div className="flex gap-2">
+              <input
+                type="url"
+                value={config.heroImageUrl}
+                onChange={(e) => setConfig({ ...config, heroImageUrl: e.target.value })}
+                placeholder="https://example.com/hero-banner.jpg"
+                className="flex-1 px-3 py-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-green-500 focus:border-transparent"
+              />
+              {config.heroImageUrl && (
+                <div className="flex items-center justify-center w-24 h-12 border border-gray-300 rounded bg-white overflow-hidden">
+                  <img 
+                    src={config.heroImageUrl} 
+                    alt="Hero preview" 
+                    className="w-full h-full object-cover"
+                    onError={(e) => {
+                      (e.target as HTMLImageElement).style.display = 'none';
+                    }}
+                  />
+                </div>
+              )}
+            </div>
+            <p className="text-xs text-gray-500">
+              URL to hero background image for your portal landing page. Recommended size: 1920x600px. Leave blank for default image.
             </p>
           </div>
         </div>
