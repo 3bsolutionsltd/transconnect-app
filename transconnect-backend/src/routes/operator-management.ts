@@ -2,6 +2,7 @@ import { Router, Request, Response } from 'express';
 import { prisma } from '../lib/prisma';
 import { authenticateToken } from '../middleware/auth';
 import { body, validationResult } from 'express-validator';
+import { requireFeature } from '../utils/feature-flags';
 
 const router = Router();
 
@@ -826,6 +827,157 @@ router.post('/buses', [
   } catch (error) {
     console.error('Error adding bus:', error);
     res.status(500).json({ error: 'Failed to add bus' });
+  }
+});
+
+/**
+ * OPERATOR PORTAL CONFIGURATION ENDPOINTS
+ * These endpoints allow operators to configure their white-labeled portals
+ */
+
+// GET /api/operator-management/portal-config - Get current portal configuration
+router.get('/portal-config', [
+  authenticateToken,
+  requireFeature('OPERATOR_PORTAL_CONFIG')
+], async (req: Request, res: Response) => {
+  try {
+    const userId = (req as any).user.id;
+    const userRole = (req as any).user.role;
+
+    if (userRole !== 'OPERATOR') {
+      return res.status(403).json({ error: 'Only operators can access portal configuration' });
+    }
+
+    // Find operator by user ID
+    const operator = await prisma.operator.findUnique({
+      where: { userId },
+      select: {
+        id: true,
+        companyName: true,
+        slug: true,
+        brandLogoUrl: true,
+        brandColor: true,
+        tagline: true,
+        description: true,
+        portalEnabled: true,
+        createdAt: true,
+        updatedAt: true
+      }
+    });
+
+    if (!operator) {
+      return res.status(404).json({ error: 'Operator profile not found' });
+    }
+
+    // Generate portal URL if slug exists
+    const portalUrl = operator.slug 
+      ? `${process.env.FRONTEND_URL || 'https://transconnect.app'}/operator/${operator.slug}`
+      : null;
+
+    res.json({
+      success: true,
+      config: {
+        ...operator,
+        portalUrl,
+        isConfigured: !!(operator.slug && operator.brandLogoUrl && operator.tagline)
+      }
+    });
+  } catch (error) {
+    console.error('Error fetching portal config:', error);
+    res.status(500).json({ error: 'Failed to fetch portal configuration' });
+  }
+});
+
+// PATCH /api/operator-management/portal-config - Update portal configuration
+router.patch('/portal-config', [
+  authenticateToken,
+  requireFeature('OPERATOR_PORTAL_CONFIG'),
+  body('slug').optional().isString().isLength({ min: 3, max: 50 })
+    .matches(/^[a-z0-9-]+$/).withMessage('Slug must be lowercase alphanumeric with hyphens'),
+  body('brandLogoUrl').optional().isURL().withMessage('Brand logo must be a valid URL'),
+  body('brandColor').optional().matches(/^#[0-9A-Fa-f]{6}$/).withMessage('Brand color must be a valid hex color'),
+  body('tagline').optional().isString().isLength({ max: 100 }).withMessage('Tagline must be 100 characters or less'),
+  body('description').optional().isString().isLength({ max: 500 }).withMessage('Description must be 500 characters or less'),
+  body('portalEnabled').optional().isBoolean().withMessage('Portal enabled must be a boolean')
+], async (req: Request, res: Response) => {
+  try {
+    const errors = validationResult(req);
+    if (!errors.isEmpty()) {
+      return res.status(400).json({ errors: errors.array() });
+    }
+
+    const userId = (req as any).user.id;
+    const userRole = (req as any).user.role;
+
+    if (userRole !== 'OPERATOR') {
+      return res.status(403).json({ error: 'Only operators can update portal configuration' });
+    }
+
+    const { slug, brandLogoUrl, brandColor, tagline, description, portalEnabled } = req.body;
+
+    // Find operator by user ID
+    const operator = await prisma.operator.findUnique({
+      where: { userId }
+    });
+
+    if (!operator) {
+      return res.status(404).json({ error: 'Operator profile not found' });
+    }
+
+    // If slug is being updated, check for uniqueness
+    if (slug && slug !== operator.slug) {
+      const existingOperator = await prisma.operator.findUnique({
+        where: { slug: slug.toLowerCase() }
+      });
+
+      if (existingOperator) {
+        return res.status(400).json({ error: 'This slug is already taken. Please choose another.' });
+      }
+    }
+
+    // Build update data object
+    const updateData: any = {};
+    if (slug !== undefined) updateData.slug = slug.toLowerCase();
+    if (brandLogoUrl !== undefined) updateData.brandLogoUrl = brandLogoUrl;
+    if (brandColor !== undefined) updateData.brandColor = brandColor;
+    if (tagline !== undefined) updateData.tagline = tagline;
+    if (description !== undefined) updateData.description = description;
+    if (portalEnabled !== undefined) updateData.portalEnabled = portalEnabled;
+
+    // Update operator
+    const updatedOperator = await prisma.operator.update({
+      where: { id: operator.id },
+      data: updateData,
+      select: {
+        id: true,
+        companyName: true,
+        slug: true,
+        brandLogoUrl: true,
+        brandColor: true,
+        tagline: true,
+        description: true,
+        portalEnabled: true,
+        updatedAt: true
+      }
+    });
+
+    // Generate portal URL
+    const portalUrl = updatedOperator.slug 
+      ? `${process.env.FRONTEND_URL || 'https://transconnect.app'}/operator/${updatedOperator.slug}`
+      : null;
+
+    res.json({
+      success: true,
+      message: 'Portal configuration updated successfully',
+      config: {
+        ...updatedOperator,
+        portalUrl,
+        isConfigured: !!(updatedOperator.slug && updatedOperator.brandLogoUrl && updatedOperator.tagline)
+      }
+    });
+  } catch (error) {
+    console.error('Error updating portal config:', error);
+    res.status(500).json({ error: 'Failed to update portal configuration' });
   }
 });
 
