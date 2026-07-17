@@ -11,53 +11,66 @@ Use this checklist to track implementation progress for the Operator Passenger P
 ### Database & Backend API (Days 1-2)
 
 #### Database Schema
-- [ ] **Add new fields to Operator model**
-  - [ ] Add `slug` field (String, unique)
-  - [ ] Add `brandLogoUrl` field (String, optional)
-  - [ ] Add `brandColor` field (String, optional)
-  - [ ] Add `tagline` field (String, optional)
-  - [ ] Add `description` field (Text, optional)
-  - [ ] Add `portalEnabled` field (Boolean, default false)
+- [x] **Add new fields to Operator model** ✅ COMPLETE (2026-07-17)
+  - [x] Add `slug` field (String, unique)
+  - [x] Add `brandLogoUrl` field (String, optional)
+  - [x] Add `brandColor` field (String, optional)
+  - [x] Add `tagline` field (String, optional)
+  - [x] Add `description` field (Text, optional)
+  - [x] Add `portalEnabled` field (Boolean, default false)
   
-- [ ] **Run Prisma migration**
-  ```bash
-  cd transconnect-backend
-  npx prisma migrate dev --name add_operator_portal_fields
-  ```
+- [x] **Run Prisma migration** ✅ Migration created and applied
+  - Migration: `20260717060817_add_operator_portal_fields`
+  - Database: Development DB reset and migrated successfully
+  - Commit: a90b8c8
 
-- [ ] **Generate Prisma client**
-  ```bash
-  npx prisma generate
-  ```
+- [x] **Generate Prisma client** ✅ Regenerated after migration
+  - Prisma Client v5.22.0 generated successfully
 
-- [ ] **Seed sample data for testing**
+- [ ] **Seed sample data for testing** ⏳ NEXT STEP
   - [ ] Create script to generate slugs for existing operators
   - [ ] Add sample branding data for 2-3 test operators
 
 #### Backend API Routes
 
-- [ ] **Create `operator-portal.ts` route file**
+- [x] **Create `operator-portal.ts` route file** ✅ COMPLETE
   - Location: `transconnect-backend/src/routes/operator-portal.ts`
+  - 310 lines, fully implemented with error handling
+  - Commit: 7755e01, fb31454
   
-- [ ] **Implement public endpoints (no auth required):**
-  - [ ] `GET /api/operator-portal/slug/:slug` - Get operator by slug
-  - [ ] `GET /api/operator-portal/:operatorId/routes` - Get operator routes
-  - [ ] `GET /api/operator-portal/:operatorId/stats` - Get operator statistics
+- [x] **Implement public endpoints (no auth required):** ✅ ALL 4 ENDPOINTS COMPLETE
+  - [x] `GET /api/operator-portal/slug/:slug` - Get operator by slug with routes/buses/stats
+  - [x] `GET /api/operator-portal/:operatorId/routes` - Get operator routes (with filters)
+  - [x] `GET /api/operator-portal/:operatorId/stats` - Get operator statistics
+  - [x] `GET /api/operator-portal/feature/status` - Check feature flag status
+  - **Feature Flags:** All endpoints protected by `OPERATOR_PORTAL` flag
+  - **Validation:** Portal enabled check, operator existence check, error handling
   
-- [ ] **Update `operator-management.ts` with configuration endpoints:**
-  - [ ] `GET /api/operator-management/portal-config` - Get portal config (authenticated)
-  - [ ] `PATCH /api/operator-management/portal-config` - Update portal config (authenticated)
+- [x] **Update `operator-management.ts` with configuration endpoints:** ✅ COMPLETE
+  - [x] `GET /api/operator-management/portal-config` - Get portal config (JWT auth + OPERATOR role)
+  - [x] `PATCH /api/operator-management/portal-config` - Update portal config (JWT auth + validation)
+  - **Feature Flags:** Protected by `OPERATOR_PORTAL_CONFIG` flag
+  - **Validation:** 
+    - Slug format (3-50 chars, lowercase alphanumeric + hyphens)
+    - Slug uniqueness enforcement
+    - Brand color validation (hex #RRGGBB)
+    - Tagline max 100 chars
+    - Description max 500 chars
   
-- [ ] **Register routes in `index.ts`**
-  ```typescript
-  app.use('/api/operator-portal', operatorPortalRoutes);
-  ```
+- [x] **Register routes in `index.ts`** ✅ COMPLETE
+  - Routes registered at line ~170
+  - Correct middleware order (after CORS, before health check)
+  - Commit: 7755e01
 
-- [ ] **Test API endpoints with Postman/curl**
+- [ ] **Test API endpoints with Postman/curl** ⏳ IN PROGRESS
+  - **Testing Guide:** See `OPERATOR_PORTAL_API_TESTING.md`
+  - **Server Status:** Starting (compiling TypeScript)
   - [ ] Test getting operator by slug
   - [ ] Test getting operator routes
   - [ ] Test getting operator stats
   - [ ] Test updating portal configuration
+  - [ ] Test feature flag status
+  - [ ] Test error cases (invalid slug, portal disabled, unauthorized)
 
 ---
 
