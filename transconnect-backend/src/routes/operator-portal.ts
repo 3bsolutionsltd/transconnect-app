@@ -54,7 +54,7 @@ router.get('/slug/:slug', requireFeature('OPERATOR_PORTAL'), async (req: Request
             destination: true,
             price: true,
             departureTime: true,
-            arrivalTime: true,
+            duration: true,
             active: true,
             busId: true,
             bus: {
