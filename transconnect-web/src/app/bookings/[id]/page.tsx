@@ -8,6 +8,7 @@ import { Calendar, Clock, Download, Mail, MapPin, Phone, QrCode, Share2 } from '
 import Link from 'next/link';
 import { Container, Section, StyledCard, StyledButton, Badge } from '@/components/styled';
 import TransConnectLogo from '@/components/branding/TransConnectLogo';
+import OperatorLogoBadge from '@/components/branding/OperatorLogoBadge';
 
 interface BookingDetails {
   id: string;
@@ -26,6 +27,8 @@ interface BookingDetails {
     operator: {
       companyName: string;
       contactNumber: string;
+      brandLogoUrl?: string;
+      logoUrl?: string;
     };
     bus: {
       plateNumber: string;
@@ -177,7 +180,13 @@ export default function BookingDetailsPage() {
                 </div>
 
                 <div className="divide-y divide-[#edf2f9] text-sm">
-                  <div className="py-2 flex justify-between"><span className="text-[#8ca4c4]">Operator</span><span className="font-semibold text-[#14263f]">{booking.route.operator.companyName}</span></div>
+                  <div className="py-2 flex justify-between items-center">
+                    <span className="text-[#8ca4c4]">Operator</span>
+                    <span className="font-semibold text-[#14263f] inline-flex items-center gap-2">
+                      <OperatorLogoBadge operator={booking.route.operator} size="sm" />
+                      {booking.route.operator.companyName}
+                    </span>
+                  </div>
                   <div className="py-2 flex justify-between"><span className="text-[#8ca4c4]">Bus Type</span><span className="font-semibold text-[#14263f]">{booking.route.bus.model}</span></div>
                   <div className="py-2 flex justify-between"><span className="text-[#8ca4c4]">Seat Number</span><span className="font-semibold text-[#214c86]">{booking.seatNumber}</span></div>
                   <div className="py-2 flex justify-between"><span className="text-[#8ca4c4]">Passenger</span><span className="font-semibold text-[#14263f]">{booking.user.firstName} {booking.user.lastName}</span></div>

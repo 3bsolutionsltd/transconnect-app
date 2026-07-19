@@ -7,6 +7,7 @@ import { useRouter } from 'next/navigation';
 import { ArrowLeft, MapPin, Clock, Route, Bus, Calendar, CheckCircle } from 'lucide-react';
 import Link from 'next/link';
 import { Section, Container, Heading, StyledCard, StyledButton, Badge } from '@/components/styled';
+import OperatorLogoBadge from '@/components/branding/OperatorLogoBadge';
 
 export default function RoutePage({ params }: { params: { id: string } }) {
   const { id } = params;
@@ -121,9 +122,7 @@ export default function RoutePage({ params }: { params: { id: string } }) {
             <div className="mb-6 p-4 bg-teal-50 border border-teal-200 rounded-lg">
               <div className="flex items-center justify-between flex-wrap gap-4">
                 <div className="flex items-center space-x-3">
-                  <div className="w-12 h-12 bg-teal-600 rounded-full flex items-center justify-center text-white font-bold shadow-md">
-                    {route.operator.companyName.charAt(0)}
-                  </div>
+                  <OperatorLogoBadge operator={route.operator} size="lg" className="!rounded-full !bg-teal-100 !border-teal-200" />
                   <div>
                     <div className="font-semibold text-teal-900">{route.operator.companyName}</div>
                     <div className="text-sm text-teal-700">Licensed Bus Operator</div>

@@ -12,6 +12,7 @@ import PortalFooter from '@/components/PortalFooter';
 import ConfirmationDialog from '@/components/ui/ConfirmationDialog';
 import toast from 'react-hot-toast';
 import { Container, Heading, Section } from '@/components/styled';
+import OperatorLogoBadge from '@/components/branding/OperatorLogoBadge';
 
 export default function BookingsPage() {
   const CASH_EXPIRY_GRACE_HOURS = 2;
@@ -560,7 +561,10 @@ export default function BookingsPage() {
                           </div>
                         </td>
                         <td className="px-4 py-3.5 text-sm text-[#314a67]">
-                          {booking.route?.operator?.companyName || 'TransConnect Partner'}
+                          <div className="flex items-center gap-2">
+                            <OperatorLogoBadge operator={booking.route?.operator} size="sm" />
+                            <span>{booking.route?.operator?.companyName || 'TransConnect Partner'}</span>
+                          </div>
                         </td>
                         <td className="px-4 py-3.5 text-sm text-[#314a67] whitespace-nowrap">
                           {new Date(booking.travelDate).toLocaleDateString('en-GB', {

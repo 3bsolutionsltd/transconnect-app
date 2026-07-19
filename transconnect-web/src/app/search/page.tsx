@@ -8,6 +8,7 @@ import PortalFooter from '@/components/PortalFooter';
 import { Bus as BusIcon, Clock, MapPin, Search, Star, Users } from 'lucide-react';
 import { useSearchParams } from 'next/navigation';
 import { Section, Container, StyledCard, StyledButton } from '@/components/styled';
+import OperatorLogoBadge from '@/components/branding/OperatorLogoBadge';
 
 function SearchContent() {
   const searchParams = useSearchParams();
@@ -229,11 +230,9 @@ function SearchContent() {
                     <div className="p-5 grid grid-cols-1 xl:grid-cols-[1.2fr_1fr_1fr_auto] gap-4 items-center">
                       <div>
                         <div className="flex items-start gap-3">
-                          <div className="h-12 w-12 rounded-xl bg-[#ecf4ff] flex items-center justify-center text-[#214c86]">
-                            <BusIcon className="h-5 w-5" />
-                          </div>
+                          <OperatorLogoBadge operator={route?.operator || route?.operatorInfo} size="lg" />
                           <div>
-                            <h3 className="text-2xl font-black text-[#132742]">{route.operator?.companyName || 'Operator'}</h3>
+                            <h3 className="text-2xl font-black text-[#132742]">{route.operator?.companyName || route.operatorInfo?.companyName || route.operatorName || 'Operator'}</h3>
                             <p className="text-xs text-[#8ca4c4] flex items-center gap-1"><Star className="h-3 w-3 text-[#f59e0b]" />4.7 • 203 reviews</p>
                             <div className="flex gap-2 mt-2">
                               <span className="px-2 py-0.5 rounded-full bg-[#eafaf5] text-[#0f8c6b] text-xs font-semibold">AC</span>

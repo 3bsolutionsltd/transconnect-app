@@ -10,6 +10,7 @@ import Header from '@/components/Header';
 import { Badge, Container, Section, StyledCard } from '@/components/styled';
 import PortalFooter from '@/components/PortalFooter';
 import TransConnectLogo from '@/components/branding/TransConnectLogo';
+import OperatorLogoBadge from '@/components/branding/OperatorLogoBadge';
 
 interface TicketInfo {
   id: string;
@@ -22,7 +23,11 @@ interface TicketInfo {
   route: { origin: string; destination: string; departureTime: string };
   user: { firstName: string; lastName: string };
   bus?: { plateNumber: string; model: string };
-  operator?: { companyName: string };
+  operator?: {
+    companyName: string;
+    brandLogoUrl?: string;
+    logoUrl?: string;
+  };
   qrCode?: string;
 }
 
@@ -176,7 +181,12 @@ export default function PublicTicketPage() {
             )}
 
             <div className="px-6 py-4 bg-[#f8fbff] text-center">
-              {ticket.operator && <p className="text-xs text-[#6f86a7]">{ticket.operator.companyName}</p>}
+              {ticket.operator && (
+                <div className="inline-flex items-center gap-2 text-xs text-[#6f86a7]">
+                  <OperatorLogoBadge operator={ticket.operator} size="sm" />
+                  <p>{ticket.operator.companyName}</p>
+                </div>
+              )}
               {ticket.bus && <p className="text-xs text-[#8ca4c4] mt-0.5">Bus: {ticket.bus.plateNumber} • {ticket.bus.model}</p>}
               <p className="text-xs text-[#8ca4c4] mt-2 font-mono">#{bookingId.slice(-8).toUpperCase()}</p>
             </div>
