@@ -23,6 +23,65 @@ function SearchContent() {
   const [maxPrice, setMaxPrice] = useState(80000);
   const [minPrice] = useState(35000);
   const [sortBy, setSortBy] = useState<'price' | 'departure' | 'duration' | 'rating'>('price');
+  const [selectedAmenities, setSelectedAmenities] = useState<string[]>([]);
+
+  function parseAmenities(route: any): string[] {
+    const rawAmenities = route?.bus?.amenities || route?.busInfo?.amenities || route?.amenities;
+
+    if (!rawAmenities) return [];
+
+    if (Array.isArray(rawAmenities)) {
+      return rawAmenities
+        .map((item) => (typeof item === 'string' ? item.trim() : String(item || '').trim()))
+        .filter(Boolean);
+    }
+
+    if (typeof rawAmenities === 'string') {
+      const trimmed = rawAmenities.trim();
+      if (!trimmed) return [];
+
+      try {
+        const parsed = JSON.parse(trimmed);
+        if (Array.isArray(parsed)) {
+          return parsed
+            .map((item) => (typeof item === 'string' ? item.trim() : String(item || '').trim()))
+            .filter(Boolean);
+        }
+      } catch {
+        // Fall through to comma-separated parsing.
+      }
+
+      return trimmed
+        .split(',')
+        .map((item) => item.trim())
+        .filter(Boolean);
+    }
+
+    return [];
+  }
+
+  function getBusLabel(route: any): string {
+    return (
+      route?.bus?.model ||
+      route?.busInfo?.model ||
+      route?.busType ||
+      route?.operator?.busModel ||
+      route?.operatorInfo?.busModel ||
+      'Standard Bus'
+    );
+  }
+
+  function getRouteAmenityOptions(routesList: any[]): string[] {
+    const uniqueAmenities = new Set<string>();
+
+    routesList.forEach((route) => {
+      parseAmenities(route).forEach((amenity) => uniqueAmenities.add(amenity));
+    });
+
+    return Array.from(uniqueAmenities).sort((a, b) => a.localeCompare(b));
+  }
+
+  const amenityOptions = useMemo(() => getRouteAmenityOptions(routes), [routes]);
 
   React.useEffect(() => {
     handleSearch();
@@ -74,6 +133,12 @@ function SearchContent() {
       const withinPrice = Number(route.price || 0) <= maxPrice;
       if (!withinPrice) return false;
 
+      if (selectedAmenities.length > 0) {
+        const routeAmenities = parseAmenities(route).map((amenity) => amenity.toLowerCase());
+        const hasSelectedAmenities = selectedAmenities.every((amenity) => routeAmenities.includes(amenity.toLowerCase()));
+        if (!hasSelectedAmenities) return false;
+      }
+
       if (!operatorFilter) return true;
 
       const routeOperatorName = (
@@ -105,7 +170,7 @@ function SearchContent() {
     });
 
     return sorted;
-  }, [maxPrice, operatorFilter, routes, sortBy]);
+  }, [maxPrice, operatorFilter, routes, selectedAmenities, sortBy]);
 
   return (
     <div className="min-h-screen bg-[#f5f8fe]">
@@ -183,12 +248,28 @@ function SearchContent() {
 
               <StyledCard hover={false} className="!p-4">
                 <p className="text-xs font-bold uppercase text-[#8ca4c4] mb-3">Amenities</p>
-                <div className="space-y-2 text-sm text-[#3f5778]">
-                  <label className="flex items-center gap-2"><input type="checkbox" defaultChecked /> Air Conditioning</label>
-                  <label className="flex items-center gap-2"><input type="checkbox" defaultChecked /> USB Charging</label>
-                  <label className="flex items-center gap-2"><input type="checkbox" /> WiFi</label>
-                  <label className="flex items-center gap-2"><input type="checkbox" /> Reclining Seats</label>
-                </div>
+                {amenityOptions.length > 0 ? (
+                  <div className="space-y-2 text-sm text-[#3f5778]">
+                    {amenityOptions.map((amenity) => (
+                      <label key={amenity} className="flex items-center gap-2">
+                        <input
+                          type="checkbox"
+                          checked={selectedAmenities.includes(amenity)}
+                          onChange={(e) => {
+                            setSelectedAmenities((current) =>
+                              e.target.checked
+                                ? [...current, amenity]
+                                : current.filter((value) => value !== amenity)
+                            );
+                          }}
+                        />
+                        {amenity}
+                      </label>
+                    ))}
+                  </div>
+                ) : (
+                  <p className="text-sm text-[#8ca4c4]">Amenity data will appear once routes are loaded.</p>
+                )}
               </StyledCard>
 
               <StyledCard hover={false} className="!p-4">
@@ -224,6 +305,12 @@ function SearchContent() {
               )}
 
               {!loading && filteredRoutes.map((route: any) => (
+                (() => {
+                  const busLabel = getBusLabel(route);
+                  const amenities = parseAmenities(route);
+                  const visibleAmenities = amenities.slice(0, 3);
+
+                  return (
                 <StyledCard key={route.id} hover={false} className="!p-0 overflow-hidden">
                   <div className="grid grid-cols-1 md:grid-cols-[4px_1fr]">
                     <div className="bg-[#00a878]" />
@@ -240,9 +327,21 @@ function SearchContent() {
                             </div>
                             <p className="text-xs text-[#8ca4c4] flex items-center gap-1 mt-1"><Star className="h-3 w-3 text-[#f59e0b]" />4.7 • 203 reviews</p>
                             <div className="flex flex-wrap gap-2 mt-2">
-                              <span className="px-2 py-0.5 rounded-full bg-[#eafaf5] text-[#0f8c6b] text-xs font-semibold">AC</span>
-                              <span className="px-2 py-0.5 rounded-full bg-[#f2ebff] text-[#7c3aed] text-xs font-semibold">USB</span>
-                              <span className="px-2 py-0.5 rounded-full bg-[#edf3ff] text-[#214c86] text-xs font-semibold">Mercedes</span>
+                              <span className="px-2 py-0.5 rounded-full bg-[#edf3ff] text-[#214c86] text-xs font-semibold">{busLabel}</span>
+                              {visibleAmenities.length > 0 ? (
+                                visibleAmenities.map((amenity) => (
+                                  <span
+                                    key={amenity}
+                                    className="px-2 py-0.5 rounded-full bg-[#eafaf5] text-[#0f8c6b] text-xs font-semibold"
+                                  >
+                                    {amenity}
+                                  </span>
+                                ))
+                              ) : (
+                                <span className="px-2 py-0.5 rounded-full bg-[#f5f7fb] text-[#6f86a7] text-xs font-semibold">
+                                  Standard amenities
+                                </span>
+                              )}
                             </div>
                           </div>
                         </div>
@@ -269,6 +368,8 @@ function SearchContent() {
                     </div>
                   </div>
                 </StyledCard>
+                  );
+                })()
               ))}
             </main>
           </div>
