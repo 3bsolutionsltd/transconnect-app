@@ -37,6 +37,43 @@ export default function BookingsPage() {
   const { user, isAuthenticated, loading: authLoading } = useAuth();
   const notificationService = useNotificationService();
 
+  const parseAmenities = (rawAmenities: unknown): string[] => {
+    if (!rawAmenities) return [];
+
+    if (Array.isArray(rawAmenities)) {
+      return rawAmenities
+        .map((item) => (typeof item === 'string' ? item.trim() : String(item || '').trim()))
+        .filter(Boolean);
+    }
+
+    if (typeof rawAmenities === 'string') {
+      const trimmed = rawAmenities.trim();
+      if (!trimmed) return [];
+
+      try {
+        const parsed = JSON.parse(trimmed);
+        if (Array.isArray(parsed)) {
+          return parsed
+            .map((item) => (typeof item === 'string' ? item.trim() : String(item || '').trim()))
+            .filter(Boolean);
+        }
+      } catch {
+        // Fall back to comma-separated amenities.
+      }
+
+      return trimmed
+        .split(',')
+        .map((item) => item.trim())
+        .filter(Boolean);
+    }
+
+    return [];
+  };
+
+  const getBusModel = (booking: any): string => {
+    return booking?.route?.bus?.model || booking?.route?.busType || 'Standard Bus';
+  };
+
   useEffect(() => {
     if (authLoading) return; // Wait for auth to load
     
@@ -540,6 +577,8 @@ export default function BookingsPage() {
                     const canTransfer = booking.status === 'CONFIRMED' || booking.status === 'PENDING';
                     const statusTone = getStatusChipMeta(booking);
                     const bookingCode = `#${String(booking.id || '').slice(-8).toUpperCase()}`;
+                    const busModel = getBusModel(booking);
+                    const bookingAmenities = parseAmenities(booking?.route?.bus?.amenities || booking?.route?.amenities).slice(0, 2);
 
                     return (
                       <tr
@@ -559,6 +598,18 @@ export default function BookingsPage() {
                           <div className="text-xs text-[#96abc7] mt-1">
                             Seat {booking.seatNumber} • {booking.route?.departureTime || 'TBD'}
                           </div>
+                          <div className="text-xs text-[#6f86a7] mt-1">
+                            Bus: {busModel}
+                          </div>
+                          {bookingAmenities.length > 0 && (
+                            <div className="flex flex-wrap gap-1 mt-1.5">
+                              {bookingAmenities.map((amenity) => (
+                                <span key={`${booking.id}-${amenity}`} className="px-1.5 py-0.5 rounded-full bg-[#eef5ff] text-[#3f5f87] text-[10px] font-semibold">
+                                  {amenity}
+                                </span>
+                              ))}
+                            </div>
+                          )}
                         </td>
                         <td className="px-4 py-3.5 text-sm text-[#314a67]">
                           <div className="flex items-center gap-2">

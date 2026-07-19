@@ -33,6 +33,7 @@ interface BookingDetails {
     bus: {
       plateNumber: string;
       model: string;
+      amenities?: string | string[];
     };
   };
   user: {
@@ -57,6 +58,39 @@ export default function BookingDetailsPage() {
   const [error, setError] = useState<string | null>(null);
 
   const bookingId = params?.id as string;
+
+  const parseAmenities = (rawAmenities: unknown): string[] => {
+    if (!rawAmenities) return [];
+
+    if (Array.isArray(rawAmenities)) {
+      return rawAmenities
+        .map((item) => (typeof item === 'string' ? item.trim() : String(item || '').trim()))
+        .filter(Boolean);
+    }
+
+    if (typeof rawAmenities === 'string') {
+      const trimmed = rawAmenities.trim();
+      if (!trimmed) return [];
+
+      try {
+        const parsed = JSON.parse(trimmed);
+        if (Array.isArray(parsed)) {
+          return parsed
+            .map((item) => (typeof item === 'string' ? item.trim() : String(item || '').trim()))
+            .filter(Boolean);
+        }
+      } catch {
+        // Fall back to comma-separated amenities.
+      }
+
+      return trimmed
+        .split(',')
+        .map((item) => item.trim())
+        .filter(Boolean);
+    }
+
+    return [];
+  };
 
   useEffect(() => {
     fetchBookingDetails();
@@ -128,6 +162,8 @@ export default function BookingDetailsPage() {
 
   const statusVariant =
     booking.status === 'CONFIRMED' ? 'success' : booking.status === 'PENDING' ? 'warning' : 'error';
+  const busModel = booking.route?.bus?.model || 'Standard Bus';
+  const routeAmenities = parseAmenities(booking.route?.bus?.amenities).slice(0, 4);
 
   return (
     <div className="min-h-screen bg-[#f5f8fe]">
@@ -187,7 +223,13 @@ export default function BookingDetailsPage() {
                       {booking.route.operator.companyName}
                     </span>
                   </div>
-                  <div className="py-2 flex justify-between"><span className="text-[#8ca4c4]">Bus Type</span><span className="font-semibold text-[#14263f]">{booking.route.bus.model}</span></div>
+                  <div className="py-2 flex justify-between"><span className="text-[#8ca4c4]">Bus Type</span><span className="font-semibold text-[#14263f]">{busModel}</span></div>
+                  <div className="py-2 flex justify-between items-start gap-4">
+                    <span className="text-[#8ca4c4]">Amenities</span>
+                    <span className="font-semibold text-[#14263f] text-right">
+                      {routeAmenities.length > 0 ? routeAmenities.join(' • ') : 'Not specified'}
+                    </span>
+                  </div>
                   <div className="py-2 flex justify-between"><span className="text-[#8ca4c4]">Seat Number</span><span className="font-semibold text-[#214c86]">{booking.seatNumber}</span></div>
                   <div className="py-2 flex justify-between"><span className="text-[#8ca4c4]">Passenger</span><span className="font-semibold text-[#14263f]">{booking.user.firstName} {booking.user.lastName}</span></div>
                 </div>
@@ -239,8 +281,8 @@ export default function BookingDetailsPage() {
                   <p className="text-xl font-black text-[#14263f]">{booking.route.departureTime}</p>
                 </div>
                 <div>
-                  <p className="text-[11px] text-[#8ca4c4] uppercase">Class</p>
-                  <p className="text-xl font-black text-[#0f8c6b]">Luxury</p>
+                  <p className="text-[11px] text-[#8ca4c4] uppercase">Bus</p>
+                  <p className="text-lg font-black text-[#0f8c6b] leading-tight">{busModel}</p>
                 </div>
               </div>
 

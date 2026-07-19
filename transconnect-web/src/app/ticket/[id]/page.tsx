@@ -22,7 +22,7 @@ interface TicketInfo {
   alightingStop?: string;
   route: { origin: string; destination: string; departureTime: string };
   user: { firstName: string; lastName: string };
-  bus?: { plateNumber: string; model: string };
+  bus?: { plateNumber: string; model: string; amenities?: string | string[] };
   operator?: {
     companyName: string;
     brandLogoUrl?: string;
@@ -37,6 +37,39 @@ export default function PublicTicketPage() {
   const [ticket, setTicket] = useState<TicketInfo | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
+
+  const parseAmenities = (rawAmenities: unknown): string[] => {
+    if (!rawAmenities) return [];
+
+    if (Array.isArray(rawAmenities)) {
+      return rawAmenities
+        .map((item) => (typeof item === 'string' ? item.trim() : String(item || '').trim()))
+        .filter(Boolean);
+    }
+
+    if (typeof rawAmenities === 'string') {
+      const trimmed = rawAmenities.trim();
+      if (!trimmed) return [];
+
+      try {
+        const parsed = JSON.parse(trimmed);
+        if (Array.isArray(parsed)) {
+          return parsed
+            .map((item) => (typeof item === 'string' ? item.trim() : String(item || '').trim()))
+            .filter(Boolean);
+        }
+      } catch {
+        // Fall back to comma-separated amenities.
+      }
+
+      return trimmed
+        .split(',')
+        .map((item) => item.trim())
+        .filter(Boolean);
+    }
+
+    return [];
+  };
 
   useEffect(() => {
     if (!bookingId) return;
@@ -99,6 +132,8 @@ export default function PublicTicketPage() {
   const to = ticket.alightingStop || ticket.route.destination;
   const statusVariant =
     ticket.status === 'CONFIRMED' ? 'success' : ticket.status === 'PENDING' ? 'warning' : 'error';
+  const busModel = ticket.bus?.model || 'Standard Bus';
+  const busAmenities = parseAmenities(ticket.bus?.amenities).slice(0, 3);
 
   return (
     <div className="min-h-screen bg-[#f5f8fe]">
@@ -187,7 +222,10 @@ export default function PublicTicketPage() {
                   <p>{ticket.operator.companyName}</p>
                 </div>
               )}
-              {ticket.bus && <p className="text-xs text-[#8ca4c4] mt-0.5">Bus: {ticket.bus.plateNumber} • {ticket.bus.model}</p>}
+              {ticket.bus && <p className="text-xs text-[#8ca4c4] mt-0.5">Bus: {ticket.bus.plateNumber} • {busModel}</p>}
+              {busAmenities.length > 0 && (
+                <p className="text-xs text-[#6f86a7] mt-1">Amenities: {busAmenities.join(' • ')}</p>
+              )}
               <p className="text-xs text-[#8ca4c4] mt-2 font-mono">#{bookingId.slice(-8).toUpperCase()}</p>
             </div>
           </StyledCard>
