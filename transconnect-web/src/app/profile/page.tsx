@@ -18,7 +18,7 @@ import {
 import Header from '@/components/Header';
 import PortalFooter from '@/components/PortalFooter';
 import { useAuth } from '@/contexts/AuthContext';
-import { Container, Heading, Lead, Section, StyledCard } from '@/components/styled';
+import { Container, Heading, Lead, StyledCard } from '@/components/styled';
 
 export default function ProfilePage() {
   const router = useRouter();
@@ -58,7 +58,7 @@ export default function ProfilePage() {
   if (!isAuthenticated) return null;
 
   return (
-    <Section variant="gray" className="min-h-screen">
+    <div className="min-h-screen bg-gray-50">
       <Header />
       <Container className="max-w-[1240px] py-8">
         <div className="grid grid-cols-1 lg:grid-cols-[280px_1fr] gap-6">
@@ -197,6 +197,6 @@ export default function ProfilePage() {
         </div>
       </Container>
       <PortalFooter slim />
-    </Section>
+    </div>
   );
 }

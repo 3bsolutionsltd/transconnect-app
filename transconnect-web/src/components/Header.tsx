@@ -53,49 +53,41 @@ export default function Header() {
           </Link>
 
           {/* Desktop Navigation */}
-          <nav className="hidden md:flex items-center space-x-6">
+          <nav className="hidden lg:flex items-center gap-5 text-[1.03rem]">
             <Link href="/search" className={`font-medium transition-colors ${linkClass('/search')}`}>
-              Search Routes
+              <span className="whitespace-nowrap">Search Routes</span>
             </Link>
             <Link href="/trusted-operators" className={`font-medium transition-colors ${linkClass('/trusted-operators')}`}>
-              Trusted Operators
+              <span className="whitespace-nowrap">Trusted Operators</span>
             </Link>
             {isAuthenticated && (
               <>
               <Link href="/bookings" className={`font-medium transition-colors ${linkClass('/bookings')}`}>
-                My Bookings
+                <span className="whitespace-nowrap">My Bookings</span>
               </Link>
               <Link href="/profile" className={`font-medium transition-colors ${linkClass('/profile')}`}>
-                My Profile
+                <span className="whitespace-nowrap">My Profile</span>
               </Link>
               </>
             )}
             {isAdmin && (
-              <>
-                <Link href="/admin" className={`font-medium transition-colors ${linkClass('/admin')}`}>
-                  Dashboard
-                </Link>
-                <Link href="/admin/routes" className={`font-medium transition-colors ${linkClass('/admin/routes')}`}>
-                  Routes
-                </Link>
-                <Link href="/admin/analytics" className={`font-medium transition-colors ${linkClass('/admin/analytics')}`}>
-                  Analytics
-                </Link>
-              </>
+              <Link href="/admin" className={`font-medium transition-colors ${linkClass('/admin')}`}>
+                <span className="whitespace-nowrap">Admin</span>
+              </Link>
             )}
           </nav>
 
           {/* Desktop Auth */}
-          <div className="hidden md:flex items-center space-x-4">
+          <div className="hidden lg:flex items-center space-x-3">
             {isAuthenticated ? (
-              <div className="flex items-center space-x-4">
-                <PlayStoreCTA compact source="header_desktop_utility" />
+              <div className="flex items-center space-x-3">
+                <PlayStoreCTA compact source="header_desktop_utility" className="hidden xl:inline-flex" />
                 <div className="h-10 rounded-xl bg-[#13273d] border border-[#1f3a58] text-slate-300 hover:text-white flex items-center justify-center px-2">
                   <NotificationCenter />
                 </div>
-                <div className="flex items-center space-x-2 bg-[#13273d] border border-[#1f3a58] rounded-xl px-3 py-2">
+                <div className="flex items-center space-x-2 bg-[#13273d] border border-[#1f3a58] rounded-xl px-3 py-2 min-w-0">
                   <User className="h-4 w-4 text-slate-300" />
-                  <span className="text-slate-100 font-medium text-sm">
+                  <span className="text-slate-100 font-medium text-sm whitespace-nowrap max-w-[140px] overflow-hidden text-ellipsis">
                     {user?.firstName} {user?.lastName}
                   </span>
                   {isAdmin && (
@@ -116,7 +108,7 @@ export default function Header() {
               </div>
             ) : (
               <div className="flex items-center space-x-3">
-                <PlayStoreCTA compact source="header_desktop_guest" />
+                <PlayStoreCTA compact source="header_desktop_guest" className="hidden xl:inline-flex" />
                 <Link href="/login">
                   <Button
                     variant="outline"
@@ -136,7 +128,7 @@ export default function Header() {
 
           {/* Mobile menu button */}
           <button
-            className="md:hidden p-2 touch-manipulation min-h-[44px] min-w-[44px] flex items-center justify-center rounded-lg hover:bg-slate-700 active:bg-slate-600 transition-colors"
+            className="lg:hidden p-2 touch-manipulation min-h-[44px] min-w-[44px] flex items-center justify-center rounded-lg hover:bg-slate-700 active:bg-slate-600 transition-colors"
             onClick={() => setMobileMenuOpen(!mobileMenuOpen)}
             aria-label="Toggle menu"
           >
@@ -150,7 +142,7 @@ export default function Header() {
 
         {/* Mobile Navigation */}
         {mobileMenuOpen && (
-          <div className="md:hidden border-t border-[#1a3a5c] bg-[#0d1b2a]">
+          <div className="lg:hidden border-t border-[#1a3a5c] bg-[#0d1b2a]">
             <div className="px-2 pt-2 pb-3 space-y-1">
               <Link 
                 href="/search" 
