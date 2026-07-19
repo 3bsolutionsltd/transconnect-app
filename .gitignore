@@ -117,6 +117,7 @@ temp/
 dist/
 build/
 out/
+*.aab
 
 # Backup files
 *.backup
