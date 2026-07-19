@@ -9,7 +9,9 @@ import {
   ActivityIndicator,
   Alert,
   Modal,
+  Linking,
 } from 'react-native';
+import { WebView } from 'react-native-webview';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
 import { bookingsApi } from '../../services/api';
@@ -18,10 +20,10 @@ import { offlineStorage } from '../../services/offlineStorage';
 import { notificationService } from '../../services/notificationService';
 import { format } from 'date-fns';
 
-type PaymentMethod = 'mtn' | 'airtel' | 'card' | 'cash';
+type PaymentMethod = 'pesapal' | 'cash';
 
 export default function PaymentScreen({ route, navigation }: any) {
-  const { route: routeData, passengers, searchParams, selectedSeats, totalAmount } = route.params;
+  const { route: routeData, passengers, searchParams, selectedSeats, totalAmount, isRetry, booking: existingBooking } = route.params;
   const { user } = useAuth();
   
   const [selectedMethod, setSelectedMethod] = useState<PaymentMethod | null>('cash');
@@ -29,39 +31,25 @@ export default function PaymentScreen({ route, navigation }: any) {
   const [loading, setLoading] = useState(false);
   const [showPaymentModal, setShowPaymentModal] = useState(false);
   const [paymentStatus, setPaymentStatus] = useState<'pending' | 'success' | 'failed'>('pending');
+  const [showWebView, setShowWebView] = useState(false);
+  const [pesapalUrl, setPesapalUrl] = useState('');
 
   const paymentMethods = [
     {
-      id: 'mtn' as PaymentMethod,
-      name: 'MTN Mobile Money',
-      icon: 'phone-portrait-outline',
-      color: '#FFCB05',
-      textColor: '#000000',
-      description: 'Pay with MTN MoMo',
-    },
-    {
-      id: 'airtel' as PaymentMethod,
-      name: 'Airtel Money',
-      icon: 'phone-portrait-outline',
-      color: '#ED1C24',
+      id: 'pesapal' as PaymentMethod,
+      name: 'PesaPal',
+      icon: 'card-outline',
+      color: '#7C3AED',
       textColor: '#FFFFFF',
-      description: 'Pay with Airtel Money',
+      description: 'Pay with Card, Bank, or Mobile Money via PesaPal',
     },
     {
       id: 'cash' as PaymentMethod,
-      name: 'Cash / Over the Counter',
+      name: 'Cash Payment',
       icon: 'cash-outline',
       color: '#10B981',
       textColor: '#FFFFFF',
-      description: 'Pay at our office or agent',
-    },
-    {
-      id: 'card' as PaymentMethod,
-      name: 'Debit/Credit Card',
-      icon: 'card-outline',
-      color: '#3B82F6',
-      textColor: '#FFFFFF',
-      description: 'Visa, Mastercard',
+      description: 'Pay at operator office or at boarding (Default)',
     },
   ];
 
@@ -71,15 +59,8 @@ export default function PaymentScreen({ route, navigation }: any) {
       return;
     }
 
-    if ((selectedMethod === 'mtn' || selectedMethod === 'airtel') && !phoneNumber) {
-      Alert.alert('Error', 'Please enter your phone number');
-      return;
-    }
-
-    if (phoneNumber && !/^256\d{9}$/.test(phoneNumber.replace(/\s/g, ''))) {
-      Alert.alert('Error', 'Please enter a valid phone number (e.g., 256701234567)');
-      return;
-    }
+    // PesaPal doesn't require phone number upfront (handled in their checkout)
+    // Cash payment doesn't need phone validation
 
     // Check for duplicate bookings
     try {
@@ -121,9 +102,7 @@ export default function PaymentScreen({ route, navigation }: any) {
     try {
       // Map payment method to backend format
       const methodMap: Record<PaymentMethod, string> = {
-        mtn: 'MTN_MOBILE_MONEY',
-        airtel: 'AIRTEL_MONEY',
-        card: 'FLUTTERWAVE',
+        pesapal: 'PESAPAL',
         cash: 'CASH',
       };
 
@@ -139,21 +118,29 @@ export default function PaymentScreen({ route, navigation }: any) {
         lastName: user?.lastName || user?.name?.split(' ')[1] || `${i + 1}`,
       }));
 
-      // Create booking
-      const bookingData = {
-        routeId: routeData.id,
-        seatNumbers: selectedSeats,
-        travelDate,
-        passengers: passengerData,
-        boardingStop: searchParams.from,
-        alightingStop: searchParams.to,
-      };
+      let createdBooking;
 
-      const response = await bookingsApi.createBooking(bookingData);
-      const createdBooking = response.data.bookings?.[0] || response.data;
-      
-      // Save booking to offline storage immediately
-      await offlineStorage.saveBooking(createdBooking);
+      // If this is a retry payment, use existing booking instead of creating new one
+      if (isRetry && existingBooking) {
+        createdBooking = existingBooking;
+        console.log('🔄 Retrying payment for existing booking:', createdBooking.id);
+      } else {
+        // Create new booking
+        const bookingData = {
+          routeId: routeData.id,
+          seatNumbers: selectedSeats,
+          travelDate,
+          passengers: passengerData,
+          boardingStop: searchParams.from,
+          alightingStop: searchParams.to,
+        };
+
+        const response = await bookingsApi.createBooking(bookingData);
+        createdBooking = response.data.bookings?.[0] || response.data;
+        
+        // Save booking to offline storage immediately
+        await offlineStorage.saveBooking(createdBooking);
+      }
       
       // Handle cash payments differently - no payment API call needed
       if (selectedMethod === 'cash') {
@@ -189,17 +176,29 @@ export default function PaymentScreen({ route, navigation }: any) {
         return;
       }
       
-      // For online payments (MTN, Airtel, Card), initiate payment
+      // For PesaPal payment, initiate payment
       const paymentData = {
         bookingId: createdBooking.id,
         method: methodMap[selectedMethod],
-        phoneNumber: phoneNumber.replace(/\s/g, ''),
+        phoneNumber: phoneNumber ? phoneNumber.replace(/\s/g, '') : undefined,
       };
 
       // Call payment API
       const paymentResponse = await bookingsApi.initiatePayment(paymentData);
       
-      // Check if payment completed immediately (demo mode)
+      // Check if we have a checkout URL (PesaPal redirect flow)
+      if (paymentResponse.data.checkoutUrl) {
+        console.log('📱 Opening PesaPal checkout:', paymentResponse.data.checkoutUrl);
+        setLoading(false);
+        setShowPaymentModal(false);
+        
+        // Open PesaPal checkout in WebView
+        setPesapalUrl(paymentResponse.data.checkoutUrl);
+        setShowWebView(true);
+        return;
+      }
+      
+      // Check if payment completed immediately (demo mode or instant payment)
       if (paymentResponse.data.status === 'COMPLETED') {
         setPaymentStatus('success');
         setLoading(false);
@@ -207,7 +206,7 @@ export default function PaymentScreen({ route, navigation }: any) {
         // Send payment success notification
         await notificationService.sendPaymentSuccess(
           routeData.price * selectedSeats.length,
-          paymentResponse.data.payment.reference
+          paymentResponse.data.payment?.reference || paymentResponse.data.paymentReference
         );
 
         // Send booking confirmation notification
@@ -215,7 +214,7 @@ export default function PaymentScreen({ route, navigation }: any) {
           searchParams.from,
           searchParams.to,
           format(new Date(travelDate), 'MMM dd, yyyy'),
-          paymentResponse.data.booking.id.slice(0, 8)
+          createdBooking.id.slice(0, 8)
         );
 
         // Schedule trip reminder
@@ -229,16 +228,15 @@ export default function PaymentScreen({ route, navigation }: any) {
         setTimeout(() => {
           setShowPaymentModal(false);
           navigation.navigate('BookingConfirmation', {
-            booking: paymentResponse.data.booking,
+            booking: createdBooking,
             route: routeData,
             searchParams,
-            paymentRef: paymentResponse.data.payment.reference,
+            paymentRef: paymentResponse.data.payment?.reference || paymentResponse.data.paymentReference,
           });
         }, 1500);
       } else {
-        // Payment pending - simulate processing
-        await new Promise(resolve => setTimeout(resolve, 3000));
-
+        // Payment is pending - this shouldn't normally happen without checkoutUrl
+        console.warn('⚠️ Payment initiated but no checkout URL provided');
         setPaymentStatus('success');
         setLoading(false);
 
@@ -248,7 +246,7 @@ export default function PaymentScreen({ route, navigation }: any) {
             booking: createdBooking,
             route: routeData,
             searchParams,
-            paymentRef: paymentResponse.data.reference,
+            paymentRef: paymentResponse.data.paymentReference,
           });
         }, 1500);
       }
@@ -360,7 +358,7 @@ export default function PaymentScreen({ route, navigation }: any) {
         <TouchableOpacity onPress={() => navigation.goBack()}>
           <Ionicons name="arrow-back" size={24} color="#1F2937" />
         </TouchableOpacity>
-        <Text style={styles.headerTitle}>Payment</Text>
+        <Text style={styles.headerTitle}>{isRetry ? 'Complete Payment' : 'Payment'}</Text>
         <View style={{ width: 24 }} />
       </View>
 
@@ -400,35 +398,24 @@ export default function PaymentScreen({ route, navigation }: any) {
           {paymentMethods.map(method => renderPaymentMethod(method))}
         </View>
 
-        {/* Phone Number Input (for mobile money) */}
-        {(selectedMethod === 'mtn' || selectedMethod === 'airtel') && (
+        {/* Payment Method Info */}
+        {selectedMethod === 'pesapal' && (
           <View style={styles.section}>
-            <Text style={styles.sectionTitle}>Phone Number</Text>
-            <View style={styles.inputContainer}>
-              <Ionicons name="phone-portrait-outline" size={20} color="#6B7280" />
-              <TextInput
-                style={styles.input}
-                placeholder="256701234567"
-                value={phoneNumber}
-                onChangeText={setPhoneNumber}
-                keyboardType="phone-pad"
-                maxLength={12}
-              />
+            <View style={styles.infoBox}>
+              <Ionicons name="information-circle-outline" size={20} color="#7C3AED" />
+              <Text style={styles.infoText}>
+                You will be redirected to PesaPal secure checkout where you can pay with Card, Bank Transfer, or Mobile Money.
+              </Text>
             </View>
-            <Text style={styles.inputHint}>
-              Enter your {selectedMethod === 'mtn' ? 'MTN' : 'Airtel'} Mobile Money number
-            </Text>
           </View>
         )}
 
-        {/* Card Input (placeholder for now) */}
-        {selectedMethod === 'card' && (
+        {selectedMethod === 'cash' && (
           <View style={styles.section}>
-            <Text style={styles.sectionTitle}>Card Details</Text>
-            <View style={styles.comingSoonBox}>
-              <Ionicons name="information-circle-outline" size={20} color="#3B82F6" />
-              <Text style={styles.comingSoonText}>
-                Card payments coming soon. Please use Mobile Money for now.
+            <View style={styles.infoBox}>
+              <Ionicons name="information-circle-outline" size={20} color="#10B981" />
+              <Text style={styles.infoText}>
+                After confirming, pay at the operator office or at boarding. Present your booking reference.
               </Text>
             </View>
           </View>
@@ -451,10 +438,10 @@ export default function PaymentScreen({ route, navigation }: any) {
         <TouchableOpacity
           style={[
             styles.payButton,
-            (!selectedMethod || (selectedMethod === 'card')) && styles.payButtonDisabled,
+            !selectedMethod && styles.payButtonDisabled,
           ]}
           onPress={handlePayment}
-          disabled={!selectedMethod || loading || selectedMethod === 'card'}
+          disabled={!selectedMethod || loading}
         >
           {loading ? (
             <>
@@ -485,10 +472,8 @@ export default function PaymentScreen({ route, navigation }: any) {
                 <ActivityIndicator size="large" color="#3B82F6" />
                 <Text style={styles.modalTitle}>Processing Payment</Text>
                 <Text style={styles.modalText}>
-                  {selectedMethod === 'mtn' 
-                    ? 'Please approve the payment on your phone...' 
-                    : selectedMethod === 'airtel'
-                    ? 'Please enter your Airtel Money PIN...'
+                  {selectedMethod === 'pesapal' 
+                    ? 'Redirecting to PesaPal secure checkout...' 
                     : 'Processing your payment...'}
                 </Text>
               </>
@@ -513,6 +498,127 @@ export default function PaymentScreen({ route, navigation }: any) {
             )}
           </View>
         </View>
+      </Modal>
+
+      {/* PesaPal WebView Modal */}
+      <Modal
+        visible={showWebView}
+        animationType="slide"
+        onRequestClose={() => {
+          Alert.alert(
+            'Cancel Payment?',
+            'Are you sure you want to cancel this payment?',
+            [
+              { text: 'Continue Payment', style: 'cancel' },
+              {
+                text: 'Cancel',
+                style: 'destructive',
+                onPress: () => {
+                  setShowWebView(false);
+                  setPesapalUrl('');
+                  navigation.goBack();
+                }
+              }
+            ]
+          );
+        }}
+      >
+        <SafeAreaView style={{ flex: 1, backgroundColor: '#FFFFFF' }}>
+          <View style={styles.webViewHeader}>
+            <TouchableOpacity
+              onPress={() => {
+                Alert.alert(
+                  'Cancel Payment?',
+                  'Are you sure you want to cancel this payment?',
+                  [
+                    { text: 'Continue Payment', style: 'cancel' },
+                    {
+                      text: 'Cancel',
+                      style: 'destructive',
+                      onPress: () => {
+                        setShowWebView(false);
+                        setPesapalUrl('');
+                        navigation.goBack();
+                      }
+                    }
+                  ]
+                );
+              }}
+              style={styles.closeButton}
+            >
+              <Ionicons name="close" size={24} color="#374151" />
+            </TouchableOpacity>
+            <Text style={styles.webViewTitle}>PesaPal Secure Checkout</Text>
+            <View style={{ width: 40 }} />
+          </View>
+          
+          {pesapalUrl ? (
+            <WebView
+              source={{ uri: pesapalUrl }}
+              onNavigationStateChange={(navState) => {
+                console.log('📱 WebView navigation:', navState.url);
+                
+                // Check if payment was completed or cancelled based on callback URL
+                if (navState.url.includes('/payment/callback') || 
+                    navState.url.includes('/payment/success') ||
+                    navState.url.includes('transconnect.app/callback')) {
+                  
+                  // Extract payment reference or status from URL
+                  const urlParams = new URLSearchParams(navState.url.split('?')[1]);
+                  const status = urlParams.get('status') || urlParams.get('OrderTrackingId');
+                  
+                  console.log('✅ Payment callback detected:', status);
+                  
+                  setShowWebView(false);
+                  setPesapalUrl('');
+                  
+                  // Show success modal briefly then navigate
+                  setShowPaymentModal(true);
+                  setPaymentStatus('success');
+                  
+                  setTimeout(() => {
+                    setShowPaymentModal(false);
+                    navigation.navigate('BookingConfirmation', {
+                      booking: route.params.booking || { id: 'PENDING' },
+                      route: routeData,
+                      searchParams,
+                      paymentRef: status || 'PESAPAL-PENDING',
+                    });
+                  }, 1500);
+                } else if (navState.url.includes('/payment/cancel') || 
+                          navState.url.includes('cancelled')) {
+                  console.log('❌ Payment cancelled');
+                  setShowWebView(false);
+                  setPesapalUrl('');
+                  Alert.alert('Payment Cancelled', 'Your payment was cancelled. Please try again.');
+                }
+              }}
+              startInLoadingState
+              renderLoading={() => (
+                <View style={{ flex: 1, justifyContent: 'center', alignItems: 'center' }}>
+                  <ActivityIndicator size="large" color="#3B82F6" />
+                  <Text style={{ marginTop: 10, color: '#6B7280' }}>Loading PesaPal...</Text>
+                </View>
+              )}
+              onError={(syntheticEvent) => {
+                const { nativeEvent } = syntheticEvent;
+                console.error('❌ WebView error:', nativeEvent);
+                Alert.alert(
+                  'Connection Error',
+                  'Failed to load payment page. Please check your internet connection.',
+                  [
+                    { text: 'Try Again', onPress: () => setShowWebView(false) },
+                    { text: 'Cancel', onPress: () => navigation.goBack() }
+                  ]
+                );
+              }}
+            />
+          ) : (
+            <View style={{ flex: 1, justifyContent: 'center', alignItems: 'center' }}>
+              <ActivityIndicator size="large" color="#3B82F6" />
+            </View>
+          )}
+        </SafeAreaView>
       </Modal>
     </SafeAreaView>
   );
@@ -690,6 +796,21 @@ const styles = StyleSheet.create({
     fontSize: 14,
     color: '#1E40AF',
   },
+  infoBox: {
+    flexDirection: 'row',
+    backgroundColor: '#F3F4F6',
+    padding: 16,
+    borderRadius: 12,
+    borderWidth: 1,
+    borderColor: '#E5E7EB',
+  },
+  infoText: {
+    flex: 1,
+    marginLeft: 12,
+    fontSize: 14,
+    color: '#374151',
+    lineHeight: 20,
+  },
   phoneInputContainer: {
     marginTop: 16,
   },
@@ -787,5 +908,23 @@ const styles = StyleSheet.create({
   },
   errorIcon: {
     marginBottom: 8,
+  },
+  webViewHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    paddingHorizontal: 16,
+    paddingVertical: 12,
+    borderBottomWidth: 1,
+    borderBottomColor: '#E5E7EB',
+    backgroundColor: '#FFFFFF',
+  },
+  webViewTitle: {
+    fontSize: 16,
+    fontWeight: '600',
+    color: '#1F2937',
+  },
+  closeButton: {
+    padding: 8,
   },
 });

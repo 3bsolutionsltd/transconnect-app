@@ -1,0 +1,17 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 32 32" fill="none">
+  <!-- Background circle -->
+  <circle cx="16" cy="16" r="16" fill="#2563EB"/>
+  <!-- Bus body -->
+  <rect x="6" y="10" width="20" height="13" rx="2" fill="white"/>
+  <!-- Bus windshield -->
+  <rect x="7" y="11" width="8" height="5" rx="1" fill="#BFDBFE"/>
+  <!-- Bus rear window -->
+  <rect x="17" y="11" width="8" height="5" rx="1" fill="#BFDBFE"/>
+  <!-- Bus wheels -->
+  <circle cx="10" cy="23" r="2.5" fill="#1E40AF"/>
+  <circle cx="22" cy="23" r="2.5" fill="#1E40AF"/>
+  <circle cx="10" cy="23" r="1" fill="white"/>
+  <circle cx="22" cy="23" r="1" fill="white"/>
+  <!-- Door line -->
+  <rect x="15" y="17" width="1" height="6" fill="#BFDBFE"/>
+</svg>

@@ -1,0 +1,68 @@
+name: Deploy to Staging
+
+on:
+  push:
+    branches: [staging]
+  workflow_dispatch:
+    inputs:
+      force_build:
+        description: 'Force rebuild of Docker images (no cache)'
+        required: false
+        default: false
+        type: boolean
+
+env:
+  FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: true
+
+concurrency:
+  group: staging-deploy
+  cancel-in-progress: false    # Don't cancel in-flight deploys
+
+jobs:
+  # ─── Deploy to VPS over SSH ──────────────────────────────────
+  deploy:
+    name: Deploy staging
+    runs-on: ubuntu-latest
+    environment: staging
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set short SHA
+        id: sha
+        run: echo "sha=$(git rev-parse --short HEAD)" >> $GITHUB_OUTPUT
+
+      - name: Deploy via SSH
+        uses: appleboy/ssh-action@v1.2.0
+        with:
+          host:     ${{ secrets.VPS_HOST }}
+          username: ${{ secrets.VPS_USER }}
+          key:      ${{ secrets.VPS_SSH_KEY }}
+          port:     ${{ secrets.VPS_PORT }}
+          timeout:  30s
+          command_timeout: 40m
+          script: |
+            set -e
+            cd /opt/transconnect/app
+            git fetch origin
+            git checkout staging
+            git pull origin staging
+
+            BUILD_FLAG=""
+            if [ "${{ github.event.inputs.force_build }}" = "true" ]; then
+              BUILD_FLAG="--build"
+            fi
+
+            bash transconnect-infra/scripts/deploy-staging.sh $BUILD_FLAG
+
+      - name: Notify deployment status
+        if: always()
+        uses: slackapi/slack-github-action@v1.27.0
+        continue-on-error: true
+        with:
+          payload: |
+            {
+              "text": "${{ job.status == 'success' && '✅' || '❌' }} Staging deploy *${{ job.status }}* — `${{ steps.sha.outputs.sha }}` by ${{ github.actor }}"
+            }
+        env:
+          SLACK_WEBHOOK_URL: ${{ env.SLACK_WEBHOOK_URL }}

@@ -1,10 +1,13 @@
 'use client';
+
 import React, { useEffect, useState } from 'react';
 import { useRouter, useParams } from 'next/navigation';
-import { useAuth } from '@/contexts/AuthContext';
 import Header from '@/components/Header';
-import { ArrowLeft, MapPin, Calendar, Clock, User, Phone, CreditCard, QrCode, Download } from 'lucide-react';
+import PortalFooter from '@/components/PortalFooter';
+import { Calendar, Clock, Download, Mail, MapPin, Phone, QrCode, Share2 } from 'lucide-react';
 import Link from 'next/link';
+import { Container, Section, StyledCard, StyledButton, Badge } from '@/components/styled';
+import TransConnectLogo from '@/components/branding/TransConnectLogo';
 
 interface BookingDetails {
   id: string;
@@ -36,7 +39,6 @@ interface BookingDetails {
     phone: string;
   };
   payment?: {
-    id: string;
     status: string;
     method: string;
     reference: string;
@@ -47,7 +49,6 @@ interface BookingDetails {
 export default function BookingDetailsPage() {
   const params = useParams();
   const router = useRouter();
-  const { isAuthenticated, user } = useAuth();
   const [booking, setBooking] = useState<BookingDetails | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -55,30 +56,36 @@ export default function BookingDetailsPage() {
   const bookingId = params?.id as string;
 
   useEffect(() => {
-    if (!isAuthenticated) {
-      router.push('/login');
-      return;
-    }
-
     fetchBookingDetails();
-  }, [isAuthenticated, bookingId]);
+  }, [bookingId]);
 
   const fetchBookingDetails = async () => {
     try {
       const token = localStorage.getItem('token');
-      const response = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/bookings/${bookingId}`, {
+      if (!token) {
+        router.push('/login');
+        return;
+      }
+
+      const apiBase = process.env.NEXT_PUBLIC_API_URL || '/api';
+      const response = await fetch(`${apiBase}/bookings/${bookingId}`, {
         headers: {
-          'Authorization': `Bearer ${token}`,
+          Authorization: `Bearer ${token}`,
           'Content-Type': 'application/json',
         },
       });
 
-      if (!response.ok) {
-        throw new Error('Failed to fetch booking details');
+      if (response.status === 401) {
+        router.push('/login');
+        return;
       }
 
-      const data = await response.json();
-      setBooking(data);
+      if (!response.ok) {
+        const body = await response.json().catch(() => ({}));
+        throw new Error(body.error || `Error ${response.status}`);
+      }
+
+      setBooking(await response.json());
     } catch (err: any) {
       setError(err.message || 'Failed to load booking details');
     } finally {
@@ -86,44 +93,12 @@ export default function BookingDetailsPage() {
     }
   };
 
-  const getStatusColor = (status: string) => {
-    switch (status) {
-      case 'CONFIRMED': return 'text-green-600 bg-green-50 border-green-200';
-      case 'PENDING': return 'text-yellow-600 bg-yellow-50 border-yellow-200';
-      case 'CANCELLED': return 'text-red-600 bg-red-50 border-red-200';
-      case 'COMPLETED': return 'text-blue-600 bg-blue-50 border-blue-200';
-      default: return 'text-gray-600 bg-gray-50 border-gray-200';
-    }
-  };
-
-  const downloadQRCode = () => {
-    if (!booking?.qrCode) return;
-    
-    // Generate QR code download (implementation would depend on your QR generation library)
-    const canvas = document.createElement('canvas');
-    const ctx = canvas.getContext('2d');
-    // QR code generation logic here
-    
-    const link = document.createElement('a');
-    link.download = `TransConnect-Ticket-${booking.id}.png`;
-    link.href = canvas.toDataURL();
-    link.click();
-  };
-
-  if (!isAuthenticated) {
-    return null; // Will redirect to login
-  }
-
   if (loading) {
     return (
-      <div className="min-h-screen bg-gray-50">
+      <div className="min-h-screen bg-[#f5f8fe]">
         <Header />
-        <div className="max-w-4xl mx-auto p-4 sm:p-6">
-          <div className="animate-pulse space-y-6">
-            <div className="h-8 bg-gray-200 rounded w-1/3"></div>
-            <div className="h-64 bg-gray-200 rounded"></div>
-            <div className="h-32 bg-gray-200 rounded"></div>
-          </div>
+        <div className="flex items-center justify-center h-72">
+          <div className="animate-spin rounded-full h-10 w-10 border-b-2 border-[#00D9A3]" />
         </div>
       </div>
     );
@@ -131,221 +106,163 @@ export default function BookingDetailsPage() {
 
   if (error || !booking) {
     return (
-      <div className="min-h-screen bg-gray-50">
+      <div className="min-h-screen bg-[#f5f8fe]">
         <Header />
-        <div className="max-w-4xl mx-auto p-4 sm:p-6">
-          <div className="text-center py-12">
-            <div className="text-red-600 mb-4">
-              <QrCode className="h-16 w-16 mx-auto mb-4" />
-              <h2 className="text-2xl font-bold">Booking Not Found</h2>
-              <p className="text-gray-600 mt-2">{error || 'The booking you\'re looking for doesn\'t exist or you don\'t have access to it.'}</p>
+        <Container className="py-12">
+          <StyledCard hover={false} className="text-center max-w-xl mx-auto">
+            <QrCode className="h-14 w-14 text-gray-300 mx-auto mb-4" />
+            <h2 className="text-3xl font-black text-[#14263f]">Booking Not Found</h2>
+            <p className="text-[#6f86a7] mt-2">{error || 'This booking could not be loaded.'}</p>
+            <div className="mt-6 flex justify-center gap-3">
+              <Link href="/bookings" className="btn-primary">View All Bookings</Link>
+              <Link href="/search" className="btn-outline">Search Routes</Link>
             </div>
-            <div className="mt-6 space-x-4">
-              <Link href="/bookings" className="btn-primary">
-                View All Bookings
-              </Link>
-              <Link href="/search" className="btn-outline">
-                Book New Trip
-              </Link>
-            </div>
-          </div>
-        </div>
+          </StyledCard>
+        </Container>
       </div>
     );
   }
 
+  const statusVariant =
+    booking.status === 'CONFIRMED' ? 'success' : booking.status === 'PENDING' ? 'warning' : 'error';
+
   return (
-    <div className="min-h-screen bg-gray-50">
+    <div className="min-h-screen bg-[#f5f8fe]">
       <Header />
-      <div className="max-w-4xl mx-auto p-4 sm:p-6">
-        {/* Header */}
-        <div className="flex items-center justify-between mb-6">
-          <div className="flex items-center space-x-4">
-            <button
-              onClick={() => router.back()}
-              className="p-2 hover:bg-gray-100 rounded-lg transition-colors"
-            >
-              <ArrowLeft className="h-5 w-5" />
-            </button>
-            <div>
-              <h1 className="text-2xl font-bold text-gray-900">Booking Details</h1>
-              <p className="text-gray-600">#{booking.id.slice(-8).toUpperCase()}</p>
-            </div>
-          </div>
-          <div className={`px-3 py-1 rounded-full border text-sm font-medium ${getStatusColor(booking.status)}`}>
-            {booking.status}
-          </div>
+      <Container className="py-5">
+        <div className="text-xs text-[#8ca4c4] mb-5">
+          <Link href="/" className="hover:text-[#214c86]">Home</Link> {'>'} <Link href="/bookings" className="hover:text-[#214c86]">My Bookings</Link> {'>'} #{booking.id.slice(-8).toUpperCase()}
         </div>
 
-        <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-          {/* Main Booking Information */}
-          <div className="lg:col-span-2 space-y-6">
-            {/* Trip Details */}
-            <div className="bg-white rounded-lg shadow-sm p-6">
-              <h3 className="text-lg font-semibold text-gray-900 mb-4">Trip Information</h3>
-              <div className="space-y-4">
-                <div className="flex items-center justify-between">
-                  <div className="flex items-center space-x-3">
-                    <MapPin className="h-5 w-5 text-gray-400" />
+        <div className="grid grid-cols-1 lg:grid-cols-[1fr_340px] gap-4">
+          <main className="space-y-4">
+            <StyledCard hover={false} className="!p-5 bg-[#0f9f6f] text-white">
+              <div className="flex items-center justify-between">
+                <div>
+                  <h1 className="text-3xl font-black">Booking Confirmed</h1>
+                  <p className="text-white/85 text-sm mt-1">Your ticket is ready • Booking ID: #{booking.id.slice(-8).toUpperCase()}</p>
+                </div>
+                <div className="text-right text-xs">
+                  <p className="uppercase">Booked On</p>
+                  <p className="text-sm font-semibold">{new Date(booking.bookingDate).toLocaleDateString()}</p>
+                </div>
+              </div>
+            </StyledCard>
+
+            <StyledCard hover={false} className="!p-0 overflow-hidden">
+              <div className="px-5 py-4 border-b border-[#ebf1f8] flex items-center justify-between">
+                <h2 className="text-2xl font-black text-[#14263f]">Trip Details</h2>
+                <Badge variant={statusVariant}>Confirmed</Badge>
+              </div>
+
+              <div className="p-5">
+                <div className="rounded-xl bg-[#f0f5fd] p-5 mb-4">
+                  <div className="grid grid-cols-3 gap-4 items-center">
                     <div>
-                      <p className="font-medium text-gray-900">
-                        {booking.route.origin} → {booking.route.destination}
-                      </p>
-                      <p className="text-sm text-gray-600">{booking.route.operator.companyName}</p>
+                      <p className="text-xs text-[#8ca4c4] uppercase">From</p>
+                      <p className="text-4xl font-black text-[#14263f]">{booking.route.origin}</p>
+                      <p className="text-sm text-[#6f86a7]">{booking.route.departureTime}</p>
+                    </div>
+                    <div className="text-center">
+                      <p className="text-xs text-[#0f8c6b] font-semibold">{Math.floor((booking.route.duration || 390) / 60)}h {(booking.route.duration || 390) % 60}m</p>
+                      <div className="h-[2px] bg-[#2a5d95] my-2" />
+                      <p className="text-xs text-[#8ca4c4]">Direct • No stops</p>
+                    </div>
+                    <div className="text-right">
+                      <p className="text-xs text-[#8ca4c4] uppercase">To</p>
+                      <p className="text-4xl font-black text-[#0f8c6b]">{booking.route.destination}</p>
+                      <p className="text-sm text-[#6f86a7]">Arrival est.</p>
                     </div>
                   </div>
                 </div>
-                
-                <div className="grid grid-cols-2 gap-4">
-                  <div className="flex items-center space-x-2">
-                    <Calendar className="h-4 w-4 text-gray-400" />
-                    <span className="text-sm text-gray-600">
-                      {new Date(booking.travelDate).toLocaleDateString('en-GB', {
-                        weekday: 'long',
-                        year: 'numeric',
-                        month: 'long',
-                        day: 'numeric'
-                      })}
-                    </span>
-                  </div>
-                  <div className="flex items-center space-x-2">
-                    <Clock className="h-4 w-4 text-gray-400" />
-                    <span className="text-sm text-gray-600">{booking.route.departureTime}</span>
-                  </div>
-                </div>
 
-                <div className="pt-4 border-t border-gray-200">
-                  <div className="grid grid-cols-2 gap-4 text-sm">
-                    <div>
-                      <span className="text-gray-600">Seat Number:</span>
-                      <span className="ml-2 font-medium">{booking.seatNumber}</span>
-                    </div>
-                    <div>
-                      <span className="text-gray-600">Bus:</span>
-                      <span className="ml-2 font-medium">{booking.route.bus.plateNumber}</span>
-                    </div>
-                  </div>
+                <div className="divide-y divide-[#edf2f9] text-sm">
+                  <div className="py-2 flex justify-between"><span className="text-[#8ca4c4]">Operator</span><span className="font-semibold text-[#14263f]">{booking.route.operator.companyName}</span></div>
+                  <div className="py-2 flex justify-between"><span className="text-[#8ca4c4]">Bus Type</span><span className="font-semibold text-[#14263f]">{booking.route.bus.model}</span></div>
+                  <div className="py-2 flex justify-between"><span className="text-[#8ca4c4]">Seat Number</span><span className="font-semibold text-[#214c86]">{booking.seatNumber}</span></div>
+                  <div className="py-2 flex justify-between"><span className="text-[#8ca4c4]">Passenger</span><span className="font-semibold text-[#14263f]">{booking.user.firstName} {booking.user.lastName}</span></div>
                 </div>
               </div>
-            </div>
+            </StyledCard>
 
-            {/* Passenger Details */}
-            <div className="bg-white rounded-lg shadow-sm p-6">
-              <h3 className="text-lg font-semibold text-gray-900 mb-4">Passenger Information</h3>
-              <div className="space-y-3">
-                <div className="flex items-center space-x-3">
-                  <User className="h-5 w-5 text-gray-400" />
-                  <span className="font-medium">{booking.user.firstName} {booking.user.lastName}</span>
-                </div>
-                <div className="flex items-center space-x-3">
-                  <Phone className="h-5 w-5 text-gray-400" />
-                  <span className="text-gray-600">{booking.user.phone}</span>
-                </div>
+            <StyledCard hover={false} className="!p-0 overflow-hidden">
+              <div className="px-5 py-4 border-b border-[#ebf1f8]"><h3 className="text-2xl font-black text-[#14263f]">Payment Summary</h3></div>
+              <div className="p-5 divide-y divide-[#edf2f9]">
+                <div className="py-2 flex justify-between text-sm"><span className="text-[#8ca4c4]">Ticket Price</span><span className="font-semibold">UGX {booking.totalAmount.toLocaleString()}</span></div>
+                <div className="py-2 flex justify-between text-sm"><span className="text-[#8ca4c4]">Service Fee</span><span className="font-semibold">UGX 2,000</span></div>
+                <div className="py-2 flex justify-between text-2xl font-black text-[#0f8c6b]"><span>Total Paid</span><span>UGX {booking.totalAmount.toLocaleString()}</span></div>
+                {booking.payment && <div className="py-2 text-xs text-[#0f8c6b]">Paid via {booking.payment.method} • Ref: {booking.payment.reference}</div>}
               </div>
-            </div>
+            </StyledCard>
+          </main>
 
-            {/* Payment Information */}
-            {booking.payment && (
-              <div className="bg-white rounded-lg shadow-sm p-6">
-                <h3 className="text-lg font-semibold text-gray-900 mb-4">Payment Details</h3>
-                <div className="space-y-3">
-                  <div className="flex justify-between">
-                    <span className="text-gray-600">Amount:</span>
-                    <span className="font-semibold">UGX {booking.totalAmount.toLocaleString()}</span>
-                  </div>
-                  <div className="flex justify-between">
-                    <span className="text-gray-600">Method:</span>
-                    <span>{booking.payment.method}</span>
-                  </div>
-                  <div className="flex justify-between">
-                    <span className="text-gray-600">Reference:</span>
-                    <span className="font-mono text-sm">{booking.payment.reference}</span>
-                  </div>
-                  <div className="flex justify-between">
-                    <span className="text-gray-600">Status:</span>
-                    <span className={`px-2 py-1 text-xs rounded-full ${
-                      booking.payment.status === 'COMPLETED' ? 'bg-green-100 text-green-800' : 
-                      booking.payment.status === 'PENDING' ? 'bg-yellow-100 text-yellow-800' :
-                      'bg-red-100 text-red-800'
-                    }`}>
-                      {booking.payment.status}
-                    </span>
-                  </div>
+          <aside className="space-y-4">
+            <StyledCard hover={false} className="!p-0 overflow-hidden">
+              <div className="bg-[#214c86] text-white px-5 py-4 text-center">
+                <div className="flex justify-center mb-2">
+                  <TransConnectLogo
+                    usage="dark"
+                    width={98}
+                    height={30}
+                    imageClassName="h-5"
+                    wordmarkClassName="text-base"
+                  />
                 </div>
+                <p className="text-xs uppercase text-[#bdd1ef]">Digital Ticket</p>
+                <p className="text-4xl font-black">#{booking.id.slice(-8).toUpperCase()}</p>
               </div>
-            )}
-          </div>
-
-          {/* QR Code & Actions */}
-          <div className="space-y-6">
-            {/* QR Code */}
-            {booking.status === 'CONFIRMED' && (
-              <div className="bg-white rounded-lg shadow-sm p-6 text-center">
-                <h3 className="text-lg font-semibold text-gray-900 mb-4">Your Ticket</h3>
-                <div className="bg-gray-100 rounded-lg p-6 mb-4">
-                  <QrCode className="h-32 w-32 mx-auto text-gray-400 mb-2" />
-                  <p className="text-xs text-gray-600">QR Code for Boarding</p>
-                </div>
-                <button
-                  onClick={downloadQRCode}
-                  className="btn-outline w-full mb-2"
-                >
-                  <Download className="h-4 w-4 mr-2" />
-                  Download Ticket
-                </button>
-                <p className="text-xs text-gray-600">
-                  Show this QR code to the conductor when boarding
-                </p>
-              </div>
-            )}
-
-            {/* Quick Actions */}
-            <div className="bg-white rounded-lg shadow-sm p-6">
-              <h3 className="text-lg font-semibold text-gray-900 mb-4">Actions</h3>
-              <div className="space-y-3">
-                <Link href="/bookings" className="btn-outline w-full">
-                  All Bookings
-                </Link>
-                <Link href="/search" className="btn-primary w-full">
-                  Book Another Trip
-                </Link>
-                {booking.status === 'PENDING' && (
-                  <button className="btn-secondary w-full">
-                    Cancel Booking
-                  </button>
+              <div className="p-4 text-center">
+                {booking.qrCode ? (
+                  <img src={booking.qrCode} alt="ticket qr code" className="w-44 h-44 mx-auto" />
+                ) : (
+                  <QrCode className="h-40 w-40 text-[#c8d5e8] mx-auto" />
                 )}
+                <p className="text-xs text-[#8ca4c4] mt-3">Show this at boarding gate</p>
               </div>
-            </div>
 
-            {/* Booking Timeline */}
-            <div className="bg-white rounded-lg shadow-sm p-6">
-              <h3 className="text-lg font-semibold text-gray-900 mb-4">Timeline</h3>
-              <div className="space-y-4">
-                <div className="flex items-start space-x-3">
-                  <div className="w-2 h-2 bg-blue-600 rounded-full mt-2"></div>
-                  <div>
-                    <p className="text-sm font-medium">Booking Created</p>
-                    <p className="text-xs text-gray-600">
-                      {new Date(booking.bookingDate).toLocaleString()}
-                    </p>
-                  </div>
+              <div className="grid grid-cols-3 border-t border-[#edf2f9] text-center py-3">
+                <div>
+                  <p className="text-[11px] text-[#8ca4c4] uppercase">Seat</p>
+                  <p className="text-xl font-black text-[#214c86]">{booking.seatNumber}</p>
                 </div>
-                {booking.payment?.status === 'COMPLETED' && (
-                  <div className="flex items-start space-x-3">
-                    <div className="w-2 h-2 bg-green-600 rounded-full mt-2"></div>
-                    <div>
-                      <p className="text-sm font-medium">Payment Confirmed</p>
-                      <p className="text-xs text-gray-600">
-                        {new Date(booking.payment.paidAt).toLocaleString()}
-                      </p>
-                    </div>
-                  </div>
-                )}
+                <div>
+                  <p className="text-[11px] text-[#8ca4c4] uppercase">Departs</p>
+                  <p className="text-xl font-black text-[#14263f]">{booking.route.departureTime}</p>
+                </div>
+                <div>
+                  <p className="text-[11px] text-[#8ca4c4] uppercase">Class</p>
+                  <p className="text-xl font-black text-[#0f8c6b]">Luxury</p>
+                </div>
               </div>
-            </div>
-          </div>
+
+              <div className="p-3 grid grid-cols-2 gap-2">
+                <button className="btn-outline !py-2 inline-flex justify-center items-center gap-2"><Download className="h-4 w-4" /> Download PDF</button>
+                <button className="btn-primary !py-2 inline-flex justify-center items-center gap-2"><Share2 className="h-4 w-4" /> Share Ticket</button>
+              </div>
+            </StyledCard>
+
+            <StyledCard hover={false} className="!p-4">
+              <h4 className="font-bold text-[#14263f] mb-3">Manage Booking</h4>
+              <div className="space-y-2">
+                <button className="w-full rounded-xl bg-[#f5efff] text-[#7c3aed] py-2.5 text-sm font-semibold">Transfer to Someone Else</button>
+                <button className="w-full rounded-xl bg-[#fff1f2] text-[#ef4444] py-2.5 text-sm font-semibold">Cancel Booking</button>
+              </div>
+            </StyledCard>
+
+            <StyledCard hover={false} className="!p-4 bg-[#eef5ff]">
+              <h4 className="font-bold text-[#214c86] mb-1">Need Help?</h4>
+              <p className="text-xs text-[#6f86a7] mb-3">Having issues with this booking? Our support team is available 24/7.</p>
+              <a href={`tel:${booking.route.operator.contactNumber || ''}`} className="w-full rounded-xl border border-[#214c86] text-[#214c86] py-2.5 text-sm font-semibold inline-flex justify-center items-center gap-2">
+                <Phone className="h-4 w-4" /> Contact Support
+              </a>
+              <a href={`mailto:${booking.user.email || ''}`} className="w-full rounded-xl border border-[#c9d7ea] text-[#4f6585] py-2.5 text-sm font-semibold inline-flex justify-center items-center gap-2 mt-2">
+                <Mail className="h-4 w-4" /> Email Receipt
+              </a>
+            </StyledCard>
+          </aside>
         </div>
-      </div>
+      </Container>
+      <PortalFooter slim />
     </div>
   );
 }

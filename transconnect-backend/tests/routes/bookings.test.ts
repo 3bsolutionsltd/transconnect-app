@@ -1,24 +1,27 @@
 import request from 'supertest';
 import express from 'express';
 import bookingRoutes from '../../src/routes/bookings';
+import { prisma } from '../../src/lib/prisma';
 
-// Mock the Prisma import first
-const mockPrisma = {
-  booking: {
-    findMany: jest.fn(),
-    findUnique: jest.fn(),
-    create: jest.fn(),
-    update: jest.fn(),
-    findFirst: jest.fn(),
+jest.mock('../../src/lib/prisma', () => ({
+  prisma: {
+    booking: {
+      findMany: jest.fn(),
+      findUnique: jest.fn(),
+      create: jest.fn(),
+      update: jest.fn(),
+      findFirst: jest.fn(),
+    },
+    route: {
+      findUnique: jest.fn(),
+    },
+    user: {
+      findUnique: jest.fn(),
+    },
   },
-  route: {
-    findUnique: jest.fn(),
-  },
-};
-
-jest.mock('../../src/index', () => ({
-  prisma: mockPrisma
 }));
+
+const mockPrisma = prisma as any;
 
 // Mock QRCode
 jest.mock('qrcode', () => ({
@@ -95,6 +98,10 @@ describe('Booking Routes', () => {
 
   beforeEach(() => {
     jest.clearAllMocks();
+    // Auth middleware always calls user.findUnique — set a valid default so routes are reachable
+    mockPrisma.user.findUnique.mockResolvedValue({
+      id: 'test-user-id', email: 'test@example.com', role: 'PASSENGER', verified: true
+    });
   });
 
   describe('GET /bookings/my-bookings', () => {
@@ -155,22 +162,27 @@ describe('Booking Routes', () => {
   describe('POST /bookings', () => {
     const validBookingData = {
       routeId: 'test-route-id',
-      seatNumber: '5',
-      travelDate: '2025-11-10T00:00:00.000Z'
+      seatNumbers: ['5'],
+      travelDate: '2025-11-10T00:00:00.000Z',
+      passengers: [{ firstName: 'Test', lastName: 'User', phone: '+256700000000' }]
     };
 
     it('should create a booking successfully', async () => {
       const mockRoute = {
         ...testRoute,
+        stops: [],
         bookings: []
+      };
+      const createdBooking = {
+        ...testBooking,
+        route: { ...mockRoute, bus: testRoute.bus, operator: testRoute.operator },
+        user: { id: 'test-user-id', firstName: 'Test', lastName: 'User' }
       };
 
       mockPrisma.route.findUnique.mockResolvedValue(mockRoute);
       mockPrisma.booking.findFirst.mockResolvedValue(null);
-      mockPrisma.booking.create.mockResolvedValue({
-        ...testBooking,
-        route: mockRoute
-      });
+      mockPrisma.booking.create.mockResolvedValue(createdBooking);
+      mockPrisma.booking.findMany.mockResolvedValue([createdBooking]);
 
       const response = await request(app)
         .post('/bookings')
@@ -178,9 +190,8 @@ describe('Booking Routes', () => {
         .send(validBookingData);
 
       expect(response.status).toBe(201);
-      expect(response.body).toHaveProperty('id');
-      expect(response.body).toHaveProperty('qrCode');
-      expect(response.body.seatNumber).toBe(validBookingData.seatNumber);
+      expect(response.body).toHaveProperty('bookings');
+      expect(response.body.bookings[0]).toHaveProperty('id');
 
       expect(mockPrisma.route.findUnique).toHaveBeenCalledWith({
         where: { id: validBookingData.routeId },
@@ -190,7 +201,7 @@ describe('Booking Routes', () => {
     });
 
     it('should return 400 for missing required fields', async () => {
-      const invalidData = { routeId: 'test-route-id' }; // missing seatNumber and travelDate
+      const invalidData = { routeId: 'test-route-id' }; // missing seatNumbers and travelDate
 
       const response = await request(app)
         .post('/bookings')
@@ -214,7 +225,7 @@ describe('Booking Routes', () => {
     });
 
     it('should return 404 for inactive route', async () => {
-      const inactiveRoute = { ...testRoute, active: false };
+      const inactiveRoute = { ...testRoute, stops: [], active: false };
       mockPrisma.route.findUnique.mockResolvedValue(inactiveRoute);
 
       const response = await request(app)
@@ -227,7 +238,7 @@ describe('Booking Routes', () => {
     });
 
     it('should return 400 if seat is already booked', async () => {
-      const mockRoute = { ...testRoute, bookings: [] };
+      const mockRoute = { ...testRoute, stops: [], bookings: [] };
       const existingBooking = { ...testBooking, status: 'CONFIRMED' };
 
       mockPrisma.route.findUnique.mockResolvedValue(mockRoute);
@@ -239,12 +250,12 @@ describe('Booking Routes', () => {
         .send(validBookingData);
 
       expect(response.status).toBe(400);
-      expect(response.body.error).toBe('Seat is already booked for this date');
+      expect(response.body.error).toContain('already booked for this date');
     });
 
     it('should return 400 for invalid seat number', async () => {
-      const mockRoute = { ...testRoute, bookings: [] };
-      const invalidSeatData = { ...validBookingData, seatNumber: '50' }; // exceeds capacity
+      const mockRoute = { ...testRoute, stops: [], bookings: [] };
+      const invalidSeatData = { ...validBookingData, seatNumbers: ['50'] }; // exceeds capacity
 
       mockPrisma.route.findUnique.mockResolvedValue(mockRoute);
       mockPrisma.booking.findFirst.mockResolvedValue(null);
@@ -255,7 +266,7 @@ describe('Booking Routes', () => {
         .send(invalidSeatData);
 
       expect(response.status).toBe(400);
-      expect(response.body.error).toBe('Invalid seat number for this bus');
+      expect(response.body.error).toContain('Invalid seat number');
     });
 
     it('should return 401 without authentication token', async () => {

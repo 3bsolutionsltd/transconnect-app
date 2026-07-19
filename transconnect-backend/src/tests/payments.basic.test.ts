@@ -17,33 +17,34 @@ describe('Payment API Basic Tests', () => {
       expect(methods).toEqual(
         expect.arrayContaining([
           expect.objectContaining({
-            value: 'MTN_MOBILE_MONEY',
-            label: 'MTN Mobile Money',
+            value: 'PESAPAL',
             isOnline: true
           }),
           expect.objectContaining({
-            value: 'AIRTEL_MONEY',
-            label: 'Airtel Money',
-            isOnline: true
+            value: 'CASH',
+            isOnline: false
           })
         ])
       );
+      const methodValues = methods.map((m: any) => m.value);
+      expect(methodValues).not.toContain('MTN_MOBILE_MONEY');
+      expect(methodValues).not.toContain('AIRTEL_MONEY');
     });
   });
 
   describe('Payment Gateway Factory', () => {
     it('should return supported payment methods', () => {
       const methods = PaymentGatewayFactory.getSupportedMethods();
-      expect(methods).toContain('MTN_MOBILE_MONEY');
-      expect(methods).toContain('AIRTEL_MONEY');
-      expect(methods).toContain('FLUTTERWAVE');
+      expect(methods).toContain('PESAPAL');
       expect(methods).toContain('CASH');
+      expect(methods).not.toContain('MTN_MOBILE_MONEY');
+      expect(methods).not.toContain('AIRTEL_MONEY');
     });
 
     it('should identify online payment methods', () => {
-      expect(PaymentGatewayFactory.isOnlinePayment('MTN_MOBILE_MONEY')).toBe(true);
-      expect(PaymentGatewayFactory.isOnlinePayment('AIRTEL_MONEY')).toBe(true);
-      expect(PaymentGatewayFactory.isOnlinePayment('FLUTTERWAVE')).toBe(true);
+      expect(PaymentGatewayFactory.isOnlinePayment('MTN_MOBILE_MONEY')).toBe(false);
+      expect(PaymentGatewayFactory.isOnlinePayment('AIRTEL_MONEY')).toBe(false);
+      expect(PaymentGatewayFactory.isOnlinePayment('PESAPAL')).toBe(true);
       expect(PaymentGatewayFactory.isOnlinePayment('CASH')).toBe(false);
     });
 

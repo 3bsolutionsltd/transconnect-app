@@ -1,0 +1,44 @@
+[Unit]
+Description=TransConnect Production Stack
+Documentation=https://github.com/3bsolutionsltd/transconnect-app
+Requires=docker.service
+After=docker.service network-online.target
+Wants=network-online.target
+
+[Service]
+Type=oneshot
+RemainAfterExit=yes
+WorkingDirectory=/opt/transconnect/app
+
+ExecStartPre=/usr/bin/docker compose \
+  --project-name transconnect-production \
+  -f transconnect-infra/docker/docker-compose.production.yml \
+  --env-file /opt/transconnect/production/.env \
+  pull --quiet
+
+ExecStart=/usr/bin/docker compose \
+  --project-name transconnect-production \
+  -f transconnect-infra/docker/docker-compose.production.yml \
+  --env-file /opt/transconnect/production/.env \
+  up -d
+
+ExecStop=/usr/bin/docker compose \
+  --project-name transconnect-production \
+  -f transconnect-infra/docker/docker-compose.production.yml \
+  --env-file /opt/transconnect/production/.env \
+  stop
+
+ExecReload=/usr/bin/docker compose \
+  --project-name transconnect-production \
+  -f transconnect-infra/docker/docker-compose.production.yml \
+  --env-file /opt/transconnect/production/.env \
+  up -d
+
+TimeoutStartSec=300
+TimeoutStopSec=60
+
+Restart=on-failure
+RestartSec=30
+
+[Install]
+WantedBy=multi-user.target

@@ -2,8 +2,6 @@ import React, { useState, useEffect, useCallback } from 'react';
 import { 
   MapPin, 
   Clock, 
-  DollarSign, 
-  TrendingUp,
   AlertCircle,
   Eye,
   BarChart3,
@@ -29,7 +27,7 @@ const OperatorRoutes = () => {
     busId: ''
   });
 
-  const API_BASE_URL = process.env.REACT_APP_API_URL || 'http://localhost:5000/api';
+  const API_BASE_URL = (process.env.REACT_APP_API_URL || 'http://localhost:5000/api').replace(/\/api\/?$/, '') + '/api';
 
   const loadBuses = useCallback(async () => {
     try {

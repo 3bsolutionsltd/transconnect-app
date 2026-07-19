@@ -1,6 +1,7 @@
 import { PaymentMethod } from '@prisma/client';
 import { createMTNService, MTNMobileMoneyService } from './mtn.service';
 import { createAirtelService, AirtelMoneyService } from './airtel.service';
+import { getPesapalService } from './pesapal.service';
 
 export interface PaymentProvider {
   requestPayment(paymentData: any): Promise<{
@@ -190,8 +191,6 @@ export class AirtelPaymentProvider implements PaymentProvider {
 
 export class FlutterwavePaymentProvider implements PaymentProvider {
   async requestPayment(paymentData: StandardPaymentRequest) {
-    // Placeholder for Flutterwave implementation
-    // This would integrate with Flutterwave's API
     return {
       transactionId: `FLW_${Date.now()}`,
       status: 'PENDING' as const,
@@ -200,7 +199,6 @@ export class FlutterwavePaymentProvider implements PaymentProvider {
   }
 
   async getTransactionStatus(transactionId: string) {
-    // Placeholder for Flutterwave status check
     return {
       transactionId,
       status: 'PENDING' as const,
@@ -209,8 +207,67 @@ export class FlutterwavePaymentProvider implements PaymentProvider {
   }
 
   verifyWebhookSignature(payload: string, signature: string, secret: string): boolean {
-    // Placeholder for Flutterwave webhook verification
     return true;
+  }
+}
+
+export class PesapalPaymentProvider implements PaymentProvider {
+  async requestPayment(paymentData: StandardPaymentRequest & {
+    callbackUrl?: string;
+    cancellationUrl?: string;
+    userEmail?: string;
+    userFirstName?: string;
+    userLastName?: string;
+  }) {
+    const service = getPesapalService();
+    const frontendUrl = process.env.FRONTEND_URL || 'https://transconnect.app';
+
+    const result = await service.submitOrder({
+      id: paymentData.reference,
+      amount: paymentData.amount,
+      currency: paymentData.currency,
+      description: paymentData.description,
+      callbackUrl: paymentData.callbackUrl || `${frontendUrl}/payment/callback`,
+      cancellationUrl: paymentData.cancellationUrl || `${frontendUrl}/payment/cancelled`,
+      notificationId: '',   // registerIPN() is called inside submitOrder()
+      billingAddress: {
+        emailAddress: paymentData.userEmail || '',
+        phoneNumber:  paymentData.phoneNumber || '',
+        countryCode:  paymentData.country    || 'UG',
+        firstName:    paymentData.userFirstName || 'TransConnect',
+        lastName:     paymentData.userLastName  || 'Customer',
+      },
+    });
+
+    return {
+      transactionId: result.orderTrackingId,
+      status: 'PENDING' as const,
+      checkoutUrl: result.redirectUrl,
+    };
+  }
+
+  async getTransactionStatus(orderTrackingId: string) {
+    const service = getPesapalService();
+    const result = await service.getTransactionStatus(orderTrackingId);
+
+    const statusMap: Record<string, 'PENDING' | 'SUCCESSFUL' | 'FAILED'> = {
+      COMPLETED: 'SUCCESSFUL',
+      FAILED:    'FAILED',
+      REVERSED:  'FAILED',
+      PENDING:   'PENDING',
+      INVALID:   'FAILED',
+    };
+
+    return {
+      transactionId:          result.merchantReference,
+      status:                 statusMap[result.paymentStatus] ?? 'PENDING',
+      message:                result.message,
+      providerTransactionId:  result.confirmationCode,
+    };
+  }
+
+  verifyWebhookSignature(payload: string, signature: string, secret: string): boolean {
+    return getPesapalService().verifyWebhookSignature(payload, signature, secret);
   }
 }
 
@@ -229,6 +286,9 @@ export class PaymentGatewayFactory {
         case 'FLUTTERWAVE':
           this.providers.set(method, new FlutterwavePaymentProvider());
           break;
+        case 'PESAPAL':
+          this.providers.set(method, new PesapalPaymentProvider());
+          break;
         case 'CASH':
           throw new Error('Cash payments do not require a payment provider');
         default:
@@ -240,6 +300,11 @@ export class PaymentGatewayFactory {
   }
 
   static async validatePaymentMethod(method: PaymentMethod, phoneNumber?: string, country?: string): Promise<boolean> {
+    // Cash doesn't need a payment provider — always valid
+    if (method === 'CASH') {
+      return true;
+    }
+
     try {
       const provider = this.getProvider(method);
       
@@ -255,11 +320,16 @@ export class PaymentGatewayFactory {
   }
 
   static getSupportedMethods(): PaymentMethod[] {
-    return ['MTN_MOBILE_MONEY', 'AIRTEL_MONEY', 'FLUTTERWAVE', 'CASH'];
+    return ['PESAPAL', 'CASH'];
   }
 
   static isOnlinePayment(method: PaymentMethod): boolean {
-    return ['MTN_MOBILE_MONEY', 'AIRTEL_MONEY', 'FLUTTERWAVE'].includes(method);
+    return ['PESAPAL'].includes(method);
+  }
+
+  /** PesaPal is a redirect-based (hosted checkout) provider, not a silent push */
+  static isRedirectPayment(method: PaymentMethod): boolean {
+    return method === 'PESAPAL';
   }
 
   static getMethodDisplayName(method: PaymentMethod): string {
@@ -267,10 +337,11 @@ export class PaymentGatewayFactory {
       'MTN_MOBILE_MONEY': 'MTN Mobile Money',
       'AIRTEL_MONEY': 'Airtel Money',
       'FLUTTERWAVE': 'Card Payment',
+      'PESAPAL': 'PesaPal (supports MTN & Airtel Money)',
       'CASH': 'Cash Payment'
     };
 
-    return displayNames[method] || method;
+    return displayNames[method] || 'Unknown Payment Method';
   }
 }
 

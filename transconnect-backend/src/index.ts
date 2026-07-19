@@ -27,6 +27,7 @@ import qrRoutes from './routes/qr';
 import notificationRoutes from './routes/notifications';
 import operatorPaymentRoutes from './routes/operator-payments';
 import operatorManagementRoutes from './routes/operator-management';
+import operatorPortalRoutes from './routes/operator-portal';
 import adminOperatorUserRoutes from './routes/admin-operator-users';
 import databaseAdminRoutes from './routes/admin/database';
 import systemFixesRoutes from './routes/admin/system-fixes';
@@ -79,7 +80,7 @@ app.set('trust proxy', 1);
 // Rate limiting
 const limiter = rateLimit({
   windowMs: 15 * 60 * 1000, // 15 minutes
-  max: 100, // limit each IP to 100 requests per windowMs
+  max: 1000, // allow normal app boot/login traffic without throttling
   message: 'Too many requests from this IP, please try again later.',
 });
 
@@ -91,14 +92,25 @@ app.use(cors({
     
     const allowedOrigins = [
       "http://localhost:3000",
-      "http://localhost:3001", 
+      "http://localhost:3001",
       "https://transconnect.app",
       "https://www.transconnect.app",
-      "https://admin.transconnect.app", 
+      "https://admin.transconnect.app",
       "https://operators.transconnect.app",
+      // Staging VPS
+      "https://staging.transconnect.app",
+      "https://admin-staging.transconnect.app",
+      "https://api-staging.transconnect.app",
+      // Legacy Render URLs
       "https://transconnect-admin-staging.onrender.com",
       "https://transconnect-web-staging.onrender.com",
-      "https://staging.transconnect.app"
+      // PesaPal payment iframe (sandbox + production)
+      "https://cybqa.pesapal.com",
+      "https://pay.pesapal.com",
+      // Allow env-configured extra origins
+      ...( process.env.CORS_ORIGINS
+            ? process.env.CORS_ORIGINS.split(',').map(o => o.trim()).filter(Boolean)
+            : [] ),
     ];
     
     if (allowedOrigins.includes(origin)) {
@@ -149,6 +161,7 @@ app.use('/api/manager/transfers', managerTransferRoutes); // NEW: Week 4 - Manag
 app.use('/api/payments', paymentRoutes);
 app.use('/api/qr', qrRoutes);
 app.use('/api/operators', operatorRoutes);
+app.use('/api/operator-portal', operatorPortalRoutes); // NEW: Operator white-labeled portals (public)
 app.use('/api/buses', busRoutes);
 app.use('/api/rides', rideRoutes);
 app.use('/api/notifications', notificationRoutes);
@@ -321,6 +334,14 @@ deployMigrations().then(() => {
     
     // Start agent cleanup scheduler
     startAgentCleanupScheduler();
+
+    // Run segment back-fill in the background after the server is already listening
+    // (previously this blocked startup via the npm start chain)
+    const { execFile } = require('child_process');
+    execFile('node', ['scripts/add-segments-to-routes.js'], (err: any) => {
+      if (err) console.warn('⚠️  add-segments-to-routes finished with error:', err.message);
+      else console.log('✅ Route segments back-fill complete');
+    });
   });
 });
 

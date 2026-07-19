@@ -1,8 +1,9 @@
 import { Router, Request, Response } from 'express';
-import { prisma } from '../index';
+import { prisma } from '../lib/prisma';
 import { authenticateToken } from '../middleware/auth';
 import { body, validationResult } from 'express-validator';
 import bcrypt from 'bcryptjs';
+import { validateAndNormalizeContact } from '../utils/contact-validation';
 
 const router = Router();
 
@@ -133,6 +134,17 @@ router.post('/', [
 
     const { operatorId, firstName, lastName, email, phone, password, role, permissions = [] } = req.body;
 
+    const contactValidation = validateAndNormalizeContact({ email, phone, defaultCountry: 'UG' });
+    if (!contactValidation.isValid) {
+      return res.status(400).json({
+        error: 'Invalid contact information',
+        details: contactValidation.errors,
+      });
+    }
+
+    const normalizedEmail = contactValidation.normalizedEmail!;
+    const normalizedPhone = contactValidation.normalizedPhone!;
+
     // Verify operator exists and is approved
     const operator = await prisma.operator.findUnique({
       where: { id: operatorId }
@@ -150,8 +162,8 @@ router.post('/', [
     const existingUser = await prisma.user.findFirst({
       where: {
         OR: [
-          { email },
-          { phone }
+          { email: normalizedEmail },
+          { phone: normalizedPhone }
         ]
       }
     });
@@ -170,8 +182,8 @@ router.post('/', [
       data: {
         firstName,
         lastName,
-        email,
-        phone,
+        email: normalizedEmail,
+        phone: normalizedPhone,
         password: hashedPassword,
         role: 'OPERATOR',
         verified: true
@@ -253,6 +265,29 @@ router.put('/:id', [
 
     const { role, permissions, active, firstName, lastName, email, phone } = req.body;
 
+    const emailInRequest = typeof email === 'string' ? email : undefined;
+    const phoneInRequest = typeof phone === 'string' ? phone : undefined;
+    let normalizedEmail = emailInRequest;
+    let normalizedPhone = phoneInRequest;
+
+    if (emailInRequest !== undefined || phoneInRequest !== undefined) {
+      const contactValidation = validateAndNormalizeContact({
+        email: emailInRequest,
+        phone: phoneInRequest,
+        defaultCountry: 'UG',
+      });
+
+      if (!contactValidation.isValid) {
+        return res.status(400).json({
+          error: 'Invalid contact information',
+          details: contactValidation.errors,
+        });
+      }
+
+      normalizedEmail = contactValidation.normalizedEmail ?? emailInRequest;
+      normalizedPhone = contactValidation.normalizedPhone ?? phoneInRequest;
+    }
+
     // Get existing operator user
     const existingOperatorUser = await prisma.operatorUser.findUnique({
       where: { id },
@@ -264,15 +299,15 @@ router.put('/:id', [
     }
 
     // Check for email/phone conflicts if updating those fields
-    if (email || phone) {
+    if (normalizedEmail || normalizedPhone) {
       const conflictingUser = await prisma.user.findFirst({
         where: {
           AND: [
             { id: { not: existingOperatorUser.userId } },
             {
               OR: [
-                ...(email ? [{ email }] : []),
-                ...(phone ? [{ phone }] : [])
+                ...(normalizedEmail ? [{ email: normalizedEmail }] : []),
+                ...(normalizedPhone ? [{ phone: normalizedPhone }] : [])
               ]
             }
           ]
@@ -293,8 +328,8 @@ router.put('/:id', [
         data: {
           ...(firstName && { firstName }),
           ...(lastName && { lastName }),
-          ...(email && { email }),
-          ...(phone && { phone })
+          ...(normalizedEmail && { email: normalizedEmail }),
+          ...(normalizedPhone && { phone: normalizedPhone })
         }
       });
     }

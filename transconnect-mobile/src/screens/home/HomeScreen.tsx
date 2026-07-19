@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import {
   View,
   Text,
@@ -8,11 +8,13 @@ import {
   ScrollView,
   Alert,
   Linking,
+  ActivityIndicator,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
 import DateTimePicker from '@react-native-community/datetimepicker';
 import { format } from 'date-fns';
+import { routesApi } from '../../services/api';
 
 const UGANDA_CITIES = [
   'Kampala', 'Entebbe', 'Jinja', 'Mbale', 'Gulu', 'Mbarara',
@@ -30,6 +32,16 @@ export default function HomeScreen({ navigation }: any) {
   const [showToSuggestions, setShowToSuggestions] = useState(false);
   const [fromError, setFromError] = useState('');
   const [toError, setToError] = useState('');
+  const [allRoutes, setAllRoutes] = useState<any[]>([]);
+  const [routesLoading, setRoutesLoading] = useState(false);
+
+  useEffect(() => {
+    setRoutesLoading(true);
+    routesApi.getAllRoutes()
+      .then(res => setAllRoutes(res.data || []))
+      .catch(() => {})
+      .finally(() => setRoutesLoading(false));
+  }, []);
 
   const getFilteredCities = (query: string, exclude?: string) => {
     if (!query) return UGANDA_CITIES.filter(city => city !== exclude);
@@ -300,6 +312,51 @@ export default function HomeScreen({ navigation }: any) {
             onChange={handleDateChange}
           />
         )}
+
+        {/* Browse All Routes */}
+        <View style={styles.browseSection}>
+          <Text style={styles.sectionTitle}>Available Routes</Text>
+          <Text style={styles.browseSubtitle}>Tap a route to book directly</Text>
+          {routesLoading ? (
+            <ActivityIndicator size="small" color="#3B82F6" style={{ marginTop: 12 }} />
+          ) : allRoutes.length === 0 ? (
+            <Text style={styles.noRoutesText}>No routes available at the moment</Text>
+          ) : (
+            allRoutes.map((r: any) => (
+              <TouchableOpacity
+                key={r.id}
+                style={styles.routeCard}
+                onPress={() => navigation.navigate('Search', {
+                  from: r.origin,
+                  to: r.destination,
+                  date: new Date().toISOString(),
+                  passengers: 1,
+                })}
+              >
+                <View style={styles.routeCardLeft}>
+                  <View style={styles.routeOriginRow}>
+                    <Ionicons name="location-outline" size={14} color="#3B82F6" />
+                    <Text style={styles.routeCity} numberOfLines={1}>{r.origin}</Text>
+                  </View>
+                  <View style={styles.routeArrow}>
+                    <Ionicons name="arrow-down" size={12} color="#9CA3AF" />
+                  </View>
+                  <View style={styles.routeOriginRow}>
+                    <Ionicons name="location" size={14} color="#EF4444" />
+                    <Text style={styles.routeCity} numberOfLines={1}>{r.destination}</Text>
+                  </View>
+                </View>
+                <View style={styles.routeCardRight}>
+                  <Text style={styles.routePrice}>UGX {(r.price || 0).toLocaleString()}</Text>
+                  <Text style={styles.routeTime}>{r.departureTime || '--:--'}</Text>
+                  <View style={styles.bookNowBadge}>
+                    <Text style={styles.bookNowText}>Book</Text>
+                  </View>
+                </View>
+              </TouchableOpacity>
+            ))
+          )}
+        </View>
       </ScrollView>
     </SafeAreaView>
   );
@@ -517,5 +574,80 @@ const styles = StyleSheet.create({
     fontWeight: '500',
     marginTop: 8,
     textAlign: 'center',
+  },
+  browseSection: {
+    marginTop: 24,
+    paddingBottom: 24,
+  },
+  browseSubtitle: {
+    fontSize: 13,
+    color: '#6B7280',
+    marginBottom: 12,
+  },
+  noRoutesText: {
+    color: '#9CA3AF',
+    fontSize: 14,
+    textAlign: 'center',
+    paddingVertical: 16,
+  },
+  routeCard: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    backgroundColor: '#FFFFFF',
+    borderRadius: 12,
+    padding: 14,
+    marginBottom: 10,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 1 },
+    shadowOpacity: 0.05,
+    shadowRadius: 3,
+    elevation: 2,
+    borderWidth: 1,
+    borderColor: '#F3F4F6',
+  },
+  routeCardLeft: {
+    flex: 1,
+  },
+  routeOriginRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+  },
+  routeArrow: {
+    paddingLeft: 2,
+    paddingVertical: 2,
+  },
+  routeCity: {
+    fontSize: 14,
+    fontWeight: '600',
+    color: '#1F2937',
+    marginLeft: 4,
+    flexShrink: 1,
+  },
+  routeCardRight: {
+    alignItems: 'flex-end',
+    marginLeft: 12,
+  },
+  routePrice: {
+    fontSize: 14,
+    fontWeight: '700',
+    color: '#059669',
+  },
+  routeTime: {
+    fontSize: 12,
+    color: '#6B7280',
+    marginTop: 2,
+  },
+  bookNowBadge: {
+    marginTop: 6,
+    backgroundColor: '#3B82F6',
+    paddingHorizontal: 10,
+    paddingVertical: 3,
+    borderRadius: 6,
+  },
+  bookNowText: {
+    color: '#FFFFFF',
+    fontSize: 11,
+    fontWeight: '600',
   },
 });

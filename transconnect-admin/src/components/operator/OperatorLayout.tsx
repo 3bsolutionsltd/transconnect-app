@@ -11,7 +11,8 @@ import {
   LogOut,
   Bell,
   Home,
-  QrCode
+  QrCode,
+  Globe
 } from 'lucide-react';
 import { useAuth } from '../../contexts/AuthContext';
 import OperatorDashboard from './OperatorDashboard';
@@ -19,6 +20,7 @@ import OperatorQRScanner from './OperatorQRScanner';
 import OperatorBookings from './OperatorBookings';
 import OperatorBuses from './OperatorBuses';
 import OperatorRoutes from './OperatorRoutes';
+import OperatorPortalConfig from './OperatorPortalConfig';
 
 const OperatorLayout = () => {
   const [sidebarOpen, setSidebarOpen] = useState(false);
@@ -32,6 +34,7 @@ const OperatorLayout = () => {
     { name: 'My Bookings', href: '/bookings', icon: Calendar, description: 'Manage bookings' },
     { name: 'My Buses', href: '/buses', icon: Bus, description: 'Fleet management' },
     { name: 'My Routes', href: '/routes', icon: MapPin, description: 'Route information' },
+    { name: 'My Portal', href: '/portal-config', icon: Globe, description: 'Customize portal' },
     { name: 'Settings', href: '/settings', icon: Settings, description: 'Account settings' },
   ];
 
@@ -172,6 +175,7 @@ const OperatorLayout = () => {
               <Route path="/bookings" element={<OperatorBookings />} />
               <Route path="/buses" element={<OperatorBuses />} />
               <Route path="/routes" element={<OperatorRoutes />} />
+              <Route path="/portal-config" element={<OperatorPortalConfig />} />
               <Route path="/settings" element={
                 <div className="bg-white rounded-lg shadow p-6">
                   <h2 className="text-xl font-bold text-gray-900 mb-4">Operator Settings</h2>

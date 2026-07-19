@@ -477,6 +477,11 @@ export async function requestWithdrawal(req: Request, res: Response) {
 
 export async function getAllAgents(req: Request, res: Response) {
   try {
+    const requestUser = (req as any).user;
+    if (!requestUser || !['ADMIN', 'MANAGER', 'MASTER_FIELD_OPERATOR', 'OPERATOR_FIELD_OPERATOR'].includes(requestUser.role)) {
+      return res.status(403).json({ error: 'Insufficient permissions to view agents' });
+    }
+
     // Get agents with basic data
     const agents = await prisma.agent.findMany({
       orderBy: {
@@ -561,6 +566,11 @@ export async function getAllAgents(req: Request, res: Response) {
 
 export async function updateAgentStatus(req: Request, res: Response) {
   try {
+    const requestUser = (req as any).user;
+    if (!requestUser || requestUser.role !== 'ADMIN') {
+      return res.status(403).json({ error: 'Only administrators can update agent status' });
+    }
+
     const { agentId } = req.params;
     const { status, reason } = req.body;
 

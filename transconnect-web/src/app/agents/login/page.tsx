@@ -5,6 +5,7 @@ import Link from 'next/link';
 import { toast } from 'react-hot-toast';
 import { setAgentToken, setAgentId } from '../../../lib/agents/authHelpers';
 import { endpoints } from '../../../lib/config';
+import TransConnectLogo from '@/components/branding/TransConnectLogo';
 
 export default function AgentLoginPage() {
   const router = useRouter();
@@ -88,14 +89,15 @@ export default function AgentLoginPage() {
           {/* Header */}
           <div className="text-center mb-8">
             <Link href="/agents" className="inline-block mb-6">
-              <div className="flex items-center justify-center space-x-2">
-                <div className="w-10 h-10 bg-blue-600 rounded-lg flex items-center justify-center">
-                  <span className="text-white font-bold text-lg">T</span>
-                </div>
-                <span className="text-xl font-bold text-gray-800">TransConnect</span>
-              </div>
+              <TransConnectLogo
+                usage="light"
+                width={110}
+                height={32}
+                imageClassName="h-6"
+                wordmarkClassName="text-xl text-gray-800"
+              />
             </Link>
-            <h1 className="text-2xl font-bold text-gray-800 mb-2">Agent Login</h1>
+            <h1 className="text-2xl font-bold text-gray-800 mb-2">Agent Sign In</h1>
             <p className="text-gray-600">Welcome back! Sign in to your agent account</p>
           </div>
 
@@ -155,7 +157,7 @@ export default function AgentLoginPage() {
                   disabled={loading || otp.length !== 6}
                   className="w-full bg-blue-600 text-white py-3 px-4 rounded-lg hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed font-medium transition-colors"
                 >
-                  {loading ? 'Verifying...' : 'Verify & Login'}
+                  {loading ? 'Verifying...' : 'Verify & Sign In'}
                 </button>
 
                 <button

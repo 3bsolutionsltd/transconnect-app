@@ -1,12 +1,424 @@
 import { Router, Request, Response } from 'express';
-import { prisma } from '../index';
-import { authenticateToken } from '../middleware/auth';
+import { prisma } from '../lib/prisma';
+import { authenticateToken, canAccessAllOperationsBookings, getScopedOperatorIdsForUser } from '../middleware/auth';
 import { body, validationResult } from 'express-validator';
 import QRCode from 'qrcode';
 import { NotificationService } from '../services/notification.service';
 
 const router = Router();
 const notificationService = NotificationService.getInstance();
+
+const OPERATIONS_ROLES = ['ADMIN', 'MANAGER', 'MASTER_FIELD_OPERATOR', 'OPERATOR_FIELD_OPERATOR'];
+
+const createLedgerEntry = async (payload: {
+  bookingId: string;
+  actorUserId?: string;
+  operatorId?: string;
+  action: string;
+  actorRole: string;
+  note?: string;
+  metadata?: any;
+}) => {
+  return prisma.bookingLedgerEntry.create({
+    data: {
+      bookingId: payload.bookingId,
+      actorUserId: payload.actorUserId,
+      operatorId: payload.operatorId,
+      action: payload.action,
+      actorRole: payload.actorRole,
+      note: payload.note,
+      metadata: payload.metadata,
+    },
+  });
+};
+
+const getOperationsAccess = async (requestUser: { id: string; role: string }, requestedOperatorId?: string) => {
+  if (!OPERATIONS_ROLES.includes(requestUser.role)) {
+    return { allowed: false, scopedOperatorIds: [] as string[] };
+  }
+
+  if (canAccessAllOperationsBookings(requestUser.role)) {
+    return { allowed: true, scopedOperatorIds: null as string[] | null };
+  }
+
+  const scopedOperatorIds = await getScopedOperatorIdsForUser(requestUser.id, requestUser.role);
+  if (!scopedOperatorIds || scopedOperatorIds.length === 0) {
+    return { allowed: false, scopedOperatorIds: [] as string[] };
+  }
+
+  if (requestedOperatorId && !scopedOperatorIds.includes(requestedOperatorId)) {
+    return { allowed: false, scopedOperatorIds };
+  }
+
+  return { allowed: true, scopedOperatorIds };
+};
+
+// ── ADMIN: all bookings with pagination and filters ────────────────────────
+router.get('/admin/all', authenticateToken, async (req: Request, res: Response) => {
+  try {
+    const requestUser = (req as any).user;
+
+    const {
+      page = '1',
+      limit = '50',
+      status,
+      operatorId,
+      paymentStatus,
+      paymentMethod,
+      dateFrom,
+      dateTo,
+      search,        // passenger name / booking ID
+    } = req.query;
+
+    const access = await getOperationsAccess(requestUser, operatorId as string | undefined);
+    if (!access.allowed) {
+      return res.status(403).json({ error: 'Operations access required for bookings' });
+    }
+
+    const pageNum  = Math.max(1, parseInt(page as string));
+    const limitNum = Math.min(200, Math.max(1, parseInt(limit as string)));
+    const skip     = (pageNum - 1) * limitNum;
+
+    // Build where clause
+    const where: any = {};
+    if (status)      where.status = status;
+    if (dateFrom || dateTo) {
+      where.travelDate = {};
+      if (dateFrom) where.travelDate.gte = new Date(dateFrom as string);
+      if (dateTo)   where.travelDate.lte = new Date(dateTo as string);
+    }
+    if (operatorId) {
+      where.route = { operatorId };
+    } else if (access.scopedOperatorIds) {
+      where.route = { operatorId: { in: access.scopedOperatorIds } };
+    }
+    if (paymentStatus || paymentMethod) {
+      where.payment = {
+        is: {
+          ...(paymentStatus && { status: paymentStatus }),
+          ...(paymentMethod && { method: paymentMethod }),
+        },
+      };
+    }
+    if (search) {
+      // Search by booking ID prefix or passenger details via join
+      where.OR = [
+        { id: { startsWith: search as string } },
+        { user: { firstName: { contains: search as string, mode: 'insensitive' } } },
+        { user: { lastName:  { contains: search as string, mode: 'insensitive' } } },
+        { user: { phone:     { contains: search as string } } },
+      ];
+    }
+
+    const [bookings, total] = await Promise.all([
+      prisma.booking.findMany({
+        where,
+        include: {
+          route: {
+            include: {
+              operator: { select: { id: true, companyName: true } },
+              bus:      { select: { plateNumber: true, model: true } },
+            },
+          },
+          user: {
+            select: { id: true, firstName: true, lastName: true, email: true, phone: true },
+          },
+          payment: {
+            select: { id: true, status: true, method: true, amount: true, reference: true, createdAt: true },
+          },
+          assignments: {
+            orderBy: { createdAt: 'desc' },
+            take: 1,
+            include: {
+              agent: { select: { id: true, name: true, phone: true, status: true } },
+              assignedBy: { select: { id: true, firstName: true, lastName: true, role: true } },
+            },
+          },
+        },
+        orderBy: { createdAt: 'desc' },
+        skip,
+        take: limitNum,
+      }),
+      prisma.booking.count({ where }),
+    ]);
+
+    // Aggregate stats for the filtered set
+    const revenueAgg = await prisma.payment.aggregate({
+      where: { booking: where, status: 'COMPLETED' },
+      _sum: { amount: true },
+    });
+    const totalRevenue = revenueAgg._sum.amount || 0;
+
+    const statusCounts = await prisma.booking.groupBy({
+      by: ['status'],
+      where,
+      _count: { status: true },
+    });
+
+    res.json({
+      bookings,
+      pagination: {
+        page: pageNum,
+        limit: limitNum,
+        total,
+        totalPages: Math.ceil(total / limitNum),
+      },
+      stats: {
+        total,
+        totalRevenue,
+        byStatus: Object.fromEntries(statusCounts.map(s => [s.status, s._count.status])),
+      },
+    });
+  } catch (error) {
+    console.error('Error fetching admin bookings:', error);
+    res.status(500).json({ error: 'Failed to fetch bookings' });
+  }
+});
+
+// ── ADMIN: confirm a cash payment manually ────────────────────────────────
+router.post('/admin/confirm-payment/:bookingId', authenticateToken, async (req: Request, res: Response) => {
+  try {
+    const requestUser = (req as any).user;
+    const { bookingId } = req.params;
+
+    const access = await getOperationsAccess(requestUser);
+    if (!access.allowed) {
+      return res.status(403).json({ error: 'Operations access required for cash confirmation' });
+    }
+
+    const booking = await prisma.booking.findUnique({
+      where: { id: bookingId },
+      include: { payment: true, route: { select: { operatorId: true } } },
+    });
+    if (!booking) return res.status(404).json({ error: 'Booking not found' });
+
+    if (access.scopedOperatorIds && !access.scopedOperatorIds.includes(booking.route.operatorId)) {
+      return res.status(403).json({ error: 'Booking is outside your operator scope' });
+    }
+
+    if (booking.status !== 'PENDING') {
+      return res.status(400).json({ error: 'Only pending bookings can be confirmed as cash' });
+    }
+
+    if (booking.payment && booking.payment.method !== 'CASH') {
+      return res.status(400).json({ error: 'Only cash bookings can be confirmed with this action' });
+    }
+
+    await prisma.$transaction([
+      prisma.booking.update({ where: { id: bookingId }, data: { status: 'CONFIRMED' } }),
+      ...(booking.payment
+        ? [prisma.payment.update({ where: { id: booking.payment.id }, data: { status: 'COMPLETED' } })]
+        : [
+            prisma.payment.create({
+              data: {
+                bookingId: booking.id,
+                userId: booking.userId,
+                amount: booking.totalAmount,
+                method: 'CASH',
+                status: 'COMPLETED',
+                reference: `CASH-${booking.id.slice(-6).toUpperCase()}-${Date.now().toString().slice(-6)}`,
+              },
+            }),
+          ]),
+      prisma.bookingLedgerEntry.create({
+        data: {
+          bookingId: booking.id,
+          actorUserId: requestUser.id,
+          operatorId: booking.route.operatorId,
+          action: 'CASH_CONFIRMED',
+          actorRole: requestUser.role,
+          note: 'Cash payment confirmed from operations bookings page',
+        },
+      }),
+    ]);
+
+    res.json({ success: true, message: 'Booking confirmed and payment marked complete' });
+  } catch (error) {
+    console.error('Error confirming booking:', error);
+    res.status(500).json({ error: 'Failed to confirm booking' });
+  }
+});
+
+// Operations: assign booking to an agent / brand ambassador
+router.post('/:bookingId/assign-agent', authenticateToken, async (req: Request, res: Response) => {
+  try {
+    const requestUser = (req as any).user;
+    const { bookingId } = req.params;
+    const { agentId, note } = req.body;
+
+    if (!agentId) {
+      return res.status(400).json({ error: 'agentId is required' });
+    }
+
+    const access = await getOperationsAccess(requestUser);
+    if (!access.allowed) {
+      return res.status(403).json({ error: 'Operations access required for assignments' });
+    }
+
+    const booking = await prisma.booking.findUnique({
+      where: { id: bookingId },
+      include: {
+        route: { select: { operatorId: true, origin: true, destination: true } },
+      },
+    });
+
+    if (!booking) {
+      return res.status(404).json({ error: 'Booking not found' });
+    }
+
+    if (access.scopedOperatorIds && !access.scopedOperatorIds.includes(booking.route.operatorId)) {
+      return res.status(403).json({ error: 'Booking is outside your operator scope' });
+    }
+
+    const agent = await prisma.agent.findUnique({ where: { id: agentId } });
+    if (!agent) {
+      return res.status(404).json({ error: 'Agent not found' });
+    }
+
+    const assignment = await prisma.$transaction(async tx => {
+      const createdAssignment = await tx.bookingAssignment.create({
+        data: {
+          bookingId,
+          agentId,
+          assignedByUserId: requestUser.id,
+          operatorId: booking.route.operatorId,
+          note,
+        },
+        include: {
+          agent: { select: { id: true, name: true, phone: true, status: true } },
+          assignedBy: { select: { id: true, firstName: true, lastName: true, role: true } },
+        },
+      });
+
+      await tx.bookingLedgerEntry.create({
+        data: {
+          bookingId,
+          actorUserId: requestUser.id,
+          operatorId: booking.route.operatorId,
+          action: 'ASSIGNED_TO_AGENT',
+          actorRole: requestUser.role,
+          note: note || `Assigned to ${agent.name}`,
+          metadata: {
+            agentId: agent.id,
+            agentName: agent.name,
+            route: `${booking.route.origin} -> ${booking.route.destination}`,
+          },
+        },
+      });
+
+      return createdAssignment;
+    });
+
+    res.status(201).json({ assignment });
+  } catch (error: any) {
+    console.error('Error assigning booking to agent:', error);
+    res.status(500).json({ error: error.message || 'Failed to assign booking to agent' });
+  }
+});
+
+// Operations: get booking ledger
+router.get('/:bookingId/ledger', authenticateToken, async (req: Request, res: Response) => {
+  try {
+    const requestUser = (req as any).user;
+    const { bookingId } = req.params;
+
+    const access = await getOperationsAccess(requestUser);
+    if (!access.allowed) {
+      return res.status(403).json({ error: 'Operations access required for ledger access' });
+    }
+
+    const booking = await prisma.booking.findUnique({
+      where: { id: bookingId },
+      select: {
+        id: true,
+        route: { select: { operatorId: true } },
+      },
+    });
+
+    if (!booking) {
+      return res.status(404).json({ error: 'Booking not found' });
+    }
+
+    if (access.scopedOperatorIds && !access.scopedOperatorIds.includes(booking.route.operatorId)) {
+      return res.status(403).json({ error: 'Booking is outside your operator scope' });
+    }
+
+    const entries = await prisma.bookingLedgerEntry.findMany({
+      where: { bookingId },
+      include: {
+        actorUser: {
+          select: {
+            id: true,
+            firstName: true,
+            lastName: true,
+            role: true,
+          },
+        },
+        operator: {
+          select: {
+            id: true,
+            companyName: true,
+          },
+        },
+      },
+      orderBy: { createdAt: 'desc' },
+    });
+
+    res.json({ entries });
+  } catch (error: any) {
+    console.error('Error fetching booking ledger:', error);
+    res.status(500).json({ error: error.message || 'Failed to fetch booking ledger' });
+  }
+});
+
+// Operations: add booking ledger note
+router.post('/:bookingId/ledger', authenticateToken, async (req: Request, res: Response) => {
+  try {
+    const requestUser = (req as any).user;
+    const { bookingId } = req.params;
+    const { note, action = 'FOLLOW_UP_NOTE', metadata } = req.body;
+
+    if (!note) {
+      return res.status(400).json({ error: 'note is required' });
+    }
+
+    const access = await getOperationsAccess(requestUser);
+    if (!access.allowed) {
+      return res.status(403).json({ error: 'Operations access required for ledger updates' });
+    }
+
+    const booking = await prisma.booking.findUnique({
+      where: { id: bookingId },
+      select: {
+        id: true,
+        route: { select: { operatorId: true } },
+      },
+    });
+
+    if (!booking) {
+      return res.status(404).json({ error: 'Booking not found' });
+    }
+
+    if (access.scopedOperatorIds && !access.scopedOperatorIds.includes(booking.route.operatorId)) {
+      return res.status(403).json({ error: 'Booking is outside your operator scope' });
+    }
+
+    const entry = await createLedgerEntry({
+      bookingId,
+      actorUserId: requestUser.id,
+      operatorId: booking.route.operatorId,
+      action,
+      actorRole: requestUser.role,
+      note,
+      metadata,
+    });
+
+    res.status(201).json({ entry });
+  } catch (error: any) {
+    console.error('Error adding booking ledger entry:', error);
+    res.status(500).json({ error: error.message || 'Failed to add booking ledger entry' });
+  }
+});
 
 // Get user's bookings
 router.get('/my-bookings', authenticateToken, async (req: Request, res: Response) => {
@@ -118,16 +530,14 @@ router.post('/', [
       boarding = route.stops.find(stop => stop.stopName === boardingStop);
       alighting = route.stops.find(stop => stop.stopName === alightingStop);
 
-      if (!boarding || !alighting) {
-        return res.status(400).json({ error: 'Invalid boarding or alighting stop' });
+      if (boarding && alighting) {
+        if (boarding.order >= alighting.order) {
+          return res.status(400).json({ error: 'Boarding stop must be before alighting stop' });
+        }
+        // Calculate price based on stops
+        finalPrice = alighting.priceFromOrigin - boarding.priceFromOrigin;
       }
-
-      if (boarding.order >= alighting.order) {
-        return res.status(400).json({ error: 'Boarding stop must be before alighting stop' });
-      }
-
-      // Calculate price based on stops
-      finalPrice = alighting.priceFromOrigin - boarding.priceFromOrigin;
+      // If stops not found in DB (e.g. fallback names), use full route price silently
     }
 
     // Check seat availability
@@ -163,29 +573,14 @@ router.post('/', [
       const passenger = passengers[i];
       const seatNumber = seatNumbers[i];
 
-      // Generate QR code data
-      const qrData = {
-        routeId: routeId,
-        seatNumber: seatNumber,
-        travelDate: travelDate,
-        route: boardingStop && alightingStop 
-          ? `${boardingStop} → ${alightingStop}` 
-          : `${route.origin} → ${route.destination}`,
-        busPlate: route.bus.plateNumber,
-        passengerName: `${passenger.firstName} ${passenger.lastName}`,
-        timestamp: Date.now()
-      };
-
-      const qrCode = await QRCode.toDataURL(JSON.stringify(qrData));
-
-      // Create booking with all required fields
+      // Create booking first so we have the ID for the QR URL
       const booking = await prisma.booking.create({
         data: {
           userId,
           routeId,
           seatNumber: seatNumber,
           travelDate: new Date(travelDate),
-          qrCode,
+          qrCode: '',  // updated below once we have the booking ID
           totalAmount: finalPrice,
           boardingStop: boardingStop || null,
           alightingStop: alightingStop || null,
@@ -194,7 +589,12 @@ router.post('/', [
         }
       });
 
-      bookings.push(booking);
+      // Generate QR code as a clickable URL so phone cameras open the ticket page
+      const frontendUrl = process.env.FRONTEND_URL || 'https://transconnect.app';
+      const qrCode = await QRCode.toDataURL(`${frontendUrl}/ticket/${booking.id}`);
+      await prisma.booking.update({ where: { id: booking.id }, data: { qrCode } });
+
+      bookings.push({ ...booking, qrCode });
     }
 
     // Fetch complete booking data with relations
@@ -338,7 +738,9 @@ router.put('/:id/cancel', authenticateToken, async (req: Request, res: Response)
     const now = new Date();
     const hoursUntilTravel = (travelDate.getTime() - now.getTime()) / (1000 * 60 * 60);
 
-    if (hoursUntilTravel < 2) {
+    // Allow cancellation of expired bookings (negative hours) or bookings with 2+ hours remaining
+    // Only block cancellations that are within 2 hours of future travel
+    if (hoursUntilTravel > 0 && hoursUntilTravel < 2) {
       return res.status(400).json({ error: 'Cannot cancel booking less than 2 hours before travel' });
     }
 
@@ -372,6 +774,15 @@ router.get('/:id', authenticateToken, async (req: Request, res: Response) => {
             stops: {
               orderBy: { order: 'asc' }
             }
+          }
+        },
+        user: {
+          select: {
+            id: true,
+            firstName: true,
+            lastName: true,
+            email: true,
+            phone: true
           }
         },
         payment: true,

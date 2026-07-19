@@ -60,8 +60,8 @@ describe('Header Component', () => {
     it('should display TransConnect logo and brand name', () => {
       renderWithAuth();
       
-      expect(screen.getByText('TransConnect')).toBeInTheDocument();
-      expect(screen.getByRole('link', { name: /transconnect/i })).toHaveAttribute('href', '/');
+      expect(screen.getByRole('img', { name: /transconnect logo/i })).toBeInTheDocument();
+      expect(screen.getByRole('link', { name: /transconnect home/i })).toHaveAttribute('href', '/');
     });
   });
 
@@ -257,7 +257,7 @@ describe('Header Component', () => {
     it('should have correct href attributes for navigation links', () => {
       renderWithAuth(mockAdminUser);
       
-      expect(screen.getByRole('link', { name: /transconnect/i })).toHaveAttribute('href', '/');
+      expect(screen.getByRole('link', { name: /transconnect home/i })).toHaveAttribute('href', '/');
       expect(screen.getByRole('link', { name: /search routes/i })).toHaveAttribute('href', '/search');
       expect(screen.getByRole('link', { name: /my bookings/i })).toHaveAttribute('href', '/bookings');
       expect(screen.getByRole('link', { name: /dashboard/i })).toHaveAttribute('href', '/admin');

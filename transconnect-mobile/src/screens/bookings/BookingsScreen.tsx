@@ -17,69 +17,97 @@ import { bookingsApi } from '../../services/api';
 import { offlineStorage } from '../../services/offlineStorage';
 
 // Memoized booking card component for better performance
-const BookingCard = React.memo(({ booking, onPress, getStatusColor, getStatusText }: any) => (
-  <TouchableOpacity
-    key={booking.id}
-    style={styles.bookingCard}
-    onPress={() => onPress(booking)}
-  >
-    <View style={styles.bookingHeader}>
-      <Text style={styles.ticketNumber}>#{booking.id.slice(0, 8)}</Text>
-      <View style={[
-        styles.statusBadge,
-        { backgroundColor: getStatusColor(booking.status) + '20' }
-      ]}>
-        <Text style={[
-          styles.statusText,
-          { color: getStatusColor(booking.status) }
+const BookingCard = React.memo(({ booking, onPress, onTransfer, onPayNow, getStatusColor, getStatusText }: any) => {
+  const isUnpaid = !booking.payment || booking.payment.status !== 'COMPLETED';
+  
+  return (
+    <TouchableOpacity
+      key={booking.id}
+      style={styles.bookingCard}
+      onPress={() => onPress(booking)}
+    >
+      <View style={styles.bookingHeader}>
+        <Text style={styles.ticketNumber}>#{booking.id.slice(0, 8)}</Text>
+        <View style={[
+          styles.statusBadge,
+          { backgroundColor: getStatusColor(booking.status) + '20' }
         ]}>
-          {getStatusText(booking.status)}
-        </Text>
+          <Text style={[
+            styles.statusText,
+            { color: getStatusColor(booking.status) }
+          ]}>
+            {getStatusText(booking.status)}
+          </Text>
+        </View>
       </View>
-    </View>
 
-    <View style={styles.routeInfo}>
-      <View style={styles.routeRow}>
-        <Text style={styles.routeText}>
-          {booking.route?.origin || booking.boardingStop} → {booking.route?.destination || booking.alightingStop}
-        </Text>
+      <View style={styles.routeInfo}>
+        <View style={styles.routeRow}>
+          <Text style={styles.routeText}>
+            {booking.route?.origin || booking.boardingStop} → {booking.route?.destination || booking.alightingStop}
+          </Text>
+        </View>
+        <Text style={styles.operatorText}>{booking.route?.operator?.companyName || 'TransConnect'}</Text>
       </View>
-      <Text style={styles.operatorText}>{booking.route?.operator?.companyName || 'TransConnect'}</Text>
-    </View>
 
-    <View style={styles.travelInfo}>
-      <View style={styles.infoRow}>
-        <Ionicons name="calendar-outline" size={16} color="#6B7280" />
-        <Text style={styles.infoText}>
-          {format(new Date(booking.travelDate), 'MMM dd, yyyy')}
-        </Text>
+      <View style={styles.travelInfo}>
+        <View style={styles.infoRow}>
+          <Ionicons name="calendar-outline" size={16} color="#6B7280" />
+          <Text style={styles.infoText}>
+            {format(new Date(booking.travelDate), 'MMM dd, yyyy')}
+          </Text>
+        </View>
+        <View style={styles.infoRow}>
+          <Ionicons name="time-outline" size={16} color="#6B7280" />
+          <Text style={styles.infoText}>{booking.route?.departureTime || 'TBA'}</Text>
+        </View>
+        <View style={styles.infoRow}>
+          <Ionicons name="card-outline" size={16} color="#6B7280" />
+          <Text style={styles.infoText}>UGX {(booking.totalAmount || 0).toLocaleString()}</Text>
+        </View>
+        {isUnpaid && (
+          <View style={styles.infoRow}>
+            <Ionicons name="warning-outline" size={16} color="#EF4444" />
+            <Text style={[styles.infoText, { color: '#EF4444' }]}>Payment Pending</Text>
+          </View>
+        )}
       </View>
-      <View style={styles.infoRow}>
-        <Ionicons name="time-outline" size={16} color="#6B7280" />
-        <Text style={styles.infoText}>{booking.route?.departureTime || 'TBA'}</Text>
-      </View>
-      <View style={styles.infoRow}>
-        <Ionicons name="card-outline" size={16} color="#6B7280" />
-        <Text style={styles.infoText}>UGX {(booking.totalAmount || 0).toLocaleString()}</Text>
-      </View>
-    </View>
 
-    <View style={styles.actionRow}>
-      {(booking.status === 'CONFIRMED' || booking.status === 'PENDING') && (
-        <TouchableOpacity 
-          style={styles.viewTicketButton}
-          onPress={() => onPress(booking)}
-        >
-          <Ionicons name="qr-code-outline" size={16} color="#3B82F6" />
-          <Text style={styles.viewTicketText}>View Ticket</Text>
+      <View style={styles.actionRow}>
+        {isUnpaid && booking.status === 'PENDING' && (
+          <TouchableOpacity 
+            style={styles.payNowButton}
+            onPress={() => onPayNow(booking)}
+          >
+            <Ionicons name="card-outline" size={16} color="#FFFFFF" />
+            <Text style={styles.payNowText}>Pay Now</Text>
+          </TouchableOpacity>
+        )}
+        {(booking.status === 'CONFIRMED' || booking.status === 'PENDING') && (
+          <TouchableOpacity 
+            style={styles.viewTicketButton}
+            onPress={() => onPress(booking)}
+          >
+            <Ionicons name="qr-code-outline" size={16} color="#3B82F6" />
+            <Text style={styles.viewTicketText}>View Ticket</Text>
+          </TouchableOpacity>
+        )}
+        {(booking.status === 'CONFIRMED' || booking.status === 'PENDING') && !isUnpaid && (
+          <TouchableOpacity 
+            style={styles.transferButton}
+            onPress={() => onTransfer(booking)}
+          >
+            <Ionicons name="swap-horizontal-outline" size={16} color="#8B5CF6" />
+            <Text style={styles.transferButtonText}>Transfer</Text>
+          </TouchableOpacity>
+        )}
+        <TouchableOpacity style={styles.detailsButton}>
+          <Ionicons name="chevron-forward" size={16} color="#6B7280" />
         </TouchableOpacity>
-      )}
-      <TouchableOpacity style={styles.detailsButton}>
-        <Ionicons name="chevron-forward" size={16} color="#6B7280" />
-      </TouchableOpacity>
-    </View>
-  </TouchableOpacity>
-));
+      </View>
+    </TouchableOpacity>
+  );
+});
 
 export default function BookingsScreen({ navigation }: any) {
   const [filter, setFilter] = useState<'all' | 'upcoming' | 'past'>('all');
@@ -252,6 +280,13 @@ export default function BookingsScreen({ navigation }: any) {
     <SafeAreaView style={styles.container}>
       <View style={styles.header}>
         <Text style={styles.title}>My Bookings</Text>
+        <TouchableOpacity
+          onPress={() => navigation.navigate('MyTransfers')}
+          style={styles.transfersLink}
+        >
+          <Ionicons name="swap-horizontal-outline" size={18} color="#8B5CF6" />
+          <Text style={styles.transfersLinkText}>Transfers</Text>
+        </TouchableOpacity>
         {isOffline && (
           <View style={styles.offlineBadge}>
             <Ionicons name="cloud-offline-outline" size={14} color="#F59E0B" />
@@ -341,6 +376,23 @@ export default function BookingsScreen({ navigation }: any) {
               key={booking.id}
               booking={booking}
               onPress={(booking: any) => navigation.navigate('TicketDetail', { booking })}
+              onTransfer={(booking: any) => navigation.navigate('TransferRequest', { booking })}
+              onPayNow={(booking: any) => {
+                // Navigate to a payment retry screen with booking details
+                navigation.navigate('Payment', {
+                  isRetry: true,
+                  booking: booking,
+                  route: booking.route,
+                  passengers: 1, // Could be extracted from booking
+                  searchParams: {
+                    from: booking.boardingStop || booking.route.origin,
+                    to: booking.alightingStop || booking.route.destination,
+                    date: booking.travelDate,
+                  },
+                  selectedSeats: [booking.seatNumber],
+                  totalAmount: booking.totalAmount,
+                });
+              }}
               getStatusColor={getStatusColor}
               getStatusText={getStatusText}
             />
@@ -640,6 +692,47 @@ const styles = StyleSheet.create({
     color: '#3B82F6',
     fontWeight: '600',
     marginLeft: 4,
+  },
+  transferButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: '#F5F3FF',
+    paddingHorizontal: 12,
+    paddingVertical: 6,
+    borderRadius: 8,
+    marginRight: 8,
+  },
+  transferButtonText: {
+    fontSize: 14,
+    color: '#8B5CF6',
+    fontWeight: '600',
+    marginLeft: 4,
+  },
+  payNowButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: '#10B981',
+    paddingHorizontal: 12,
+    paddingVertical: 6,
+    borderRadius: 8,
+    marginRight: 8,
+  },
+  payNowText: {
+    fontSize: 14,
+    color: '#FFFFFF',
+    fontWeight: '600',
+    marginLeft: 4,
+  },
+  transfersLink: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 4,
+    marginLeft: 12,
+  },
+  transfersLinkText: {
+    fontSize: 14,
+    color: '#8B5CF6',
+    fontWeight: '600',
   },
   detailsButton: {
     paddingHorizontal: 12,

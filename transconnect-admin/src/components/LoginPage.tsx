@@ -46,15 +46,6 @@ const LoginPage: React.FC = () => {
             </div>
           )}
 
-          {/* Test Credentials */}
-          <div className="mb-6 p-4 bg-blue-50 border border-blue-200 rounded-lg">
-            <h3 className="text-sm font-semibold text-blue-900 mb-2">Test Credentials:</h3>
-            <div className="space-y-1 text-xs text-blue-700">
-              <p><strong>Admin:</strong> admin@transconnect.ug / admin123</p>
-              <p><strong>Operator:</strong> operator@buscompany.ug / operator123</p>
-            </div>
-          </div>
-
           {/* Login Form */}
           <form onSubmit={handleSubmit} className="space-y-6">
             <div>

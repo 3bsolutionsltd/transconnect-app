@@ -1,6 +1,6 @@
 import { Request, Response, Router } from 'express';
 import { osrmService } from '../services/osrm.service';
-import { prisma } from '../index';
+import { prisma } from '../lib/prisma';
 import { authenticateToken } from '../middleware/auth';
 
 const router = Router();

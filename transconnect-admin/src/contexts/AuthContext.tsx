@@ -5,7 +5,7 @@ interface User {
   email: string;
   firstName: string;
   lastName: string;
-  role: 'ADMIN' | 'OPERATOR' | 'PASSENGER';
+  role: 'ADMIN' | 'OPERATOR' | 'PASSENGER' | 'MASTER_FIELD_OPERATOR' | 'OPERATOR_FIELD_OPERATOR';
 }
 
 interface AuthContextType {
@@ -26,12 +26,29 @@ export const useAuth = () => {
   return context;
 };
 
-// Use the same API configuration as the main api.ts file
-const API_BASE_URL = process.env.REACT_APP_API_URL || 'http://localhost:5000/api';
+// Ensure API_BASE_URL always ends with /api so endpoints like /auth/login resolve correctly
+// regardless of whether REACT_APP_API_URL is set with or without the /api suffix.
+const _rawApiUrl = process.env.REACT_APP_API_URL || 'http://localhost:5000/api';
+const API_BASE_URL = _rawApiUrl.replace(/\/api\/?$/, '') + '/api';
 
 const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
   const [user, setUser] = useState<User | null>(null);
   const [loading, setLoading] = useState(true);
+
+  const readResponseError = async (response: Response): Promise<string> => {
+    const rawBody = await response.text();
+
+    if (!rawBody) {
+      return `Request failed with status ${response.status}`;
+    }
+
+    try {
+      const parsed = JSON.parse(rawBody);
+      return parsed.error || parsed.message || rawBody;
+    } catch {
+      return rawBody;
+    }
+  };
 
   useEffect(() => {
     // Check for stored auth token on app load
@@ -41,11 +58,11 @@ const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => 
     if (token && userData) {
       try {
         const parsedUser = JSON.parse(userData);
-        // Verify user has admin or operator role
-        if (parsedUser.role === 'ADMIN' || parsedUser.role === 'OPERATOR') {
+        // Verify user has portal access role
+        if (['ADMIN', 'OPERATOR', 'MASTER_FIELD_OPERATOR', 'OPERATOR_FIELD_OPERATOR'].includes(parsedUser.role)) {
           console.log(`🔍 Validating ${parsedUser.role} token for:`, parsedUser.email);
-          // Test token validity by making a quick API call
-          fetch(`${API_BASE_URL}/users`, {
+          // Test token validity with a role-agnostic profile endpoint
+          fetch(`${API_BASE_URL}/auth/me`, {
             headers: {
               'Authorization': `Bearer ${token}`,
               'Content-Type': 'application/json'
@@ -56,6 +73,9 @@ const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => 
               localStorage.removeItem('admin_token');
               localStorage.removeItem('admin_user');
               setUser(null);
+            } else if (response.status === 429) {
+              console.warn('⚠️ Auth validation rate-limited; keeping stored session for now');
+              setUser(parsedUser);
             } else if (response.ok) {
               console.log(`✅ ${parsedUser.role} token valid, setting user:`, parsedUser.email);
               setUser(parsedUser);
@@ -94,15 +114,15 @@ const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => 
       });
 
       if (!response.ok) {
-        const errorData = await response.json();
-        throw new Error(errorData.error || 'Login failed');
+        const errorMessage = await readResponseError(response);
+        throw new Error(errorMessage || 'Login failed');
       }
 
       const data = await response.json();
       
-      // Check if user has admin or operator role
-      if (data.user.role !== 'ADMIN' && data.user.role !== 'OPERATOR') {
-        throw new Error('Access denied. Admin or operator privileges required.');
+      // Check if user has portal access role
+      if (!['ADMIN', 'OPERATOR', 'MASTER_FIELD_OPERATOR', 'OPERATOR_FIELD_OPERATOR'].includes(data.user.role)) {
+        throw new Error('Access denied. Portal privileges required.');
       }
       
       console.log(`✅ ${data.user.role} login successful:`, data.user.email);

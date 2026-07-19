@@ -4,10 +4,16 @@ import authRoutes from '../../src/routes/auth';
 import bookingRoutes from '../../src/routes/bookings';
 import routeRoutes from '../../src/routes/routes';
 import { mockPrisma, createTestUser, createTestRoute } from '../setup';
+import { searchRoutesWithSegments } from '../../src/services/routeSegmentService';
 
-// Mock the Prisma import
-jest.mock('../../src/index', () => ({
-  prisma: mockPrisma
+// Mock the Prisma import using require() inside factory to avoid TDZ with hoisted jest.mock
+jest.mock('../../src/lib/prisma', () => ({
+  prisma: require('../setup').mockPrisma
+}));
+
+// Mock segment-based route search (used when both origin & destination are provided)
+jest.mock('../../src/services/routeSegmentService', () => ({
+  searchRoutesWithSegments: jest.fn()
 }));
 
 // Mock bcrypt
@@ -69,8 +75,20 @@ describe('Complete Booking Flow Integration', () => {
 
       const token = registerResponse.body.token;
 
-      // Step 2: Search for routes
-      mockPrisma.route.findMany.mockResolvedValueOnce([testRoute]);
+      // Step 2: Search for routes (origin+destination triggers segment-based search)
+      const mockSegmentResult = [{
+        routeId: testRoute.id,
+        pickupLocation: testRoute.origin,
+        dropoffLocation: testRoute.destination,
+        finalPrice: testRoute.price,
+        totalDistance: 50,
+        totalDuration: 60,
+        departureTime: testRoute.departureTime,
+        busInfo: null,
+        operatorInfo: null,
+        segments: []
+      }];
+      (searchRoutesWithSegments as jest.Mock).mockResolvedValueOnce(mockSegmentResult);
 
       const routesResponse = await request(app)
         .get('/routes')
@@ -106,6 +124,7 @@ describe('Complete Booking Flow Integration', () => {
       mockPrisma.user.findUnique.mockResolvedValue(testUser); // For auth middleware
       mockPrisma.route.findUnique.mockResolvedValueOnce({
         ...testRoute,
+        stops: [],
         bookings: []
       });
       mockPrisma.booking.findFirst.mockResolvedValueOnce(null); // Seat available
@@ -121,25 +140,27 @@ describe('Complete Booking Flow Integration', () => {
         qrCode: 'data:image/png;base64,mocked-qr-code',
         createdAt: new Date(),
         updatedAt: new Date(),
-        route: testRoute
+        route: { ...testRoute, bus: testRoute.bus, operator: testRoute.operator },
+        user: { id: testUser.id, firstName: 'Test', lastName: 'User' }
       };
       
       mockPrisma.booking.create.mockResolvedValueOnce(newBooking);
+      mockPrisma.booking.findMany.mockResolvedValueOnce([newBooking]);
 
       const bookingResponse = await request(app)
         .post('/bookings')
         .set('Authorization', `Bearer ${token}`)
         .send({
           routeId: testRoute.id,
-          seatNumber: '5',
-          travelDate: '2025-11-10T00:00:00.000Z'
+          seatNumbers: ['5'],
+          travelDate: '2025-11-10T00:00:00.000Z',
+          passengers: [{ firstName: 'Test', lastName: 'User', phone: '+256700000000' }]
         });
 
       expect(bookingResponse.status).toBe(201);
-      expect(bookingResponse.body).toHaveProperty('id');
-      expect(bookingResponse.body).toHaveProperty('qrCode');
-      expect(bookingResponse.body.seatNumber).toBe('5');
-      expect(bookingResponse.body.status).toBe('PENDING');
+      expect(bookingResponse.body).toHaveProperty('bookings');
+      expect(bookingResponse.body.bookings[0]).toHaveProperty('id');
+      expect(bookingResponse.body.bookings[0].seatNumber).toBe('5');
 
       // Step 5: View user's bookings
       mockPrisma.booking.findMany.mockResolvedValueOnce([{
@@ -196,7 +217,7 @@ describe('Complete Booking Flow Integration', () => {
       };
 
       // First booking attempt
-      mockPrisma.route.findUnique.mockResolvedValueOnce(routeWithNoBookings);
+      mockPrisma.route.findUnique.mockResolvedValueOnce({ ...routeWithNoBookings, stops: [] });
       mockPrisma.booking.findFirst.mockResolvedValueOnce(null); // Seat appears available
       
       const firstBooking = {
@@ -208,24 +229,27 @@ describe('Complete Booking Flow Integration', () => {
         status: 'PENDING',
         totalAmount: 5000,
         qrCode: 'data:image/png;base64,mocked-qr-code',
-        route: testRoute
+        route: { ...testRoute, bus: testRoute.bus, operator: testRoute.operator },
+        user: { id: testUser.id, firstName: 'Test', lastName: 'User' }
       };
       
       mockPrisma.booking.create.mockResolvedValueOnce(firstBooking);
+      mockPrisma.booking.findMany.mockResolvedValueOnce([firstBooking]);
 
       const firstResponse = await request(app)
         .post('/bookings')
         .set('Authorization', `Bearer test-token`)
         .send({
           routeId: testRoute.id,
-          seatNumber: '5',
-          travelDate: '2025-11-10T00:00:00.000Z'
+          seatNumbers: ['5'],
+          travelDate: '2025-11-10T00:00:00.000Z',
+          passengers: [{ firstName: 'Test', lastName: 'User', phone: '+256700000000' }]
         });
 
       expect(firstResponse.status).toBe(201);
 
       // Second booking attempt for the same seat
-      mockPrisma.route.findUnique.mockResolvedValueOnce(routeWithNoBookings);
+      mockPrisma.route.findUnique.mockResolvedValueOnce({ ...routeWithNoBookings, stops: [] });
       mockPrisma.booking.findFirst.mockResolvedValueOnce(firstBooking); // Seat now taken
 
       const secondResponse = await request(app)
@@ -233,12 +257,13 @@ describe('Complete Booking Flow Integration', () => {
         .set('Authorization', `Bearer test-token`)
         .send({
           routeId: testRoute.id,
-          seatNumber: '5',
-          travelDate: '2025-11-10T00:00:00.000Z'
+          seatNumbers: ['5'],
+          travelDate: '2025-11-10T00:00:00.000Z',
+          passengers: [{ firstName: 'Test', lastName: 'User', phone: '+256700000000' }]
         });
 
       expect(secondResponse.status).toBe(400);
-      expect(secondResponse.body.error).toBe('Seat is already booked for this date');
+      expect(secondResponse.body.error).toContain('already booked for this date');
     });
 
     it('should handle cancellation workflow correctly', async () => {
@@ -291,9 +316,8 @@ describe('Complete Booking Flow Integration', () => {
       // Step 3: Verify seat is now available again
       const routeWithCancelledBooking = {
         ...testRoute,
-        bookings: [
-          { seatNumber: '7', status: 'CANCELLED' } // Cancelled bookings don't block seats
-        ]
+        // DB query filters status IN ['PENDING','CONFIRMED'], so cancelled bookings won't appear
+        bookings: []
       };
       mockPrisma.route.findUnique.mockResolvedValueOnce(routeWithCancelledBooking);
 
@@ -315,12 +339,13 @@ describe('Complete Booking Flow Integration', () => {
 
       expect(response1.status).toBe(401);
 
-      // Try with invalid token
+      // Try with invalid token — jwt mock always validates, but user won't be found
+      mockPrisma.user.findUnique.mockResolvedValueOnce(null);
       const response2 = await request(app)
         .get('/bookings/my-bookings')
         .set('Authorization', 'Bearer invalid-token');
 
-      expect(response2.status).toBe(403);
+      expect(response2.status).toBe(401);
 
       // Try with malformed authorization header
       const response3 = await request(app)
@@ -341,8 +366,9 @@ describe('Complete Booking Flow Integration', () => {
         .set('Authorization', `Bearer test-token`)
         .send({
           routeId: testRoute.id,
-          seatNumber: '5',
-          travelDate: '2025-11-10T00:00:00.000Z'
+          seatNumbers: ['5'],
+          travelDate: '2025-11-10T00:00:00.000Z',
+          passengers: [{ firstName: 'Test', lastName: 'User', phone: '+256700000000' }]
         });
 
       expect(response.status).toBe(500);

@@ -9,7 +9,6 @@ import {
   Users,
   Clock,
   CheckCircle,
-  XCircle,
   AlertCircle
 } from 'lucide-react';
 
@@ -46,7 +45,7 @@ const OperatorDashboard = () => {
   const [recentBookings, setRecentBookings] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
 
-  const API_BASE_URL = process.env.REACT_APP_API_URL || 'http://localhost:5000/api';
+  const API_BASE_URL = (process.env.REACT_APP_API_URL || 'http://localhost:5000/api').replace(/\/api\/?$/, '') + '/api';
 
   const loadOperatorData = useCallback(async () => {
     try {

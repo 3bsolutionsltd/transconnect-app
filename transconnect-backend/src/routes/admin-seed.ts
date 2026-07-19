@@ -5,7 +5,7 @@
  */
 
 import { Router, Request, Response } from 'express';
-import { prisma } from '../index';
+import { prisma } from '../lib/prisma';
 import { authenticateToken, isAdmin } from '../middleware/auth';
 import bcrypt from 'bcryptjs';
 

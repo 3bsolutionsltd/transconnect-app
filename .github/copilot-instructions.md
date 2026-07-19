@@ -116,6 +116,22 @@ Each component should include:
 - Reference the technical stack when suggesting solutions
 - Prioritize MVP features over advanced functionality
 
+## UX Skill Pack
+Use these reusable skills for all UX and UI work:
+
+- .github/skills/transconnect-customer-portal/SKILL.md
+- .github/skills/transconnect-operator-portal/SKILL.md
+- .github/skills/transconnect-design-system/SKILL.md
+
+Skill routing:
+- General traveller-facing portal work: use TransConnect Customer Portal Skill.
+- Operator-branded passenger portal work: use TransConnect Operator Portal Skill.
+- Shared UI architecture, styling tokens, and reusable components: use TransConnect Design System Skill.
+
+Mandatory UI rule:
+- Do not hardcode visual styles into individual page files when the same outcome can be achieved via shared tokens, utility classes, or reusable styled components.
+- Extend shared primitives first, then compose pages from those primitives.
+
 When implementing features, always consider:
 1. Mobile-first design approach
 2. Offline functionality where applicable

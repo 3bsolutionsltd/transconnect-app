@@ -1,0 +1,163 @@
+# ============================================================
+# TransConnect STAGING Environment
+# Domain:   staging.transconnect.app
+# API:      api-staging.transconnect.app
+# Admin:    admin-staging.transconnect.app
+# ============================================================
+
+services:
+  # ─── PostgreSQL Database ────────────────────────────────
+  postgres_staging:
+    image: postgres:15-alpine
+    container_name: tc_postgres_staging
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB: transconnect_staging
+      POSTGRES_USER: transconnect_staging
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
+    volumes:
+      - postgres_staging_data:/var/lib/postgresql/data
+    networks:
+      - staging_network
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U transconnect_staging -d transconnect_staging"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    # DB port NOT exposed externally - only accessible within staging_network
+
+  # ─── Redis (session caching / seat locking) ──────────────
+  redis_staging:
+    image: redis:7-alpine
+    container_name: tc_redis_staging
+    restart: unless-stopped
+    command: redis-server --requirepass ${REDIS_PASSWORD} --maxmemory 256mb --maxmemory-policy allkeys-lru
+    volumes:
+      - redis_staging_data:/data
+    networks:
+      - staging_network
+    healthcheck:
+      test: ["CMD", "redis-cli", "-a", "${REDIS_PASSWORD}", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  # ─── Backend API ─────────────────────────────────────────
+  backend_staging:
+    build:
+      context: ../../transconnect-backend
+      dockerfile: Dockerfile
+    container_name: tc_backend_staging
+    restart: unless-stopped
+    environment:
+      NODE_ENV: staging
+      PORT: 5000
+      DATABASE_URL: postgresql://transconnect_staging:${POSTGRES_PASSWORD}@postgres_staging:5432/transconnect_staging
+      REDIS_URL: redis://:${REDIS_PASSWORD}@redis_staging:6379
+      JWT_SECRET: ${JWT_SECRET}
+      JWT_EXPIRES_IN: ${JWT_EXPIRES_IN:-30d}
+      FRONTEND_URL: ${FRONTEND_URL}
+      ADMIN_URL: ${ADMIN_URL}
+      CORS_ORIGINS: ${CORS_ORIGINS}
+      # SMS
+      ESMS_API_KEY: ${ESMS_API_KEY}
+      ESMS_USERNAME: ${ESMS_USERNAME:-2057}
+      ESMS_SENDER_ID: ${ESMS_SENDER_ID:-TransTest}
+      # Payments (SANDBOX)
+      FLUTTERWAVE_SECRET_KEY: ${FLUTTERWAVE_SECRET_KEY}
+      FLUTTERWAVE_PUBLIC_KEY: ${FLUTTERWAVE_PUBLIC_KEY}
+      FLUTTERWAVE_ENCRYPTION_KEY: ${FLUTTERWAVE_ENCRYPTION_KEY}
+      MTN_MOMO_SUBSCRIPTION_KEY: ${MTN_MOMO_SUBSCRIPTION_KEY}
+      MTN_MOMO_USER_ID: ${MTN_MOMO_USER_ID}
+      MTN_MOMO_API_KEY: ${MTN_MOMO_API_KEY}
+      MTN_MOMO_ENVIRONMENT: sandbox
+      AIRTEL_MONEY_CLIENT_ID: ${AIRTEL_MONEY_CLIENT_ID}
+      AIRTEL_MONEY_CLIENT_SECRET: ${AIRTEL_MONEY_CLIENT_SECRET}
+      AIRTEL_MONEY_ENVIRONMENT: sandbox
+      # PesaPal
+      PAYMENT_DEMO_MODE: ${PAYMENT_DEMO_MODE:-false}
+      PESAPAL_CONSUMER_KEY: ${PESAPAL_CONSUMER_KEY}
+      PESAPAL_CONSUMER_SECRET: ${PESAPAL_CONSUMER_SECRET}
+      PESAPAL_ENVIRONMENT: ${PESAPAL_ENVIRONMENT:-sandbox}
+      PESAPAL_IPN_URL: ${PESAPAL_IPN_URL}
+      # Feature flags
+      ENABLE_ROUTE_SEGMENTS: "true"
+      ENABLE_DYNAMIC_SCHEDULING: "false"
+      ENABLE_BOOKING_TRANSFERS: "true"
+      # Logging
+      LOG_LEVEL: debug
+      ENABLE_REQUEST_LOGGING: "true"
+      # Security
+      BCRYPT_ROUNDS: 10
+      RATE_LIMIT_MAX: 500
+      RATE_LIMIT_WINDOW: 900000
+    ports:
+      - "127.0.0.1:5001:5000"   # Only bind to localhost; Nginx proxies externally
+    depends_on:
+      postgres_staging:
+        condition: service_healthy
+      redis_staging:
+        condition: service_healthy
+    networks:
+      - staging_network
+    healthcheck:
+      test: ["CMD", "wget", "-qO-", "http://127.0.0.1:5000/api/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 60s
+
+  # ─── Admin Dashboard ─────────────────────────────────────
+  admin_staging:
+    build:
+      context: ../../transconnect-admin
+      dockerfile: Dockerfile
+      args:
+        REACT_APP_API_URL: ${REACT_APP_API_URL}
+        REACT_APP_APP_NAME: "TransConnect Admin (Staging)"
+    container_name: tc_admin_staging
+    restart: unless-stopped
+    ports:
+      - "127.0.0.1:3011:80"
+    depends_on:
+      - backend_staging
+    networks:
+      - staging_network
+
+  # ─── Web Portal (Next.js) ────────────────────────────────
+  web_staging:
+    build:
+      context: ../../transconnect-web
+      dockerfile: Dockerfile
+      args:
+        NEXT_PUBLIC_API_URL: ${NEXT_PUBLIC_API_URL}
+        NEXT_PUBLIC_SOCKET_URL: ${NEXT_PUBLIC_SOCKET_URL}
+        NEXT_PUBLIC_SITE_URL: ${NEXT_PUBLIC_SITE_URL}
+        NEXT_PUBLIC_ADMIN_URL: ${NEXT_PUBLIC_ADMIN_URL}
+    container_name: tc_web_staging
+    restart: unless-stopped
+    environment:
+      NODE_ENV: staging
+    ports:
+      - "127.0.0.1:3010:3000"
+    depends_on:
+      - backend_staging
+    networks:
+      - staging_network
+    healthcheck:
+      test: ["CMD", "wget", "-qO-", "http://127.0.0.1:3000/"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 30s
+
+volumes:
+  postgres_staging_data:
+    name: tc_postgres_staging_data
+  redis_staging_data:
+    name: tc_redis_staging_data
+
+networks:
+  staging_network:
+    name: tc_staging_network
+    driver: bridge

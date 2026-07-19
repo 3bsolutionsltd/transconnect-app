@@ -1,17 +1,17 @@
 import { Request, Response, NextFunction } from 'express';
 import jwt from 'jsonwebtoken';
 import { authenticateToken, requireRole } from '../../src/middleware/auth';
+import { prisma } from '../../src/lib/prisma';
 
-// Mock the Prisma import first
-const mockPrisma = {
-  user: {
-    findUnique: jest.fn(),
+jest.mock('../../src/lib/prisma', () => ({
+  prisma: {
+    user: {
+      findUnique: jest.fn(),
+    },
   },
-};
-
-jest.mock('../../src/index', () => ({
-  prisma: mockPrisma
 }));
+
+const mockPrisma = prisma as any;
 
 // Mock jwt
 jest.mock('jsonwebtoken');
@@ -74,7 +74,7 @@ describe('Auth Middleware', () => {
         select: { id: true, email: true, role: true, verified: true }
       });
       expect((mockRequest as any).user).toEqual({
-        userId: testUser.id,
+        id: testUser.id,
         email: testUser.email,
         role: testUser.role
       });
@@ -127,7 +127,7 @@ describe('Auth Middleware', () => {
       );
 
       expect(mockResponse.status).toHaveBeenCalledWith(403);
-      expect(mockResponse.json).toHaveBeenCalledWith({ error: 'Invalid token' });
+      expect(mockResponse.json).toHaveBeenCalledWith({ error: 'Invalid or expired token', code: 'AUTH_ERROR' });
       expect(nextFunction).not.toHaveBeenCalled();
     });
 
@@ -203,7 +203,7 @@ describe('Auth Middleware', () => {
       );
 
       expect(mockResponse.status).toHaveBeenCalledWith(403);
-      expect(mockResponse.json).toHaveBeenCalledWith({ error: 'Invalid token' });
+      expect(mockResponse.json).toHaveBeenCalledWith({ error: 'Invalid or expired token', code: 'AUTH_ERROR' });
       expect(nextFunction).not.toHaveBeenCalled();
     });
   });

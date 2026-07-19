@@ -1,6 +1,6 @@
 import { Request, Response, NextFunction } from 'express';
 import jwt from 'jsonwebtoken';
-import { prisma } from '../index';
+import { prisma } from '../lib/prisma';
 
 interface AuthRequest extends Request {
   user?: {
@@ -75,6 +75,39 @@ export const requireRole = (roles: string[]) => {
 
     next();
   };
+};
+
+export const PLATFORM_OPERATIONS_ROLES = [
+  'ADMIN',
+  'MANAGER',
+  'MASTER_FIELD_OPERATOR',
+  'OPERATOR_FIELD_OPERATOR',
+] as const;
+
+export const canAccessAllOperationsBookings = (role?: string) => {
+  return role === 'ADMIN' || role === 'MANAGER' || role === 'MASTER_FIELD_OPERATOR';
+};
+
+export const getScopedOperatorIdsForUser = async (userId: string, role?: string) => {
+  if (canAccessAllOperationsBookings(role)) {
+    return null;
+  }
+
+  if (role !== 'OPERATOR_FIELD_OPERATOR') {
+    return [];
+  }
+
+  const scopes = await prisma.fieldOperatorScope.findMany({
+    where: {
+      userId,
+      active: true,
+    },
+    select: {
+      operatorId: true,
+    },
+  });
+
+  return scopes.map(scope => scope.operatorId);
 };
 
 // Admin-only middleware

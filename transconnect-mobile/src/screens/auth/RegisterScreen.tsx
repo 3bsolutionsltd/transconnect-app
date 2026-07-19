@@ -71,7 +71,7 @@ export default function RegisterScreen({ navigation }: any) {
 
     setIsLoading(true);
     try {
-      await register({
+      const result = await register({
         firstName: formData.firstName,
         lastName: formData.lastName,
         email: formData.email,
@@ -79,8 +79,37 @@ export default function RegisterScreen({ navigation }: any) {
         password: formData.password,
         role: 'PASSENGER',
       });
+      if (result?.verificationRequired) {
+        Alert.alert(
+          'Verify Your Email',
+          'We sent a 6-digit code to your email. Enter it to activate your account.',
+          [
+            {
+              text: 'Continue',
+              onPress: () => navigation.navigate('EmailVerification', {
+                email: result.email || formData.email,
+              }),
+            },
+          ]
+        );
+      }
     } catch (error: any) {
-      const errorMessage = error.response?.data?.message || error.message || 'Please try again';
+      console.log('Registration error:', error.response?.data);
+      
+      // Backend returns validation errors as { errors: [...] } or single error as { error: "..." }
+      let errorMessage = 'Registration failed. Please try again.';
+      
+      if (error.response?.data?.errors && Array.isArray(error.response.data.errors)) {
+        // Express-validator error format
+        errorMessage = error.response.data.errors.map((e: any) => e.msg).join(', ');
+      } else if (error.response?.data?.error) {
+        // Single error message
+        errorMessage = error.response.data.error;
+      } else if (error.response?.data?.message) {
+        errorMessage = error.response.data.message;
+      } else if (error.message) {
+        errorMessage = error.message;
+      }
       
       // Check if user already exists
       if (errorMessage.toLowerCase().includes('already exists') || 

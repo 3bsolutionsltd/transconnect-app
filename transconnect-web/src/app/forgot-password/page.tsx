@@ -3,8 +3,9 @@ import React, { useState } from 'react';
 import Link from 'next/link';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
-import { Bus, Mail, ArrowLeft, CheckCircle } from 'lucide-react';
+import { Mail, ArrowLeft, CheckCircle } from 'lucide-react';
 import toast from 'react-hot-toast';
+import TransConnectLogo from '@/components/branding/TransConnectLogo';
 
 export default function ForgotPasswordPage() {
   const [email, setEmail] = useState('');
@@ -67,7 +68,7 @@ export default function ForgotPasswordPage() {
               The link will expire in 1 hour. If you don't see the email, check your spam folder.
             </p>
             <Link href="/login">
-              <Button className="w-full">Back to Login</Button>
+              <Button className="w-full">Back to Sign In</Button>
             </Link>
           </CardContent>
         </Card>
@@ -81,8 +82,13 @@ export default function ForgotPasswordPage() {
         {/* Header */}
         <div className="text-center mb-6 sm:mb-8">
           <div className="flex items-center justify-center mb-4">
-            <Bus className="h-10 w-10 sm:h-12 sm:w-12 text-blue-600" />
-            <h1 className="ml-3 text-2xl sm:text-3xl font-bold text-gray-900">TransConnect</h1>
+            <TransConnectLogo
+              usage="light"
+              width={120}
+              height={34}
+              imageClassName="h-7"
+              wordmarkClassName="text-2xl"
+            />
           </div>
           <p className="text-gray-600">Reset your password</p>
         </div>
@@ -127,14 +133,14 @@ export default function ForgotPasswordPage() {
               </Button>
             </form>
 
-            {/* Back to Login */}
+            {/* Back to Sign In */}
             <div className="mt-6 text-center">
               <Link
                 href="/login"
                 className="inline-flex items-center text-sm text-blue-600 hover:text-blue-700 font-medium"
               >
                 <ArrowLeft className="mr-1 h-4 w-4" />
-                Back to Login
+                Back to Sign In
               </Link>
             </div>
           </CardContent>

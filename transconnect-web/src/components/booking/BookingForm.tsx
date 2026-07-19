@@ -15,13 +15,15 @@ type Props = {
   onSuccess?: (booking: any) => void;
   routeOrigin?: string;
   routeDestination?: string;
+  routeDepartureTime?: string;
 };
 
-export default function BookingForm({ routeId, price, selectedSeats = [], defaultTravelDate, onSuccess, routeOrigin, routeDestination }: Props) {
+export default function BookingForm({ routeId, price, selectedSeats = [], defaultTravelDate, onSuccess, routeOrigin, routeDestination, routeDepartureTime }: Props) {
   const [travelDate, setTravelDate] = useState(defaultTravelDate || '');
   const [passengerDetails, setPassengerDetails] = useState<Array<{name: string, phone: string}>>([]);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [showConfirmation, setShowConfirmation] = useState(false);
   
   // Route stops state
   const [boardingStop, setBoardingStop] = useState<string>('');
@@ -58,38 +60,56 @@ export default function BookingForm({ routeId, price, selectedSeats = [], defaul
     setBoardingStop(boarding);
     setAlightingStop(alighting);
     setDynamicPrice(calculatedPrice);
+    setShowConfirmation(false);
   };
 
-  async function submitBooking(e: React.FormEvent) {
-    e.preventDefault();
-    setError(null);
-    
+  const buildPassengers = () => selectedSeats.map((seatNumber, index) => ({
+    firstName: passengerDetails[index].name.split(' ')[0] || passengerDetails[index].name,
+    lastName: passengerDetails[index].name.split(' ').slice(1).join(' ') || '',
+    phone: passengerDetails[index].phone || user?.phone || ''
+  }));
+
+  const validateBookingData = (): string | null => {
     if (!isAuthenticated) {
-      setError('Please log in to make a booking');
-      return;
-    }
-    
-    if (selectedSeats.length === 0 || !travelDate) {
-      setError('Please select at least one seat and choose your travel date');
-      return;
+      return 'Please sign in to make a booking';
     }
 
-    // Validate passenger details
+    if (selectedSeats.length === 0 || !travelDate) {
+      return 'Please select at least one seat and choose your travel date';
+    }
+
     for (let i = 0; i < selectedSeats.length; i++) {
       if (!passengerDetails[i]?.name.trim()) {
-        setError(`Please enter passenger name for seat ${selectedSeats[i]}`);
-        return;
+        return `Please enter passenger name for seat ${selectedSeats[i]}`;
       }
+    }
+
+    return null;
+  };
+
+  function reviewBooking(e: React.FormEvent) {
+    e.preventDefault();
+    setError(null);
+    const validationError = validateBookingData();
+    if (validationError) {
+      setError(validationError);
+      return;
+    }
+    setShowConfirmation(true);
+  }
+
+  async function confirmBooking() {
+    setError(null);
+    const validationError = validateBookingData();
+    if (validationError) {
+      setError(validationError);
+      setShowConfirmation(false);
+      return;
     }
 
     setLoading(true);
     try {
-      // Create booking payload with stops support
-      const passengers = selectedSeats.map((seatNumber, index) => ({
-        firstName: passengerDetails[index].name.split(' ')[0] || passengerDetails[index].name,
-        lastName: passengerDetails[index].name.split(' ').slice(1).join(' ') || '',
-        phone: passengerDetails[index].phone || user?.phone || ''
-      }));
+      const passengers = buildPassengers();
 
       const payload = {
         routeId,
@@ -124,8 +144,9 @@ export default function BookingForm({ routeId, price, selectedSeats = [], defaul
           id: bookingId,
           totalAmount: result.summary?.totalAmount || (selectedSeats.length * effectivePrice),
           route: {
-            origin: boardingStop || 'Origin',
-            destination: alightingStop || 'Destination'
+            origin: boardingStop || routeOrigin || 'Origin',
+            destination: alightingStop || routeDestination || 'Destination',
+            departureTime: routeDepartureTime || null
           },
           travelDate: travelDate,
           seatNumber: selectedSeats.join(', '),
@@ -135,8 +156,10 @@ export default function BookingForm({ routeId, price, selectedSeats = [], defaul
           })),
           pricePerSeat: effectivePrice,
           boardingStop: boardingStop,
-          alightingStop: alightingStop
-        };      // Redirect to payment page with booking data
+          alightingStop: alightingStop,
+          qrCode: primaryBooking?.qrCode || null
+        };
+
       const bookingData = encodeURIComponent(JSON.stringify(bookingForPayment));
       router.push(`/payment?booking=${bookingData}`);
     } catch (err: any) {
@@ -151,11 +174,11 @@ export default function BookingForm({ routeId, price, selectedSeats = [], defaul
       {!isAuthenticated && (
         <div className="bg-yellow-50 border border-yellow-200 rounded-lg p-4">
           <div className="text-yellow-800 text-sm">
-            <strong>Note:</strong> You need to log in to make a booking.
+            <strong>Note:</strong> You need to sign in to make a booking.
           </div>
           <div className="mt-3 space-x-3">
             <Link href="/login" className="btn-primary inline-block">
-              Login
+              Sign In
             </Link>
             <Link href="/register" className="btn-outline inline-block">
               Register
@@ -172,7 +195,7 @@ export default function BookingForm({ routeId, price, selectedSeats = [], defaul
         </div>
       )}
       
-      <form onSubmit={submitBooking} className="space-y-6">
+      <form onSubmit={reviewBooking} className="space-y-6">
         {/* Travel Date */}
         <div>
           <label className="block text-sm font-medium text-gray-700 mb-2">
@@ -181,7 +204,10 @@ export default function BookingForm({ routeId, price, selectedSeats = [], defaul
           <input 
             type="date" 
             value={travelDate} 
-            onChange={(e) => setTravelDate(e.target.value)} 
+            onChange={(e) => {
+              setTravelDate(e.target.value);
+              setShowConfirmation(false);
+            }} 
             className="form-input w-full"
             min={new Date().toISOString().split('T')[0]}
             required
@@ -265,6 +291,7 @@ export default function BookingForm({ routeId, price, selectedSeats = [], defaul
                         const newDetails = [...passengerDetails];
                         newDetails[index] = { ...newDetails[index], name: e.target.value };
                         setPassengerDetails(newDetails);
+                        setShowConfirmation(false);
                       }}
                       className="form-input w-full"
                       placeholder="Enter passenger name"
@@ -283,6 +310,7 @@ export default function BookingForm({ routeId, price, selectedSeats = [], defaul
                         const newDetails = [...passengerDetails];
                         newDetails[index] = { ...newDetails[index], phone: e.target.value };
                         setPassengerDetails(newDetails);
+                        setShowConfirmation(false);
                       }}
                       className="form-input w-full"
                       placeholder="Phone number (optional)"
@@ -334,18 +362,56 @@ export default function BookingForm({ routeId, price, selectedSeats = [], defaul
           </div>
         )}
 
+        {showConfirmation && (
+          <div className="rounded-xl border border-[#b9e6d8] bg-[#f2fbf7] p-5 space-y-4">
+            <h4 className="text-lg font-semibold text-[#11614e]">Booking Confirmation</h4>
+            <p className="text-sm text-[#2f6f61]">
+              Please review your trip details before we place this booking and continue to payment.
+            </p>
+
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-3 text-sm">
+              <p><span className="font-medium">Journey:</span> {boardingStop || routeOrigin || 'Origin'} to {alightingStop || routeDestination || 'Destination'}</p>
+              <p><span className="font-medium">Travel Date:</span> {travelDate}</p>
+              <p><span className="font-medium">Seats:</span> {selectedSeats.join(', ')}</p>
+              <p><span className="font-medium">Total:</span> UGX {calculateTotal().toLocaleString()}</p>
+            </div>
+
+            <div className="space-y-2">
+              {selectedSeats.map((seat, index) => (
+                <div key={`confirm-${seat}`} className="text-sm text-[#315d56]">
+                  Seat {seat}: {passengerDetails[index]?.name || `Passenger ${index + 1}`}
+                </div>
+              ))}
+            </div>
+
+            <div className="flex flex-col sm:flex-row gap-3">
+              <button
+                type="button"
+                className="btn-outline w-full"
+                onClick={() => setShowConfirmation(false)}
+                disabled={loading}
+              >
+                Edit Details
+              </button>
+              <button
+                type="button"
+                className="btn-primary w-full"
+                onClick={confirmBooking}
+                disabled={loading}
+              >
+                {loading ? 'Confirming Booking...' : 'Confirm and Proceed to Payment'}
+              </button>
+            </div>
+          </div>
+        )}
+
         <button 
           type="submit"
           disabled={loading || !isAuthenticated || selectedSeats.length === 0 || !travelDate} 
           className="btn-primary w-full text-lg"
         >
-          {loading ? (
-            <span className="flex items-center justify-center">
-              <div className="animate-spin rounded-full h-5 w-5 border-b-2 border-white mr-2"></div>
-              Processing Bookings...
-            </span>
-          ) : selectedSeats.length > 0 ? (
-            `Complete Booking${selectedSeats.length > 1 ? 's' : ''} - UGX ${calculateTotal().toLocaleString()}`
+          {selectedSeats.length > 0 ? (
+            `Review Booking Details - UGX ${calculateTotal().toLocaleString()}`
           ) : (
             'Select Seats to Continue'
           )}

@@ -1,5 +1,6 @@
 'use client';
 import React, { useState, useEffect } from 'react';
+import { Suspense } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -8,7 +9,7 @@ import { useAuth } from '@/contexts/AuthContext';
 import { useNotificationService } from '@/lib/notificationService';
 import { paymentApi } from '@/lib/api';
 
-export default function PaymentPage() {
+function PaymentContent() {
   const router = useRouter();
   const searchParams = useSearchParams();
   const { user, loading } = useAuth();
@@ -36,7 +37,23 @@ export default function PaymentPage() {
     if (booking) {
       try {
         const parsed = JSON.parse(decodeURIComponent(booking));
-        setBookingData(parsed);
+
+        // Live check: fetch current booking status from the API
+        // (URL param status is stale — set at booking creation time)
+        import('@/lib/api').then(({ getBookingStatus, authApi }) => {
+          getBookingStatus(parsed.id, authApi.getToken())
+            .then((live: any) => {
+              if (live?.status === 'CONFIRMED' || live?.status === 'COMPLETED') {
+                const successData = encodeURIComponent(
+                  JSON.stringify({ ...parsed, ...live })
+                );
+                router.replace(`/booking-success?booking=${successData}`);
+              } else {
+                setBookingData(parsed);
+              }
+            })
+            .catch(() => setBookingData(parsed)); // fallback: show payment page on API error
+        });
       } catch (error) {
         router.push('/search');
       }
@@ -46,20 +63,18 @@ export default function PaymentPage() {
   }, [searchParams, router, user, loading]);
 
   const paymentMethods = [
-    { id: 'MTN_MOBILE_MONEY', name: 'MTN Mobile Money', icon: Smartphone, color: 'text-yellow-600' },
-    { id: 'AIRTEL_MONEY', name: 'Airtel Money', icon: Smartphone, color: 'text-red-600' },
-    { id: 'FLUTTERWAVE', name: 'Card Payment', icon: CreditCard, color: 'text-blue-600' },
+    { id: 'PESAPAL', name: 'PesaPal (MTN MoMo / Airtel / Card)', icon: CreditCard, color: 'text-purple-600', description: 'Pay via PesaPal — supports MTN Mobile Money, Airtel Money, Visa & Mastercard' },
     { id: 'CASH', name: 'Cash Payment (Over the Counter)', icon: Banknote, color: 'text-green-600', description: 'Pay at operator office or at boarding' },
   ];
 
   const handlePayment = async () => {
     if (!user) {
-      setErrorMessage('Please log in to complete payment');
+      setErrorMessage('Please sign in to complete payment');
       setPaymentStatus('failed');
       return;
     }
 
-    if (!phoneNumber && selectedMethod !== 'FLUTTERWAVE' && selectedMethod !== 'CASH') {
+    if (!phoneNumber && selectedMethod !== 'PESAPAL' && selectedMethod !== 'CASH') {
       notificationService.showWarning('Phone Number Required', 'Please enter your phone number to proceed with payment');
       return;
     }
@@ -68,43 +83,44 @@ export default function PaymentPage() {
     setPaymentStatus('processing');
 
     try {
-      // Handle cash payments differently - no payment API call needed
-      if (selectedMethod === 'CASH') {
-        setPaymentStatus('success');
-        
-        // Show success notification
-        notificationService.showSuccess('Booking Confirmed', 'Please pay at the operator office or boarding point');
-        
-        // Wait a moment to show success, then redirect
-        setTimeout(() => {
-          const successData = encodeURIComponent(JSON.stringify({
-            ...bookingData,
-            paymentStatus: 'PENDING',
-            paymentMethod: 'CASH',
-            isCashPayment: true,
-            paymentRef: 'CASH-' + bookingData.id,
-            qrCode: bookingData.qrCode
-          }));
-          router.push(`/booking-success?booking=${successData}`);
-        }, 1500);
-        setProcessing(false);
-        return;
-      }
-      
-      // Call actual payment API for online methods (MTN, Airtel, Card)
+      // Always initiate through backend so payment method/status is persisted.
       const paymentRequest = {
-        bookingId: bookingData.id,
+        bookingId: bookingData.id as string,
         method: selectedMethod,
-        phoneNumber: phoneNumber
+        ...(phoneNumber ? { phoneNumber } : {}),
+        // Pass total for multi-seat bookings (backend uses it instead of single-booking amount)
+        ...(bookingData.totalAmount ? { totalAmount: bookingData.totalAmount } : {})
       };
 
       const response = await paymentApi.initiate(paymentRequest);
       
       if (response && response.paymentId) {
         setPaymentId(response.paymentId);
+
+        // Redirect-based providers (PesaPal, Flutterwave hosted) return a checkoutUrl
+        if (response.checkoutUrl) {
+          window.location.href = response.checkoutUrl;
+          return;
+        }
         
-        // For demo mode, payment should complete immediately
-        if (response.status === 'COMPLETED') {
+        // Cash flow remains pending until operator marks it paid.
+        if (selectedMethod === 'CASH' && response.status === 'PENDING') {
+          setPaymentStatus('success');
+          notificationService.showSuccess('Cash Payment Registered', 'Please pay at the operator office or boarding point.');
+
+          setTimeout(() => {
+            const successData = encodeURIComponent(JSON.stringify({
+              ...bookingData,
+              paymentStatus: 'PENDING',
+              paymentMethod: 'CASH',
+              paymentId: response.paymentId,
+              paymentRef: response.paymentReference,
+              isCashPayment: true,
+              qrCode: response.qrCode || bookingData.qrCode
+            }));
+            router.push(`/booking-success?booking=${successData}`);
+          }, 1200);
+        } else if (response.status === 'COMPLETED') {
           setPaymentStatus('success');
           
           // Show payment success notification
@@ -141,11 +157,11 @@ export default function PaymentPage() {
       // Handle specific error types
       let errorMsg = '';
       if (error.response?.status === 401) {
-        errorMsg = 'Please log in to complete payment';
+        errorMsg = 'Please sign in to complete payment';
         setErrorMessage(errorMsg);
         setTimeout(() => router.push('/login'), 2000);
       } else if (error.response?.status === 403) {
-        errorMsg = 'Authentication failed. Please log in again.';
+        errorMsg = 'Authentication failed. Please sign in again.';
         setErrorMessage(errorMsg);
         setTimeout(() => router.push('/login'), 2000);
       } else {
@@ -327,39 +343,21 @@ export default function PaymentPage() {
                       </p>
                     </div>
                   </div>
-                ) : selectedMethod === 'FLUTTERWAVE' ? (
+                ) : selectedMethod === 'PESAPAL' ? (
                   <div className="space-y-4">
-                    <div>
-                      <label className="block text-sm font-medium text-gray-700 mb-1">
-                        Card Number
-                      </label>
-                      <input
-                        type="text"
-                        placeholder="1234 5678 9012 3456"
-                        className="form-input"
-                      />
+                    <div className="bg-purple-50 border border-purple-200 rounded-lg p-4">
+                      <h4 className="font-semibold text-purple-900 mb-2 flex items-center">
+                        <CreditCard className="h-5 w-5 mr-2" />
+                        PesaPal Secure Checkout
+                      </h4>
+                      <p className="text-sm text-purple-800">
+                        You will be redirected to the PesaPal secure payment page where you can pay by card, bank transfer, or mobile money.
+                      </p>
                     </div>
-                    <div className="grid grid-cols-2 gap-4">
-                      <div>
-                        <label className="block text-sm font-medium text-gray-700 mb-1">
-                          Expiry Date
-                        </label>
-                        <input
-                          type="text"
-                          placeholder="MM/YY"
-                          className="form-input"
-                        />
-                      </div>
-                      <div>
-                        <label className="block text-sm font-medium text-gray-700 mb-1">
-                          CVV
-                        </label>
-                        <input
-                          type="text"
-                          placeholder="123"
-                          className="form-input"
-                        />
-                      </div>
+                    <div className="bg-blue-50 border border-blue-200 rounded-lg p-3">
+                      <p className="text-sm text-blue-800">
+                        <strong>Note:</strong> After completing payment on PesaPal, you will be returned here automatically.
+                      </p>
                     </div>
                   </div>
                 ) : (
@@ -406,5 +404,13 @@ export default function PaymentPage() {
         </div>
       </div>
     </div>
+  );
+}
+
+export default function PaymentPage() {
+  return (
+    <Suspense fallback={<div className="min-h-screen flex items-center justify-center"><div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600" /></div>}>
+      <PaymentContent />
+    </Suspense>
   );
 }

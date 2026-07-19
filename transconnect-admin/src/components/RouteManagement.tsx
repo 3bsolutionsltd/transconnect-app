@@ -54,7 +54,7 @@ const RouteManagement: React.FC = () => {
     active: true
   });
 
-  const API_BASE_URL = process.env.REACT_APP_API_URL || 'http://localhost:5000/api';
+  const API_BASE_URL = (process.env.REACT_APP_API_URL || 'http://localhost:5000/api').replace(/\/api\/?$/, '') + '/api';
 
   const fetchRoutes = useCallback(async () => {
     try {

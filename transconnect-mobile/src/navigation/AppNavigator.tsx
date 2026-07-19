@@ -10,6 +10,8 @@ import LoadingScreen from '../components/LoadingScreen';
 import LoginScreen from '../screens/auth/LoginScreen';
 import RegisterScreen from '../screens/auth/RegisterScreen';
 import ForgotPasswordScreen from '../screens/auth/ForgotPasswordScreen';
+import PhoneLoginScreen from '../screens/auth/PhoneLoginScreen';
+import EmailVerificationScreen from '../screens/auth/EmailVerificationScreen';
 
 // Main App Screens
 import HomeScreen from '../screens/home/HomeScreen';
@@ -26,6 +28,10 @@ import SeatSelectionScreen from '../screens/booking/SeatSelectionScreen';
 import PaymentScreen from '../screens/booking/PaymentScreen';
 import BookingConfirmationScreen from '../screens/booking/BookingConfirmationScreen';
 
+// Transfer Screens
+import TransferRequestScreen from '../screens/booking/TransferRequestScreen';
+import MyTransfersScreen from '../screens/bookings/MyTransfersScreen';
+
 // Other Screens
 import TicketDetailScreen from '../screens/tickets/TicketDetailScreen';
 
@@ -37,6 +43,8 @@ const AuthStack = () => (
     <Stack.Screen name="Login" component={LoginScreen} />
     <Stack.Screen name="Register" component={RegisterScreen} />
     <Stack.Screen name="ForgotPassword" component={ForgotPasswordScreen} />
+    <Stack.Screen name="PhoneLogin" component={PhoneLoginScreen} />
+    <Stack.Screen name="EmailVerification" component={EmailVerificationScreen} />
   </Stack.Navigator>
 );
 
@@ -119,15 +127,29 @@ const AppStack = () => (
       component={NotificationSettingsScreen}
       options={{ headerShown: false }}
     />
+    <Stack.Screen 
+      name="TransferRequest" 
+      component={TransferRequestScreen}
+      options={{ headerShown: false }}
+    />
+    <Stack.Screen 
+      name="MyTransfers" 
+      component={MyTransfersScreen}
+      options={{ headerShown: false }}
+    />
   </Stack.Navigator>
 );
 
 export default function AppNavigator() {
   const { isAuthenticated, isLoading } = useAuth();
 
+  console.log('🧭 AppNavigator - isLoading:', isLoading, 'isAuthenticated:', isAuthenticated);
+
   if (isLoading) {
+    console.log('⏳ Showing loading screen...');
     return <LoadingScreen />;
   }
 
+  console.log('🚦 Showing', isAuthenticated ? 'AppStack' : 'AuthStack');
   return isAuthenticated ? <AppStack /> : <AuthStack />;
 }

@@ -1,8 +1,9 @@
 import { Router, Request, Response } from 'express';
-import { prisma } from '../index';
+import { prisma } from '../lib/prisma';
 import { authenticateToken } from '../middleware/auth';
 import { body, validationResult } from 'express-validator';
 import bcrypt from 'bcryptjs';
+import { validateAndNormalizeContact } from '../utils/contact-validation';
 
 const router = Router();
 
@@ -32,6 +33,17 @@ router.post('/create', [
 
     const { operatorId, firstName, lastName, email, phone, password, role } = req.body;
 
+    const contactValidation = validateAndNormalizeContact({ email, phone, defaultCountry: 'UG' });
+    if (!contactValidation.isValid) {
+      return res.status(400).json({
+        error: 'Invalid contact information',
+        details: contactValidation.errors,
+      });
+    }
+
+    const normalizedEmail = contactValidation.normalizedEmail!;
+    const normalizedPhone = contactValidation.normalizedPhone!;
+
     // Verify operator exists
     const operator = await prisma.operator.findUnique({
       where: { id: operatorId },
@@ -54,8 +66,8 @@ router.post('/create', [
     const existingUser = await prisma.user.findFirst({
       where: {
         OR: [
-          { email },
-          { phone }
+          { email: normalizedEmail },
+          { phone: normalizedPhone }
         ]
       }
     });
@@ -74,8 +86,8 @@ router.post('/create', [
       data: {
         firstName,
         lastName,
-        email,
-        phone,
+        email: normalizedEmail,
+        phone: normalizedPhone,
         password: hashedPassword,
         role: 'OPERATOR',
         verified: true

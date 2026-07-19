@@ -16,6 +16,8 @@ export default function QRScannerPage() {
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const streamRef = useRef<MediaStream | null>(null);
+  const isValidatingRef = useRef(false);   // prevent duplicate concurrent scans
+  const resultRef = useRef<HTMLDivElement>(null); // TC008: scroll target
 
   const stopCamera = useCallback(() => {
     if (streamRef.current) {
@@ -118,14 +120,11 @@ export default function QRScannerPage() {
 
       if (qrResult) {
         console.log('QR Code detected!', qrResult.data);
-        // QR code found! Stop scanning first, then validate
-        if (scanningInterval) {
-          clearInterval(scanningInterval);
-          setScanningInterval(null);
+        // TC007: skip if already validating to avoid duplicate calls; do NOT stop interval
+        if (!isValidatingRef.current) {
+          isValidatingRef.current = true;
+          validateQRCode(qrResult.data);
         }
-        // Validate the QR code
-        validateQRCode(qrResult.data);
-        // Don't stop camera here - let validateQRCode handle it after validation
       } else {
         console.log('No QR code found in current frame');
       }
@@ -234,26 +233,21 @@ export default function QRScannerPage() {
         parsedData = { rawData: qrData };
       }
 
-      // Check if this looks like a booking QR (has bookingId and passengerName)
-      // OR if it's a route QR that we can try to convert/validate
-      if (parsedData.bookingId && parsedData.passengerName) {
+      // A booking QR contains passengerName + seatNumber (initial creation format)
+      // OR bookingId + passengerName (payment-completion regenerated format).
+      // A pure route-selection QR only has routeId/seatNumber with NO passengerName.
+      const isBookingQR =
+        (parsedData.passengerName && parsedData.seatNumber) ||
+        (parsedData.bookingId && parsedData.passengerName);
+
+      if (isBookingQR) {
         // This is a proper booking QR - validate it
         console.log('Valid booking QR detected, validating...');
-      } else if (parsedData.routeId || parsedData.seatNumber) {
-        // This is a route selection QR - provide helpful guidance
-        setError(`This appears to be a route selection QR code. 
-                  To validate a passenger ticket, you need the QR code from a completed booking.
-                  Ask the passenger to show their booking confirmation QR code.`);
-        stopCamera();
-        return;
-      } else if (parsedData.rawData) {
-        // Plain text QR - might be a booking reference
-        console.log('Plain text QR detected, attempting validation...');
-      } else {
-        // Unknown format
-        setError(`QR code format not recognized. 
-                  Please scan a valid booking confirmation QR code from TransConnect.`);
-        stopCamera();
+      } else if (!parsedData.rawData) {
+        setError(
+          'QR code format not recognized. Please scan a valid booking confirmation QR code from TransConnect.'
+        );
+        isValidatingRef.current = false;  // allow retry
         return;
       }
       
@@ -264,12 +258,13 @@ export default function QRScannerPage() {
       });
 
       setResult(response.data);
-      stopCamera(); // Stop camera after successful validation
+      stopCamera(); // Only stop camera on successful validation
+      // TC008: scroll result into view
+      setTimeout(() => resultRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' }), 150);
       
     } catch (err: any) {
       console.error('QR validation error:', err);
-      
-      // Provide more user-friendly error messages
+      // TC007: show error but keep camera scanning — don't call stopCamera()
       if (err.response?.status === 400) {
         setError('This QR code is not a valid TransConnect booking ticket. Please ask the passenger for their booking confirmation QR code.');
       } else if (err.response?.status === 404) {
@@ -277,7 +272,8 @@ export default function QRScannerPage() {
       } else {
         setError('Unable to validate ticket. Please check your internet connection and try again.');
       }
-      stopCamera();
+    } finally {
+      isValidatingRef.current = false; // allow next scan
     }
   };
 
@@ -454,7 +450,7 @@ export default function QRScannerPage() {
 
         {/* Results */}
         {result && (
-          <div className={`rounded-lg shadow border mb-6 ${result.valid ? 'border-green-200 bg-green-50' : 'border-red-200 bg-red-50'}`}>
+          <div ref={resultRef} className={`rounded-lg shadow border mb-6 ${result.valid ? 'border-green-200 bg-green-50' : 'border-red-200 bg-red-50'}`}>
             <div className="p-6 border-b border-gray-200">
               <h2 className={`text-lg font-semibold flex items-center ${result.valid ? 'text-green-700' : 'text-red-700'}`}>
                 {result.valid ? <CheckCircle className="h-5 w-5 mr-2" /> : <XCircle className="h-5 w-5 mr-2" />}

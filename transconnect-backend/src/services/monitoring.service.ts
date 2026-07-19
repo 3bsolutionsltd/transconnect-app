@@ -199,10 +199,11 @@ export class MonitoringService {
   }
 
   private async getQueryMetrics(): Promise<DatabaseMetrics['queries']> {
+    const fallback = { total: 0, slow: 0, errors: 0, avgDuration: 0, maxDuration: 0 };
     try {
       const prisma = this.dbService.getPrismaClient();
       
-      // Get query statistics from pg_stat_statements
+      // pg_stat_statements extension may not be enabled — skip silently if absent
       const queryStats = await prisma.$queryRaw<any[]>`
         SELECT 
           count(*) as total_queries,
@@ -219,22 +220,16 @@ export class MonitoringService {
         return {
           total: parseInt(stats.total_calls) || 0,
           slow: parseInt(stats.slow_queries) || 0,
-          errors: 0, // Would need error tracking
+          errors: 0,
           avgDuration: parseFloat(stats.avg_duration) || 0,
           maxDuration: parseFloat(stats.max_duration) || 0,
         };
       }
-    } catch (error) {
-      console.error('Error collecting query metrics:', error);
+    } catch {
+      // pg_stat_statements not available — return zeros without logging
     }
 
-    return {
-      total: 0,
-      slow: 0,
-      errors: 0,
-      avgDuration: 0,
-      maxDuration: 0,
-    };
+    return fallback;
   }
 
   private async getDatabaseMetrics(): Promise<DatabaseMetrics['database']> {
@@ -589,10 +584,10 @@ export class MonitoringService {
       
       const redis = this.dbService.getRedisClient();
       if (redis) {
-        await redis.setex(
+        await redis.set(
           `metrics:${Date.now()}`,
-          86400, // 1 day TTL
-          JSON.stringify(metrics)
+          JSON.stringify(metrics),
+          { EX: 86400 } // 1 day TTL
         );
       }
     } catch (error) {

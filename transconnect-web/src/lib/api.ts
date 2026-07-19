@@ -164,6 +164,7 @@ export const paymentApi = {
     bookingId: string;
     method: string;
     phoneNumber?: string;
+    totalAmount?: number;
   }) {
     const response = await api.post('/payments/initiate', paymentData);
     return response.data;
@@ -193,6 +194,34 @@ export const paymentApi = {
     const response = await api.post(`/payments/${paymentId}/complete`);
     return response.data;
   }
+};
+
+// Booking Transfer API
+export const transferApi = {
+  async request(bookingId: string, data: {
+    targetTravelDate?: string;
+    targetRouteId?: string;
+    reason: 'SCHEDULE_CONFLICT' | 'EMERGENCY' | 'PERSONAL_PREFERENCE' | 'PRICE_DIFFERENCE' | 'OTHER';
+    reasonDetails?: string;
+  }) {
+    const response = await api.post(`/bookings/${bookingId}/transfers`, data);
+    return response.data;
+  },
+
+  async getMyRequests() {
+    const response = await api.get('/bookings/transfers/my-requests');
+    return response.data;
+  },
+
+  async getById(transferId: string) {
+    const response = await api.get(`/bookings/transfers/${transferId}`);
+    return response.data;
+  },
+
+  async cancel(transferId: string) {
+    const response = await api.delete(`/bookings/transfers/${transferId}`);
+    return response.data;
+  },
 };
 
 export default api;

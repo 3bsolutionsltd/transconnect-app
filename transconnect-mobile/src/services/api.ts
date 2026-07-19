@@ -2,8 +2,10 @@ import axios from 'axios';
 import Constants from 'expo-constants';
 import { secureStorage } from './storage';
 
-const API_BASE_URL = Constants.expoConfig?.extra?.apiUrl || 
-  'https://transconnect-app-44ie.onrender.com/api';
+// Use environment variable first, then Expo config, then default to VPS
+const API_BASE_URL = process.env.EXPO_PUBLIC_API_URL ||
+  Constants.expoConfig?.extra?.apiUrl || 
+  'https://api.transconnect.app/api';
 
 export const apiClient = axios.create({
   baseURL: API_BASE_URL,
@@ -148,6 +150,12 @@ export const authApi = {
   
   register: (userData: any) =>
     apiClient.post('/auth/register', userData),
+
+  verifyEmailOtp: (payload: { email: string; otp: string }) =>
+    apiClient.post('/auth/verify-email-otp', payload),
+
+  resendEmailVerification: (email: string) =>
+    apiClient.post('/auth/resend-email-verification', { email }),
   
   getCurrentUser: () =>
     apiClient.get('/auth/me'),
@@ -222,6 +230,26 @@ export const paymentsApi = {
   
   getSupportedMethods: () =>
     apiClient.get('/payments/methods'),
+};
+
+// Booking Transfers API
+export const transfersApi = {
+  requestTransfer: (bookingId: string, transferData: {
+    targetTravelDate?: string;
+    targetRouteId?: string;
+    reason: 'SCHEDULE_CONFLICT' | 'EMERGENCY' | 'PERSONAL_PREFERENCE' | 'PRICE_DIFFERENCE' | 'OTHER';
+    reasonDetails?: string;
+  }) =>
+    apiClient.post(`/bookings/${bookingId}/transfers`, transferData),
+
+  getMyTransfers: () =>
+    apiClient.get('/bookings/transfers/my-requests'),
+
+  getTransferById: (transferId: string) =>
+    apiClient.get(`/bookings/transfers/${transferId}`),
+
+  cancelTransfer: (transferId: string) =>
+    apiClient.delete(`/bookings/transfers/${transferId}`),
 };
 
 // QR API

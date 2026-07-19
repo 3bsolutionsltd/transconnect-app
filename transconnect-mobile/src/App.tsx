@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef, Component } from 'react';
+import React, { useState, useEffect, useRef, Component, useCallback } from 'react';
 import { View, Text, TouchableOpacity, StyleSheet } from 'react-native';
 import { NavigationContainer } from '@react-navigation/native';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
@@ -109,8 +109,22 @@ export default function App() {
   const notificationListener = useRef<Notifications.Subscription>();
   const responseListener = useRef<Notifications.Subscription>();
 
+  const handleSplashFinish = useCallback(() => {
+    console.log('🎬 Splash finish called, transitioning to main app...');
+    setShowSplash(false);
+  }, []);
+
   useEffect(() => {
     console.log('🚀 App starting up...');
+    console.log('📍 Show splash:', showSplash);
+    
+    // Emergency failsafe - force finish splash after 5 seconds
+    const emergencyTimer = setTimeout(() => {
+      if (showSplash) {
+        console.log('🚨 Emergency splash bypass triggered!');
+        setShowSplash(false);
+      }
+    }, 5000);
     
     // Register for push notifications (non-blocking, delayed)
     setTimeout(() => {
@@ -172,6 +186,7 @@ export default function App() {
 
     // Cleanup listeners on unmount
     return () => {
+      clearTimeout(emergencyTimer);
       try {
         if (notificationListener.current) {
           notificationListener.current.remove();
@@ -186,9 +201,11 @@ export default function App() {
   }, []);
 
   if (showSplash) {
-    return <SplashScreen onFinish={() => setShowSplash(false)} />;
+    console.log('📱 Rendering splash screen...');
+    return <SplashScreen onFinish={handleSplashFinish} />;
   }
 
+  console.log('📱 Rendering main app...');
   return (
     <ErrorBoundary>
       <SafeAreaProvider>

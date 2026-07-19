@@ -1,15 +1,12 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import { 
   Users, 
   Phone, 
   Mail, 
   Calendar, 
-  DollarSign,
   Building2,
-  TrendingUp,
   Filter,
   Search,
-  MoreVertical,
   CheckCircle,
   Clock,
   AlertCircle,
@@ -61,13 +58,9 @@ const AgentManagement = () => {
   const [statusReason, setStatusReason] = useState('');
   const [updatingStatus, setUpdatingStatus] = useState(false);
 
-  const API_BASE_URL = process.env.REACT_APP_API_URL || 'http://localhost:5000/api';
+  const API_BASE_URL = (process.env.REACT_APP_API_URL || 'http://localhost:5000/api').replace(/\/api\/?$/, '') + '/api';
 
-  useEffect(() => {
-    loadAgents();
-  }, []);
-
-  const loadAgents = async () => {
+  const loadAgents = useCallback(async () => {
     try {
       setLoading(true);
       const token = localStorage.getItem('admin_token');
@@ -94,7 +87,11 @@ const AgentManagement = () => {
     } finally {
       setLoading(false);
     }
-  };
+  }, [API_BASE_URL]);
+
+  useEffect(() => {
+    loadAgents();
+  }, [loadAgents]);
 
   const handleStatusUpdate = async () => {
     if (!selectedAgent || !newStatus) return;

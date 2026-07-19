@@ -26,11 +26,18 @@ interface User {
   firstName: string;
   lastName: string;
   phone: string;
-  role: 'PASSENGER' | 'OPERATOR' | 'ADMIN';
+  role: 'PASSENGER' | 'OPERATOR' | 'ADMIN' | 'MASTER_FIELD_OPERATOR' | 'OPERATOR_FIELD_OPERATOR';
   verified: boolean;
   createdAt: string;
   lastLogin?: string;
   bookingsCount?: number;
+  fieldOperatorScopes?: Array<{
+    operatorId: string;
+    operator: {
+      id: string;
+      companyName: string;
+    };
+  }>;
 }
 
 interface OperatorUser {
@@ -58,6 +65,37 @@ interface Operator {
   approved: boolean;
 }
 
+const PLATFORM_ROLE_OPTIONS = [
+  'ADMIN',
+  'MASTER_FIELD_OPERATOR',
+  'OPERATOR_FIELD_OPERATOR',
+  'OPERATOR',
+  'PASSENGER',
+] as const;
+
+const normalizeEmail = (email: string) => email.trim().toLowerCase();
+
+const sanitizePhone = (phone: string) => phone.trim();
+
+const validateEmailContent = (email: string): string | null => {
+  const normalized = normalizeEmail(email);
+  if (!normalized) return 'Email is required';
+  if (!/^[^\s@]+@[^\s@]+\.[^\s@]{2,}$/.test(normalized)) return 'Please enter a valid email address';
+  if (normalized.includes('..')) return 'Email cannot contain consecutive dots';
+  return null;
+};
+
+const validatePhoneContent = (phone: string): string | null => {
+  const sanitized = sanitizePhone(phone);
+  if (!sanitized) return 'Phone number is required';
+  if (!/^[+\d\s()-]+$/.test(sanitized)) return 'Phone number contains invalid characters';
+  if ((sanitized.match(/\+/g) || []).length > 1) return 'Phone number format is invalid';
+  if (sanitized.includes(',') || sanitized.includes('/') || sanitized.includes(';')) return 'Please enter only one phone number';
+  const digits = sanitized.replace(/\D/g, '');
+  if (digits.length < 9 || digits.length > 15) return 'Phone number must have between 9 and 15 digits';
+  return null;
+};
+
 const UserManagement: React.FC = () => {
   const [activeTab, setActiveTab] = useState<'users' | 'operator-users'>('users');
   const [users, setUsers] = useState<User[]>([]);
@@ -72,6 +110,20 @@ const UserManagement: React.FC = () => {
   const [showUserModal, setShowUserModal] = useState(false);
   const [showCreateOperatorUserModal, setShowCreateOperatorUserModal] = useState(false);
   const [selectedUser, setSelectedUser] = useState<User | null>(null);
+  const [showCreatePlatformUserModal, setShowCreatePlatformUserModal] = useState(false);
+  const [createPlatformUserLoading, setCreatePlatformUserLoading] = useState(false);
+  const [savingUserScope, setSavingUserScope] = useState(false);
+
+  const [createPlatformUserForm, setCreatePlatformUserForm] = useState({
+    firstName: '',
+    lastName: '',
+    email: '',
+    phone: '',
+    password: '',
+    role: 'MASTER_FIELD_OPERATOR' as User['role'],
+    verified: true,
+    operatorScopeIds: [] as string[],
+  });
 
   const [createOperatorUserForm, setCreateOperatorUserForm] = useState({
     operatorId: '',
@@ -196,9 +248,27 @@ const UserManagement: React.FC = () => {
   };
 
   const handleCreateOperatorUser = async () => {
+    const emailError = validateEmailContent(createOperatorUserForm.email);
+    if (emailError) {
+      alert(emailError);
+      return;
+    }
+
+    const phoneError = validatePhoneContent(createOperatorUserForm.phone);
+    if (phoneError) {
+      alert(phoneError);
+      return;
+    }
+
+    const payload = {
+      ...createOperatorUserForm,
+      email: normalizeEmail(createOperatorUserForm.email),
+      phone: sanitizePhone(createOperatorUserForm.phone),
+    };
+
     try {
       setCreateLoading(true);
-      await api.post('/admin/operator-users/create', createOperatorUserForm);
+      await api.post('/admin/operator-users/create', payload);
       
       // Reset form
       setCreateOperatorUserForm({
@@ -222,13 +292,102 @@ const UserManagement: React.FC = () => {
     }
   };
 
+  const handleCreatePlatformUser = async () => {
+    const emailError = validateEmailContent(createPlatformUserForm.email);
+    if (emailError) {
+      alert(emailError);
+      return;
+    }
+
+    const phoneError = validatePhoneContent(createPlatformUserForm.phone);
+    if (phoneError) {
+      alert(phoneError);
+      return;
+    }
+
+    const payload = {
+      ...createPlatformUserForm,
+      email: normalizeEmail(createPlatformUserForm.email),
+      phone: sanitizePhone(createPlatformUserForm.phone),
+    };
+
+    try {
+      setCreatePlatformUserLoading(true);
+      await api.post('/users', payload);
+
+      setCreatePlatformUserForm({
+        firstName: '',
+        lastName: '',
+        email: '',
+        phone: '',
+        password: '',
+        role: 'MASTER_FIELD_OPERATOR',
+        verified: true,
+        operatorScopeIds: [],
+      });
+
+      setShowCreatePlatformUserModal(false);
+      await fetchUsers();
+      alert('Platform user created successfully');
+    } catch (error: any) {
+      console.error('Error creating platform user:', error);
+      alert(error.message || 'Failed to create platform user');
+    } finally {
+      setCreatePlatformUserLoading(false);
+    }
+  };
+
+  const handleSaveFieldOperatorScopes = async () => {
+    if (!selectedUser || selectedUser.role !== 'OPERATOR_FIELD_OPERATOR') return;
+
+    try {
+      setSavingUserScope(true);
+      const operatorScopeIds = (selectedUser.fieldOperatorScopes || []).map(scope => scope.operatorId);
+      const response = await api.put(`/users/${selectedUser.id}/field-operator-scopes`, { operatorScopeIds });
+      const scopes = Array.isArray(response?.scopes) ? response.scopes : [];
+
+      setSelectedUser({
+        ...selectedUser,
+        fieldOperatorScopes: scopes.map((scope: any) => ({
+          operatorId: scope.operatorId,
+          operator: scope.operator,
+        })),
+      });
+
+      await fetchUsers();
+      alert('Field operator scope updated successfully');
+    } catch (error: any) {
+      console.error('Error saving field operator scope:', error);
+      alert(error.message || 'Failed to update field operator scope');
+    } finally {
+      setSavingUserScope(false);
+    }
+  };
+
   const handleEditOperatorUser = async () => {
     if (!editOperatorUserForm) return;
+
+    const emailError = validateEmailContent(editOperatorUserForm.email);
+    if (emailError) {
+      alert(emailError);
+      return;
+    }
+
+    const phoneError = validatePhoneContent(editOperatorUserForm.phone);
+    if (phoneError) {
+      alert(phoneError);
+      return;
+    }
     
     try {
       setEditLoading(true);
       const { id, ...updateData } = editOperatorUserForm;
-      await api.put(`/admin/operator-users/${id}`, updateData);
+      const payload = {
+        ...updateData,
+        email: normalizeEmail(updateData.email),
+        phone: sanitizePhone(updateData.phone),
+      };
+      await api.put(`/admin/operator-users/${id}`, payload);
       
       setShowEditOperatorUserModal(false);
       setEditOperatorUserForm(null);
@@ -401,6 +560,8 @@ const UserManagement: React.FC = () => {
   const userStats = {
     total: safeUsers.length,
     admins: safeUsers.filter(u => u.role === 'ADMIN').length,
+    masterFieldOperators: safeUsers.filter(u => u.role === 'MASTER_FIELD_OPERATOR').length,
+    operatorFieldOperators: safeUsers.filter(u => u.role === 'OPERATOR_FIELD_OPERATOR').length,
     operators: safeUsers.filter(u => u.role === 'OPERATOR').length,
     passengers: safeUsers.filter(u => u.role === 'PASSENGER').length,
     verified: safeUsers.filter(u => u.verified).length,
@@ -439,11 +600,15 @@ const UserManagement: React.FC = () => {
   const getRoleBadgeColor = (role: string) => {
     switch (role) {
       case 'ADMIN': return 'bg-red-100 text-red-800';
+      case 'MASTER_FIELD_OPERATOR': return 'bg-purple-100 text-purple-800';
+      case 'OPERATOR_FIELD_OPERATOR': return 'bg-indigo-100 text-indigo-800';
       case 'OPERATOR': return 'bg-blue-100 text-blue-800';
       case 'PASSENGER': return 'bg-green-100 text-green-800';
       default: return 'bg-gray-100 text-gray-800';
     }
   };
+
+  const formatRoleLabel = (role: string) => role.replace(/_/g, ' ');
 
 
 
@@ -491,6 +656,15 @@ const UserManagement: React.FC = () => {
           <p className="text-gray-600">Manage platform users and operator staff</p>
         </div>
         <div className="flex items-center space-x-3">
+          {activeTab === 'users' && (
+            <button
+              onClick={() => setShowCreatePlatformUserModal(true)}
+              className="bg-blue-600 text-white px-4 py-2 rounded-lg hover:bg-blue-700 transition-colors flex items-center space-x-2"
+            >
+              <UserPlus className="h-4 w-4" />
+              <span>Add Platform User</span>
+            </button>
+          )}
           {activeTab === 'operator-users' && (
             <button
               onClick={() => setShowCreateOperatorUserModal(true)}
@@ -561,7 +735,7 @@ const UserManagement: React.FC = () => {
 
       {/* Stats Cards */}
       {activeTab === 'users' ? (
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-6 gap-4">
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-8 gap-4">
           <div className="bg-white p-4 rounded-lg shadow border">
             <div className="flex items-center">
               <Users className="h-8 w-8 text-blue-600" />
@@ -578,6 +752,26 @@ const UserManagement: React.FC = () => {
               <div className="ml-3">
                 <p className="text-xs font-medium text-gray-600">Admins</p>
                 <p className="text-xl font-semibold text-gray-900">{userStats.admins}</p>
+              </div>
+            </div>
+          </div>
+
+          <div className="bg-white p-4 rounded-lg shadow border">
+            <div className="flex items-center">
+              <Shield className="h-8 w-8 text-purple-600" />
+              <div className="ml-3">
+                <p className="text-xs font-medium text-gray-600">Master Field Ops</p>
+                <p className="text-xl font-semibold text-gray-900">{userStats.masterFieldOperators}</p>
+              </div>
+            </div>
+          </div>
+
+          <div className="bg-white p-4 rounded-lg shadow border">
+            <div className="flex items-center">
+              <Shield className="h-8 w-8 text-indigo-600" />
+              <div className="ml-3">
+                <p className="text-xs font-medium text-gray-600">Operator Field Ops</p>
+                <p className="text-xl font-semibold text-gray-900">{userStats.operatorFieldOperators}</p>
               </div>
             </div>
           </div>
@@ -722,6 +916,8 @@ const UserManagement: React.FC = () => {
                 >
                   <option value="ALL">All Roles</option>
                   <option value="ADMIN">Admin</option>
+                  <option value="MASTER_FIELD_OPERATOR">Master Field Operator</option>
+                  <option value="OPERATOR_FIELD_OPERATOR">Operator Field Operator</option>
                   <option value="OPERATOR">Operator</option>
                   <option value="PASSENGER">Passenger</option>
                 </select>
@@ -896,7 +1092,7 @@ const UserManagement: React.FC = () => {
                   <td className="px-6 py-4">
                     <div className="space-y-2">
                       <span className={`inline-flex px-2 py-1 text-xs font-semibold rounded-full ${getRoleBadgeColor(user.role)}`}>
-                        {user.role}
+                        {formatRoleLabel(user.role)}
                       </span>
                       <div>
                         <span className={`inline-flex px-2 py-1 text-xs font-semibold rounded-full ${
@@ -1013,7 +1209,7 @@ const UserManagement: React.FC = () => {
                     {selectedUser.firstName} {selectedUser.lastName}
                   </h4>
                   <span className={`inline-flex px-2 py-1 text-xs font-semibold rounded-full ${getRoleBadgeColor(selectedUser.role)}`}>
-                    {selectedUser.role}
+                    {formatRoleLabel(selectedUser.role)}
                   </span>
                 </div>
               </div>
@@ -1053,6 +1249,46 @@ const UserManagement: React.FC = () => {
                 )}
               </div>
 
+              {selectedUser.role === 'OPERATOR_FIELD_OPERATOR' && (
+                <div className="border rounded-lg p-4 bg-gray-50">
+                  <div className="flex items-center justify-between mb-3">
+                    <div>
+                      <label className="block text-sm font-medium text-gray-700">Operator Scope</label>
+                      <p className="text-xs text-gray-500">Choose the operator(s) this field operator can manage.</p>
+                    </div>
+                    <button
+                      onClick={handleSaveFieldOperatorScopes}
+                      disabled={savingUserScope}
+                      className="px-3 py-2 text-sm bg-blue-600 text-white rounded-md hover:bg-blue-700 disabled:opacity-50"
+                    >
+                      {savingUserScope ? 'Saving…' : 'Save Scope'}
+                    </button>
+                  </div>
+                  <div className="space-y-2 max-h-40 overflow-y-auto">
+                    {operators.map(operator => {
+                      const checked = (selectedUser.fieldOperatorScopes || []).some(scope => scope.operatorId === operator.id);
+                      return (
+                        <label key={operator.id} className="flex items-center gap-2 text-sm text-gray-700">
+                          <input
+                            type="checkbox"
+                            checked={checked}
+                            onChange={(e) => {
+                              const currentScopes = selectedUser.fieldOperatorScopes || [];
+                              const nextScopes = e.target.checked
+                                ? [...currentScopes, { operatorId: operator.id, operator: { id: operator.id, companyName: operator.companyName } }]
+                                : currentScopes.filter(scope => scope.operatorId !== operator.id);
+                              setSelectedUser({ ...selectedUser, fieldOperatorScopes: nextScopes });
+                            }}
+                            className="rounded border-gray-300 text-blue-600 focus:ring-blue-500"
+                          />
+                          <span>{operator.companyName}</span>
+                        </label>
+                      );
+                    })}
+                  </div>
+                </div>
+              )}
+
               <div className="flex justify-end space-x-3 pt-4 border-t">
                 <button
                   onClick={() => setShowUserModal(false)}
@@ -1089,6 +1325,104 @@ const UserManagement: React.FC = () => {
         operators={operators}
         loading={createLoading}
       />
+
+      {showCreatePlatformUserModal && (
+        <div className="fixed inset-0 bg-gray-600 bg-opacity-50 flex items-center justify-center p-4 z-50">
+          <div className="bg-white rounded-lg p-6 w-full max-w-2xl">
+            <div className="flex items-center justify-between mb-6">
+              <h3 className="text-lg font-semibold text-gray-900">Create Platform User</h3>
+              <button
+                onClick={() => setShowCreatePlatformUserModal(false)}
+                className="text-gray-400 hover:text-gray-600"
+              >
+                ×
+              </button>
+            </div>
+
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              <input className="px-3 py-2 border rounded-lg" placeholder="First name"
+                value={createPlatformUserForm.firstName}
+                onChange={(e) => setCreatePlatformUserForm({ ...createPlatformUserForm, firstName: e.target.value })} />
+              <input className="px-3 py-2 border rounded-lg" placeholder="Last name"
+                value={createPlatformUserForm.lastName}
+                onChange={(e) => setCreatePlatformUserForm({ ...createPlatformUserForm, lastName: e.target.value })} />
+              <input className="px-3 py-2 border rounded-lg" placeholder="Email"
+                type="email"
+                value={createPlatformUserForm.email}
+                onChange={(e) => setCreatePlatformUserForm({ ...createPlatformUserForm, email: e.target.value })} />
+              <input className="px-3 py-2 border rounded-lg" placeholder="Phone"
+                type="tel"
+                value={createPlatformUserForm.phone}
+                onChange={(e) => setCreatePlatformUserForm({ ...createPlatformUserForm, phone: e.target.value })} />
+              <input className="px-3 py-2 border rounded-lg" type="password" placeholder="Password"
+                value={createPlatformUserForm.password}
+                onChange={(e) => setCreatePlatformUserForm({ ...createPlatformUserForm, password: e.target.value })} />
+              <select
+                className="px-3 py-2 border rounded-lg"
+                value={createPlatformUserForm.role}
+                onChange={(e) => setCreatePlatformUserForm({ ...createPlatformUserForm, role: e.target.value as User['role'], operatorScopeIds: [] })}
+              >
+                {PLATFORM_ROLE_OPTIONS.map(role => (
+                  <option key={role} value={role}>{formatRoleLabel(role)}</option>
+                ))}
+              </select>
+            </div>
+
+            <label className="flex items-center gap-2 mt-4 text-sm text-gray-700">
+              <input
+                type="checkbox"
+                checked={createPlatformUserForm.verified}
+                onChange={(e) => setCreatePlatformUserForm({ ...createPlatformUserForm, verified: e.target.checked })}
+                className="rounded border-gray-300 text-blue-600 focus:ring-blue-500"
+              />
+              Verified user
+            </label>
+
+            {createPlatformUserForm.role === 'OPERATOR_FIELD_OPERATOR' && (
+              <div className="mt-4 border rounded-lg p-4 bg-gray-50">
+                <label className="block text-sm font-medium text-gray-700 mb-2">Operator Scope</label>
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-2 max-h-48 overflow-y-auto">
+                  {operators.map(operator => {
+                    const checked = createPlatformUserForm.operatorScopeIds.includes(operator.id);
+                    return (
+                      <label key={operator.id} className="flex items-center gap-2 text-sm text-gray-700">
+                        <input
+                          type="checkbox"
+                          checked={checked}
+                          onChange={(e) => {
+                            const operatorScopeIds = e.target.checked
+                              ? [...createPlatformUserForm.operatorScopeIds, operator.id]
+                              : createPlatformUserForm.operatorScopeIds.filter(id => id !== operator.id);
+                            setCreatePlatformUserForm({ ...createPlatformUserForm, operatorScopeIds });
+                          }}
+                          className="rounded border-gray-300 text-blue-600 focus:ring-blue-500"
+                        />
+                        <span>{operator.companyName}</span>
+                      </label>
+                    );
+                  })}
+                </div>
+              </div>
+            )}
+
+            <div className="flex justify-end gap-3 mt-6 pt-4 border-t">
+              <button
+                onClick={() => setShowCreatePlatformUserModal(false)}
+                className="px-4 py-2 text-gray-700 bg-gray-100 hover:bg-gray-200 rounded-md transition-colors"
+              >
+                Cancel
+              </button>
+              <button
+                onClick={handleCreatePlatformUser}
+                disabled={createPlatformUserLoading}
+                className="px-4 py-2 text-white bg-blue-600 hover:bg-blue-700 rounded-md transition-colors disabled:opacity-50"
+              >
+                {createPlatformUserLoading ? 'Creating…' : 'Create User'}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* Edit Operator User Modal */}
       <EditOperatorUserModal
