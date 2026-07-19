@@ -405,7 +405,7 @@ export default function HomePage() {
 
             <div className="relative grid grid-cols-1 lg:grid-cols-[1.12fr_0.88fr] gap-8 lg:gap-12 items-center">
               <div className="max-w-2xl">
-                <div className="mb-6 space-y-3">
+                <div className="mb-5 sm:mb-6 space-y-2.5 sm:space-y-3">
                   <div className="inline-flex items-center rounded-2xl border border-white/20 bg-white/10 px-3 py-2 backdrop-blur-sm">
                     <TransConnectLogo
                       usage="dark"
@@ -415,20 +415,20 @@ export default function HomePage() {
                       wordmarkClassName="text-lg"
                     />
                   </div>
-                  <div className="flex flex-wrap items-center gap-2.5">
-                    <span className="inline-flex items-center gap-1.5 rounded-full border border-white/25 bg-white/15 px-3 py-1.5 text-[11px] font-bold uppercase tracking-[0.08em] text-[#7ee8d0]">
+                  <div className="flex flex-wrap items-center gap-2">
+                    <span className="inline-flex items-center gap-1.5 rounded-full border border-[#73c7ff]/45 bg-[#173a61]/58 px-3 py-1.5 text-[11px] font-bold uppercase tracking-[0.08em] text-[#c6e4ff] shadow-[0_5px_14px_rgba(7,23,44,0.28)] transition-all duration-200 hover:-translate-y-0.5 hover:bg-[#1e4673] hover:border-[#92d4ff]/60">
                       <Play className="h-3 w-3" />
                       Android
                     </span>
-                    <span className="inline-flex items-center gap-1.5 rounded-full border border-white/25 bg-white/15 px-3 py-1.5 text-[11px] font-bold uppercase tracking-[0.08em] text-[#c9f6ff]">
+                    <span className="inline-flex items-center gap-1.5 rounded-full border border-white/32 bg-white/12 px-3 py-1.5 text-[11px] font-bold uppercase tracking-[0.08em] text-[#e3f5ff] shadow-[0_5px_14px_rgba(7,23,44,0.22)] transition-all duration-200 hover:-translate-y-0.5 hover:bg-white/18 hover:border-white/45">
                       <Apple className="h-3 w-3" />
                       iOS
                     </span>
                   </div>
                 </div>
 
-                <h3 className="text-3xl sm:text-4xl lg:text-[2.9rem] leading-[1.03] font-black mb-4 [text-wrap:balance] max-w-[14ch]">Take TransConnect wherever you go</h3>
-                <p className="text-[#d0def3] mb-6 max-w-xl text-base sm:text-lg">Manage bookings, view QR tickets, and track your bus in real-time from your pocket.</p>
+                <h3 className="text-3xl sm:text-4xl lg:text-[2.9rem] leading-[1.03] font-black mb-3.5 sm:mb-4 [text-wrap:balance] max-w-[14ch]">Take TransConnect wherever you go</h3>
+                <p className="text-[#d0def3] mb-5 sm:mb-6 max-w-xl text-base sm:text-lg">Manage bookings, view QR tickets, and track your bus in real-time from your pocket.</p>
 
                 <div className="flex flex-wrap items-center gap-3">
                   <PlayStoreCTA compact source="home_app_section" className="min-w-[176px] justify-center" />
