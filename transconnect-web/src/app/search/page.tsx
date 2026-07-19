@@ -21,6 +21,7 @@ function SearchContent() {
 
   const [maxPrice, setMaxPrice] = useState(80000);
   const [minPrice] = useState(35000);
+  const [sortBy, setSortBy] = useState<'price' | 'departure' | 'duration' | 'rating'>('price');
 
   React.useEffect(() => {
     handleSearch();
@@ -44,7 +45,31 @@ function SearchContent() {
   }
 
   const filteredRoutes = useMemo(() => {
-    return routes.filter((route) => {
+    function toDepartureMinutes(value: unknown) {
+      if (typeof value !== 'string' || !value.trim()) return Number.MAX_SAFE_INTEGER;
+      const raw = value.trim().toUpperCase();
+
+      const twelveHourMatch = raw.match(/^(\d{1,2}):(\d{2})\s*(AM|PM)$/);
+      if (twelveHourMatch) {
+        let hours = Number(twelveHourMatch[1]);
+        const minutes = Number(twelveHourMatch[2]);
+        const ampm = twelveHourMatch[3];
+        if (ampm === 'PM' && hours < 12) hours += 12;
+        if (ampm === 'AM' && hours === 12) hours = 0;
+        return (hours * 60) + minutes;
+      }
+
+      const twentyFourMatch = raw.match(/^(\d{1,2}):(\d{2})$/);
+      if (twentyFourMatch) {
+        const hours = Number(twentyFourMatch[1]);
+        const minutes = Number(twentyFourMatch[2]);
+        return (hours * 60) + minutes;
+      }
+
+      return Number.MAX_SAFE_INTEGER;
+    }
+
+    const filtered = routes.filter((route) => {
       const withinPrice = Number(route.price || 0) <= maxPrice;
       if (!withinPrice) return false;
 
@@ -60,7 +85,26 @@ function SearchContent() {
 
       return routeOperatorName.includes(operatorFilter.toLowerCase());
     });
-  }, [maxPrice, operatorFilter, routes]);
+
+    const sorted = [...filtered].sort((a, b) => {
+      if (sortBy === 'price') {
+        return Number(a.price || 0) - Number(b.price || 0);
+      }
+
+      if (sortBy === 'departure') {
+        return toDepartureMinutes(a.departureTime) - toDepartureMinutes(b.departureTime);
+      }
+
+      if (sortBy === 'duration') {
+        return Number(a.duration || 0) - Number(b.duration || 0);
+      }
+
+      // Rating currently static in UI; preserve order for now.
+      return 0;
+    });
+
+    return sorted;
+  }, [maxPrice, operatorFilter, routes, sortBy]);
 
   return (
     <div className="min-h-screen bg-[#f5f8fe]">
@@ -117,10 +161,22 @@ function SearchContent() {
               <StyledCard hover={false} className="!p-4">
                 <p className="text-xs font-bold uppercase text-[#8ca4c4] mb-3">Sort By</p>
                 <div className="space-y-2 text-sm text-[#3f5778]">
-                  <label className="flex items-center gap-2"><input type="radio" defaultChecked /> Price - Low to High</label>
-                  <label className="flex items-center gap-2"><input type="radio" /> Departure Time</label>
-                  <label className="flex items-center gap-2"><input type="radio" /> Duration</label>
-                  <label className="flex items-center gap-2"><input type="radio" /> Rating</label>
+                  <label className="flex items-center gap-2">
+                    <input type="radio" name="sortBy" checked={sortBy === 'price'} onChange={() => setSortBy('price')} />
+                    Price - Low to High
+                  </label>
+                  <label className="flex items-center gap-2">
+                    <input type="radio" name="sortBy" checked={sortBy === 'departure'} onChange={() => setSortBy('departure')} />
+                    Departure Time
+                  </label>
+                  <label className="flex items-center gap-2">
+                    <input type="radio" name="sortBy" checked={sortBy === 'duration'} onChange={() => setSortBy('duration')} />
+                    Duration
+                  </label>
+                  <label className="flex items-center gap-2">
+                    <input type="radio" name="sortBy" checked={sortBy === 'rating'} onChange={() => setSortBy('rating')} />
+                    Rating
+                  </label>
                 </div>
               </StyledCard>
 

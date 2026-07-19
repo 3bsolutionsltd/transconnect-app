@@ -2,7 +2,7 @@
 import React, { useState } from 'react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
-import { authApi } from '@/lib/api';
+import { useAuth } from '@/contexts/AuthContext';
 import { Eye, EyeOff, Mail, Lock, LogIn, Smartphone } from 'lucide-react';
 import toast from 'react-hot-toast';
 import { Heading, StyledButton } from '@/components/styled';
@@ -15,6 +15,7 @@ export default function LoginPage() {
   const [showPassword, setShowPassword] = useState(false);
   const [loading, setLoading] = useState(false);
   const router = useRouter();
+  const { login } = useAuth();
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
@@ -25,8 +26,9 @@ export default function LoginPage() {
 
     setLoading(true);
     try {
-      const result = await authApi.login(email, password);
-      toast.success(`Welcome back, ${result.user.name}!`);
+      const result = await login(email, password);
+      const fullName = [result?.user?.firstName, result?.user?.lastName].filter(Boolean).join(' ').trim();
+      toast.success(`Welcome back, ${fullName || result?.user?.email || 'traveller'}!`);
       router.push('/search');
     } catch (error: any) {
       console.error('Login error:', error);
