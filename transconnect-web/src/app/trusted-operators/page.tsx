@@ -14,6 +14,16 @@ export default function TrustedOperatorsPage() {
   const [query, setQuery] = useState('');
   const [operators, setOperators] = useState<TrustedOperator[]>([]);
   const [totalRoutes, setTotalRoutes] = useState(0);
+  const [portalSlugByOperator, setPortalSlugByOperator] = useState<Record<string, string>>({});
+
+  function toOperatorSlug(name: string) {
+    return name
+      .toLowerCase()
+      .trim()
+      .replace(/[^a-z0-9\s-]/g, '')
+      .replace(/\s+/g, '-')
+      .replace(/-+/g, '-');
+  }
 
   useEffect(() => {
     async function loadTrustedOperators() {
@@ -31,6 +41,36 @@ export default function TrustedOperatorsPage() {
 
     loadTrustedOperators();
   }, []);
+
+  useEffect(() => {
+    async function detectAvailablePortals() {
+      if (!operators.length) {
+        setPortalSlugByOperator({});
+        return;
+      }
+
+      const apiBaseUrl = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:5000/api';
+      const checks = await Promise.all(
+        operators.map(async (operator) => {
+          const slug = toOperatorSlug(operator.name);
+          try {
+            const response = await fetch(`${apiBaseUrl}/operator-portal/slug/${slug}`);
+            return response.ok ? { name: operator.name, slug } : null;
+          } catch {
+            return null;
+          }
+        })
+      );
+
+      const nextMap: Record<string, string> = {};
+      for (const match of checks) {
+        if (match) nextMap[match.name] = match.slug;
+      }
+      setPortalSlugByOperator(nextMap);
+    }
+
+    detectAvailablePortals();
+  }, [operators]);
 
   const filtered = useMemo(() => {
     const term = query.trim().toLowerCase();
@@ -96,6 +136,14 @@ export default function TrustedOperatorsPage() {
             <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4">
               {filtered.map((operator) => (
                 <StyledCard key={operator.name} hover={false} className="!p-5 border border-[#e7edf8]">
+                  {(() => {
+                    const portalSlug = portalSlugByOperator[operator.name];
+                    const viewRoutesHref = portalSlug
+                      ? `/operator/${portalSlug}`
+                      : `/search?operator=${encodeURIComponent(operator.name)}`;
+
+                    return (
+                      <>
                   <div className="flex items-start justify-between gap-3 mb-3">
                     <div>
                       <h3 className="text-xl font-bold text-[#14263f]">{operator.name}</h3>
@@ -128,9 +176,12 @@ export default function TrustedOperatorsPage() {
                     <span>Top fare: UGX {operator.maxPrice.toLocaleString()}</span>
                   </div>
 
-                  <Link href="/search" className="block">
+                  <Link href={viewRoutesHref} className="block">
                     <StyledButton variant="primary" className="w-full !py-2.5">View Routes</StyledButton>
                   </Link>
+                      </>
+                    );
+                  })()}
                 </StyledCard>
               ))}
             </div>

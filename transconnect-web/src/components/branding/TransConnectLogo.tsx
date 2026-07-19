@@ -25,7 +25,7 @@ export default function TransConnectLogo({
   const safeWidth = Math.max(width, 80);
 
   return (
-    <div className={['inline-flex items-center gap-2.5 shrink-0', className ?? ''].join(' ').trim()}>
+    <div className={['inline-flex min-w-0 items-center gap-2.5', className ?? ''].join(' ').trim()}>
       <div
         className={[
           'inline-flex items-center justify-center shrink-0',
@@ -38,8 +38,9 @@ export default function TransConnectLogo({
           width={safeWidth}
           height={height}
           priority={priority}
+          style={{ width: '100%', maxWidth: `${safeWidth}px`, height: 'auto' }}
           className={[
-            'h-auto w-auto object-contain max-w-none',
+            'h-auto w-auto object-contain',
             imageClassName ?? ''
           ].join(' ').trim()}
         />
@@ -47,7 +48,7 @@ export default function TransConnectLogo({
       {showWordmark && (
         <span
           className={[
-            'tc-font-brand text-lg sm:text-xl leading-none font-bold whitespace-nowrap tracking-tight',
+            'tc-font-brand text-base sm:text-lg md:text-xl leading-none font-bold whitespace-nowrap tracking-tight',
             usage === 'dark' ? 'text-white' : 'text-[#0d1b2a]',
             wordmarkClassName ?? ''
           ].join(' ').trim()}

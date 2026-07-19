@@ -11,9 +11,10 @@ import { Section, Container, StyledCard, StyledButton } from '@/components/style
 
 function SearchContent() {
   const searchParams = useSearchParams();
-  const [origin, setOrigin] = useState(searchParams.get('origin') || 'Kampala');
-  const [destination, setDestination] = useState(searchParams.get('destination') || 'Gulu');
-  const [date, setDate] = useState(searchParams.get('date') || new Date().toISOString().split('T')[0]);
+  const operatorFilter = (searchParams.get('operator') || '').trim();
+  const [origin, setOrigin] = useState(searchParams.get('origin') || '');
+  const [destination, setDestination] = useState(searchParams.get('destination') || '');
+  const [date, setDate] = useState(searchParams.get('date') || '');
   const [passengers, setPassengers] = useState(Number(searchParams.get('passengers') || 1));
   const [routes, setRoutes] = useState<any[]>([]);
   const [loading, setLoading] = useState(false);
@@ -43,8 +44,23 @@ function SearchContent() {
   }
 
   const filteredRoutes = useMemo(() => {
-    return routes.filter((route) => Number(route.price || 0) <= maxPrice);
-  }, [maxPrice, routes]);
+    return routes.filter((route) => {
+      const withinPrice = Number(route.price || 0) <= maxPrice;
+      if (!withinPrice) return false;
+
+      if (!operatorFilter) return true;
+
+      const routeOperatorName = (
+        route?.operator?.companyName ||
+        route?.operator?.name ||
+        route?.operatorInfo?.companyName ||
+        route?.operatorName ||
+        ''
+      ).toString().toLowerCase();
+
+      return routeOperatorName.includes(operatorFilter.toLowerCase());
+    });
+  }, [maxPrice, operatorFilter, routes]);
 
   return (
     <div className="min-h-screen bg-[#f5f8fe]">
@@ -90,6 +106,13 @@ function SearchContent() {
                 <h2 className="text-2xl font-black text-[#14263f]">{filteredRoutes.length} routes found</h2>
                 <button className="text-sm font-semibold text-[#0f8c6b]" onClick={() => setMaxPrice(80000)}>Clear all</button>
               </div>
+
+              {operatorFilter && (
+                <StyledCard hover={false} className="!p-3">
+                  <p className="text-xs font-bold uppercase text-[#8ca4c4] mb-1">Filtered by operator</p>
+                  <p className="text-sm font-semibold text-[#214c86]">{operatorFilter}</p>
+                </StyledCard>
+              )}
 
               <StyledCard hover={false} className="!p-4">
                 <p className="text-xs font-bold uppercase text-[#8ca4c4] mb-3">Sort By</p>
