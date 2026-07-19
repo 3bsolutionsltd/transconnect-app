@@ -1,61 +1,27 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { useParams } from "next/navigation";
 import Link from "next/link";
 import Image from "next/image";
-import { Button } from "@/components/ui/button";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import {
-  Phone,
+  Bus,
+  Calendar,
+  CheckCircle2,
+  Clock,
+  CreditCard,
   Mail,
   MapPin,
-  Calendar,
-  Clock,
-  Users,
-  Bus,
-  TrendingUp,
-  Award,
-  Star,
+  Phone,
   Search,
-  CheckCircle2,
   Shield,
-  CreditCard,
-  Headphones,
+  Users,
 } from "lucide-react";
+import { Badge, Container, Heading, Lead, Section, StyledButton, StyledCard } from "@/components/styled";
 
-// Fixed teal color for all operators
-const TEAL_COLOR = "#00D9A3";
+const FALLBACK_COLOR = "#00D9A3";
 
-// Types
-interface Operator {
-  id: string;
-  companyName: string;
-  license: string;
-  approved: boolean;
-  slug: string;
-  brandLogoUrl: string | null;
-  brandColor: string | null;
-  heroImageUrl: string | null;
-  tagline: string | null;
-  description: string | null;
-  portalEnabled: boolean;
-  contact: {
-    name: string;
-    phone: string | null;
-    email: string | null;
-  };
-  stats: {
-    totalBuses: number;
-    activeRoutes: number;
-    totalTripsCompleted: number;
-    yearsInOperation: number;
-  };
-  routes: Route[];
-  buses: BusData[];
-}
-
-interface Route {
+interface OperatorRoute {
   id: string;
   origin: string;
   destination: string;
@@ -70,584 +36,309 @@ interface Route {
   };
 }
 
-interface BusData {
+interface OperatorBus {
   id: string;
   plateNumber: string;
   model: string;
   capacity: number;
-  createdAt: string;
 }
 
-interface ApiResponse {
+interface OperatorData {
+  id: string;
+  companyName: string;
+  slug: string;
+  brandLogoUrl: string | null;
+  brandColor: string | null;
+  heroImageUrl: string | null;
+  tagline: string | null;
+  description: string | null;
+  contact: {
+    name: string;
+    phone: string | null;
+    email: string | null;
+  };
+  stats: {
+    totalBuses: number;
+    activeRoutes: number;
+    totalTripsCompleted?: number;
+    yearsInOperation?: number | string;
+  };
+  routes: OperatorRoute[];
+  buses: OperatorBus[];
+}
+
+interface OperatorResponse {
   success: boolean;
-  operator: Operator;
+  operator: OperatorData;
 }
 
 export default function OperatorPortalPage() {
   const params = useParams();
   const slug = params?.slug as string;
 
-  const [operator, setOperator] = useState<Operator | null>(null);
+  const [operator, setOperator] = useState<OperatorData | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [searchFrom, setSearchFrom] = useState("");
   const [searchTo, setSearchTo] = useState("");
-  const [searchDate, setSearchDate] = useState("");
+  const [travelDate, setTravelDate] = useState("");
 
   useEffect(() => {
-    if (!slug) return;
+    if (!slug) {
+      setLoading(false);
+      setError("Invalid operator portal URL");
+      return;
+    }
 
-    async function fetchOperatorData() {
+    async function loadOperator() {
       try {
-        setLoading(true);
         const apiBaseUrl = process.env.NEXT_PUBLIC_API_URL || "http://localhost:5000/api";
         const response = await fetch(`${apiBaseUrl}/operator-portal/slug/${slug}`);
 
         if (!response.ok) {
           if (response.status === 404) {
-            throw new Error("Operator not found or portal not enabled");
+            throw new Error("Operator portal not found or not enabled");
           }
-          throw new Error("Failed to load operator data");
+          throw new Error("Failed to load operator portal");
         }
 
-        const data: ApiResponse = await response.json();
+        const data: OperatorResponse = await response.json();
         setOperator(data.operator);
-      } catch (err) {
-        setError(err instanceof Error ? err.message : "An error occurred");
+      } catch (err: any) {
+        setError(err?.message || "Failed to load operator portal");
       } finally {
         setLoading(false);
       }
     }
 
-    fetchOperatorData();
+    loadOperator();
   }, [slug]);
 
-  // Loading state
+  const primaryColor = operator?.brandColor || FALLBACK_COLOR;
+  const heroImage = operator?.heroImageUrl || "/images/default-hero.jpg";
+  const activeRoutes = useMemo(() => (operator?.routes || []).filter((route) => route.active), [operator]);
+
   if (loading) {
     return (
       <div className="min-h-screen flex items-center justify-center bg-white">
-        <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-[#00D9A3]"></div>
+        <div className="animate-spin rounded-full h-12 w-12 border-b-2" style={{ borderBottomColor: FALLBACK_COLOR }} />
       </div>
     );
   }
 
-  // Error state
   if (error || !operator) {
     return (
-      <div className="min-h-screen flex items-center justify-center bg-white">
-        <div className="text-center">
-          <h1 className="text-4xl font-bold text-gray-900 mb-4">Oops!</h1>
-          <p className="text-gray-600 mb-6">{error || "Operator not found"}</p>
-          <Link href="/">
-            <Button style={{ backgroundColor: TEAL_COLOR }}>Go to TransConnect Home</Button>
-          </Link>
-        </div>
+      <div className="min-h-screen flex items-center justify-center bg-gray-50 px-4">
+        <StyledCard className="max-w-lg w-full text-center" hover={false}>
+          <h1 className="tc-heading-3 text-gray-900 mb-3">Portal Not Found</h1>
+          <p className="text-gray-600 mb-6">{error || "The operator portal is unavailable."}</p>
+          <Link href="/" className="btn-primary inline-flex">Go to TransConnect Home</Link>
+        </StyledCard>
       </div>
     );
   }
 
-  // Get popular routes (first 6)
-  const popularRoutes = operator.routes.filter(r => r.active).slice(0, 6);
-
-  // Get hero image or default
-  const heroImage = operator.heroImageUrl || "/images/default-hero.jpg";
-
   return (
-    <div className="min-h-screen bg-white font-sans">
-      {/* Navigation Bar */}
-      <nav className="bg-white border-b border-gray-100 py-5 shadow-sm sticky top-0 z-50">
-        <div className="container mx-auto px-6">
-          <div className="flex items-center justify-between">
-            {/* Logo and Company Name */}
-            <div className="flex items-center gap-3">
-              {operator.brandLogoUrl && (
-                <div className="bg-[#00D9A3] p-2.5 rounded-lg shadow-md">
-                  <Image
-                    src={operator.brandLogoUrl}
-                    alt={`${operator.companyName} logo`}
-                    width={36}
-                    height={36}
-                    className="rounded"
-                  />
-                </div>
-              )}
-              <div>
-                <h1 className="text-lg font-bold text-gray-900 tracking-tight">{operator.companyName}</h1>
-                <p className="text-[10px] text-gray-500 uppercase tracking-wider font-medium">Trusted & Recommended</p>
-              </div>
-            </div>
-
-            {/* Navigation Links */}
-            <div className="hidden lg:flex items-center gap-10">
-              <a href="#home" className="text-sm font-semibold text-gray-700 hover:text-[#00D9A3] transition-colors">
-                Home
-              </a>
-              <a href="#routes" className="text-sm font-semibold text-gray-700 hover:text-[#00D9A3] transition-colors">
-                Routes
-              </a>
-              <a href="#schedule" className="text-sm font-semibold text-gray-700 hover:text-[#00D9A3] transition-colors">
-                Schedule
-              </a>
-              <a href="#about" className="text-sm font-semibold text-gray-700 hover:text-[#00D9A3] transition-colors">
-                About Us
-              </a>
-              <a href="#contact" className="text-sm font-semibold text-gray-700 hover:text-[#00D9A3] transition-colors">
-                Contact
-              </a>
-            </div>
-
-            {/* Action Buttons */}
-            <div className="flex items-center gap-3">
-              <Link href="/">
-                <Button variant="outline" className="border-gray-300 text-gray-700 font-semibold text-sm px-5 py-2">
-                  My Tickets
-                </Button>
-              </Link>
-              <Button className="text-white font-bold text-sm px-6 py-2.5" style={{ backgroundColor: TEAL_COLOR }}>
-                Book Now
-              </Button>
-            </div>
-          </div>
-        </div>
-      </nav>
-
-      {/* Hero Section with Background Image */}
+    <div className="min-h-screen bg-white">
       <section
-        id="home"
-        className="relative h-[550px] bg-cover bg-center"
+        className="relative bg-cover bg-center"
         style={{
-          backgroundImage: `linear-gradient(rgba(0, 0, 0, 0.55), rgba(0, 0, 0, 0.55)), url(${heroImage})`,
+          backgroundImage: `linear-gradient(125deg, rgba(13,27,42,0.88), rgba(13,27,42,0.68)), url(${heroImage})`,
         }}
       >
-        <div className="container mx-auto px-6 h-full flex flex-col justify-center items-start">
-          {/* Official Badge */}
-          <div className="inline-flex items-center gap-2 bg-[#00D9A3] text-white px-5 py-2.5 rounded-full mb-8 shadow-lg">
-            <CheckCircle2 className="w-4 h-4" />
-            <span className="text-xs font-bold uppercase tracking-widest">Official Booking Portal</span>
+        <Container className="py-8 sm:py-10">
+          <div className="flex items-center justify-between mb-8">
+            <div className="flex items-center gap-3">
+              <div className="h-12 w-12 rounded-xl bg-white/10 backdrop-blur flex items-center justify-center border border-white/20">
+                {operator.brandLogoUrl ? (
+                  <Image src={operator.brandLogoUrl} alt={operator.companyName} width={34} height={34} className="rounded-md object-cover" />
+                ) : (
+                  <Bus className="h-6 w-6 text-white" />
+                )}
+              </div>
+              <div>
+                <h1 className="text-white font-bold text-lg sm:text-xl">{operator.companyName}</h1>
+                <p className="text-white/70 text-xs uppercase tracking-wide">Official Operator Portal</p>
+              </div>
+            </div>
+            <Link href="/" className="text-white/90 text-sm hover:text-white underline">Powered by TransConnect</Link>
           </div>
 
-          {/* Two-Tone Title */}
-          <h2 className="text-6xl md:text-7xl font-extrabold mb-6 leading-tight">
-            <span className="text-white">Travel Uganda</span>
-            <br />
-            <span className="text-[#00D9A3]">With {operator.companyName.split(' ')[0]}</span>
-          </h2>
+          <Badge className="!bg-white/15 !text-white border border-white/25 mb-4" icon={<CheckCircle2 className="h-3 w-3" />}>
+            Official Booking Portal
+          </Badge>
 
-          {/* Tagline */}
-          <p className="text-lg md:text-xl text-white mb-10 max-w-2xl leading-relaxed font-medium">
-            {operator.tagline || "Direct bookings from Kampala to Gulu, Mbarara, Mbale & more. Best price guaranteed."}
-          </p>
+          <Heading as="h2" className="text-white mb-4 max-w-3xl">Travel Uganda With {operator.companyName}</Heading>
+          <Lead className="text-white/85 max-w-2xl mb-8 text-base sm:text-lg">
+            {operator.tagline || "Book direct with your operator and get instant digital tickets with secure mobile money checkout."}
+          </Lead>
 
-          {/* Action Buttons */}
-          <div className="flex items-center gap-4">
-            <Button
-              className="text-white font-bold px-10 py-6 text-base rounded-lg shadow-xl hover:shadow-2xl transition-all"
-              style={{ backgroundColor: TEAL_COLOR }}
-              onClick={() => {
-                document.getElementById("search")?.scrollIntoView({ behavior: "smooth" });
-              }}
-            >
-              Search Routes →
-            </Button>
-            <Button
-              variant="outline"
-              className="border-2 border-white text-white font-bold px-10 py-6 text-base rounded-lg hover:bg-white hover:text-gray-900 transition-all"
-              onClick={() => {
-                document.getElementById("schedule")?.scrollIntoView({ behavior: "smooth" });
-              }}
-            >
-              View Schedule
-            </Button>
-          </div>
-        </div>
+          <StyledCard variant="elevated" className="max-w-6xl" hover={false}>
+            <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
+              <input
+                type="text"
+                placeholder="From (e.g. Kampala)"
+                value={searchFrom}
+                onChange={(e) => setSearchFrom(e.target.value)}
+                className="tc-input"
+              />
+              <input
+                type="text"
+                placeholder="To (e.g. Gulu)"
+                value={searchTo}
+                onChange={(e) => setSearchTo(e.target.value)}
+                className="tc-input"
+              />
+              <input type="date" value={travelDate} onChange={(e) => setTravelDate(e.target.value)} className="tc-input" />
+              <StyledButton
+                variant="primary"
+                className="w-full"
+                onClick={() => {
+                  const params = new URLSearchParams();
+                  if (searchFrom) params.set("origin", searchFrom);
+                  if (searchTo) params.set("destination", searchTo);
+                  if (travelDate) params.set("date", travelDate);
+                  params.set("operator", operator.companyName);
+                  window.location.href = `/search?${params.toString()}`;
+                }}
+                style={{ backgroundColor: primaryColor }}
+              >
+                <Search className="h-4 w-4 mr-2" />
+                Search Routes
+              </StyledButton>
+            </div>
+          </StyledCard>
+        </Container>
       </section>
 
-      {/* Find Your Bus Section */}
-      <section id="search" className="py-16 bg-white">
-        <div className="container mx-auto px-6">
-          <div className="max-w-6xl mx-auto">
-            <h3 className="text-3xl font-bold text-gray-900 mb-8 tracking-tight">Find Your Bus</h3>
-            <Card className="shadow-2xl border-0 rounded-xl">
-              <CardContent className="pt-8 pb-8">
-                <div className="grid md:grid-cols-4 gap-6">
-                  <div>
-                    <label className="block text-xs font-bold text-gray-700 mb-3 uppercase tracking-widest">
-                      <MapPin className="w-3.5 h-3.5 inline mr-1.5" style={{ color: TEAL_COLOR }} />
-                      FROM
-                    </label>
-                    <input
-                      type="text"
-                      placeholder="Kampala"
-                      value={searchFrom}
-                      onChange={(e) => setSearchFrom(e.target.value)}
-                      className="w-full px-5 py-4 border-2 border-gray-200 rounded-xl focus:ring-2 focus:ring-[#00D9A3] focus:border-transparent font-medium text-gray-900 text-base"
-                    />
-                  </div>
-                  <div>
-                    <label className="block text-xs font-bold text-gray-700 mb-3 uppercase tracking-widest">
-                      <MapPin className="w-3.5 h-3.5 inline mr-1.5" style={{ color: TEAL_COLOR }} />
-                      TO
-                    </label>
-                    <input
-                      type="text"
-                      placeholder="Gulu"
-                      value={searchTo}
-                      onChange={(e) => setSearchTo(e.target.value)}
-                      className="w-full px-5 py-4 border-2 border-gray-200 rounded-xl focus:ring-2 focus:ring-[#00D9A3] focus:border-transparent font-medium text-gray-900 text-base"
-                    />
-                  </div>
-                  <div>
-                    <label className="block text-xs font-bold text-gray-700 mb-3 uppercase tracking-widest">
-                      <Calendar className="w-3.5 h-3.5 inline mr-1.5" style={{ color: TEAL_COLOR }} />
-                      TRAVEL DATE
-                    </label>
-                    <input
-                      type="date"
-                      value={searchDate}
-                      onChange={(e) => setSearchDate(e.target.value)}
-                      className="w-full px-5 py-4 border-2 border-gray-200 rounded-xl focus:ring-2 focus:ring-[#00D9A3] focus:border-transparent font-medium text-gray-900 text-base"
-                    />
-                  </div>
-                  <div>
-                    <label className="block text-xs font-bold text-gray-700 mb-3 uppercase tracking-widest">
-                      <Users className="w-3.5 h-3.5 inline mr-1.5" style={{ color: TEAL_COLOR }} />
-                      PASSENGERS
-                    </label>
-                    <select className="w-full px-5 py-4 border-2 border-gray-200 rounded-xl focus:ring-2 focus:ring-[#00D9A3] focus:border-transparent font-medium text-gray-900 text-base">
-                      <option>1 Adult</option>
-                      <option>2 Adults</option>
-                      <option>3 Adults</option>
-                      <option>4+ Adults</option>
-                    </select>
-                  </div>
-                </div>
-                <div className="mt-6">
-                  <Button
-                    className="w-full py-5 text-white font-bold text-base rounded-xl shadow-lg hover:shadow-xl transition-all"
-                    style={{ backgroundColor: TEAL_COLOR }}
-                    onClick={() => {
-                      if (searchFrom && searchTo) {
-                        window.location.href = `/?origin=${encodeURIComponent(searchFrom)}&destination=${encodeURIComponent(
-                          searchTo
-                        )}&date=${searchDate}`;
-                      }
-                    }}
-                  >
-                    Search Routes →
-                  </Button>
-                </div>
-              </CardContent>
-            </Card>
+      <Section variant="gray" className="py-10">
+        <Container>
+          <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+            <StyledCard hover={false} className="text-center !p-4">
+              <p className="text-xs uppercase tracking-widest text-gray-500">Routes</p>
+              <p className="text-3xl font-extrabold mt-1" style={{ color: primaryColor }}>{operator.stats.activeRoutes || 0}</p>
+            </StyledCard>
+            <StyledCard hover={false} className="text-center !p-4">
+              <p className="text-xs uppercase tracking-widest text-gray-500">Fleet</p>
+              <p className="text-3xl font-extrabold mt-1" style={{ color: primaryColor }}>{operator.stats.totalBuses || 0}</p>
+            </StyledCard>
+            <StyledCard hover={false} className="text-center !p-4">
+              <p className="text-xs uppercase tracking-widest text-gray-500">Trips</p>
+              <p className="text-3xl font-extrabold mt-1" style={{ color: primaryColor }}>{operator.stats.totalTripsCompleted || 0}</p>
+            </StyledCard>
+            <StyledCard hover={false} className="text-center !p-4">
+              <p className="text-xs uppercase tracking-widest text-gray-500">Years</p>
+              <p className="text-3xl font-extrabold mt-1" style={{ color: primaryColor }}>{operator.stats.yearsInOperation || "1+"}</p>
+            </StyledCard>
           </div>
-        </div>
-      </section>
+        </Container>
+      </Section>
 
-      {/* Stats Bar */}
-      <section className="bg-gray-50 border-y border-gray-200 py-12">
-        <div className="container mx-auto px-6">
-          <div className="grid grid-cols-2 md:grid-cols-4 gap-10">
-            <div className="text-center">
-              <div className="text-5xl font-extrabold text-gray-900 mb-2">{operator.stats.activeRoutes}+</div>
-              <div className="text-xs text-gray-600 uppercase tracking-widest font-bold">Routes Served</div>
-            </div>
-            <div className="text-center">
-              <div className="text-5xl font-extrabold text-gray-900 mb-2">{operator.stats.totalTripsCompleted || 50},000+</div>
-              <div className="text-xs text-gray-600 uppercase tracking-widest font-bold">Happy Passengers</div>
-            </div>
-            <div className="text-center">
-              <div className="text-5xl font-extrabold text-gray-900 mb-2">4.8★</div>
-              <div className="text-xs text-gray-600 uppercase tracking-widest font-bold">Customer Rating</div>
-            </div>
-            <div className="text-center">
-              <div className="text-5xl font-extrabold text-gray-900 mb-2">Daily</div>
-              <div className="text-xs text-gray-600 uppercase tracking-widest font-bold">Departures</div>
-            </div>
-          </div>
-        </div>
-      </section>
-
-      {/* Popular Routes Section */}
-      <section id="routes" className="py-20 bg-white">
-        <div className="container mx-auto px-6">
-          <div className="flex items-center justify-between mb-10">
+      <Section variant="light" className="py-14">
+        <Container>
+          <div className="flex items-center justify-between mb-6">
             <div>
-              <h2 className="text-4xl font-extrabold text-gray-900 mb-3 tracking-tight">Popular Routes</h2>
-              <p className="text-gray-600 text-base">Daily departures from Kampala</p>
+              <Heading as="h3" className="text-gray-900">Available Routes</Heading>
+              <p className="text-gray-600">Showing only {operator.companyName} routes and schedules.</p>
             </div>
-            {operator.routes.length > 6 && (
-              <Link href={`/?operator=${operator.companyName}`}>
-                <Button variant="link" style={{ color: TEAL_COLOR }} className="text-base font-semibold">
-                  View all routes →
-                </Button>
-              </Link>
-            )}
           </div>
 
-          <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-8">
-            {popularRoutes.map((route) => (
-              <Card key={route.id} className="hover:shadow-2xl transition-all duration-300 border-0 overflow-hidden rounded-xl shadow-lg">
-                <div className="bg-gradient-to-r from-[#00D9A3] to-[#00C28F] px-6 py-5">
-                  <div className="flex items-center gap-3">
-                    <div className="text-xl font-extrabold text-white">{route.origin}</div>
-                    <div className="text-white text-2xl">→</div>
-                    <div className="text-xl font-extrabold text-white">{route.destination}</div>
+          {activeRoutes.length === 0 ? (
+            <StyledCard className="text-center" hover={false}>
+              <MapPin className="h-10 w-10 mx-auto text-gray-400 mb-3" />
+              <p className="text-gray-600">No active routes available at the moment.</p>
+            </StyledCard>
+          ) : (
+            <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-6">
+              {activeRoutes.map((route) => (
+                <StyledCard key={route.id} className="!p-0 overflow-hidden" hover>
+                  <div className="px-5 py-4 text-white" style={{ backgroundColor: primaryColor }}>
+                    <p className="font-bold text-lg">{route.origin} → {route.destination}</p>
+                    <p className="text-sm text-white/90">Departs at {route.departureTime}</p>
                   </div>
-                </div>
-                <CardContent className="pt-6 pb-6 px-6">
-                  <div className="space-y-4 mb-6">
-                    <div className="flex items-center justify-between">
-                      <div className="text-sm text-gray-500 font-semibold">DEPART</div>
-                      <div className="text-lg font-bold text-gray-900">{route.departureTime}</div>
+                  <div className="p-5">
+                    <div className="space-y-2 text-sm text-gray-600 mb-4">
+                      <div className="flex items-center gap-2"><Clock className="h-4 w-4" /> {Math.floor(route.duration / 60)}h {route.duration % 60}m</div>
+                      <div className="flex items-center gap-2"><Bus className="h-4 w-4" /> {route.bus.model} • {route.bus.capacity} seats</div>
                     </div>
-                    <div className="flex items-center justify-between">
-                      <div className="text-sm text-gray-500 font-semibold">ARRIVAL</div>
-                      <div className="text-lg font-bold text-gray-900">
-                        {new Date(
-                          new Date("2000-01-01 " + route.departureTime).getTime() + route.duration * 60 * 60 * 1000
-                        ).toLocaleTimeString("en-US", { hour: "2-digit", minute: "2-digit", hour12: false })}
-                      </div>
-                    </div>
-                    <div className="border-t border-gray-200 pt-4">
-                      <div className="flex items-center justify-between mb-4">
-                        <div className="flex items-center gap-2 text-sm text-gray-600">
-                          <Bus className="w-4 h-4" style={{ color: TEAL_COLOR }} />
-                          <span className="font-medium">{route.bus.capacity} seats left</span>
-                        </div>
-                        <div className="text-3xl font-extrabold" style={{ color: TEAL_COLOR }}>
-                          UGX {route.price.toLocaleString()}K
-                        </div>
-                      </div>
+                    <div className="flex items-center justify-between border-t pt-4">
+                      <p className="text-2xl font-extrabold" style={{ color: primaryColor }}>UGX {route.price.toLocaleString()}</p>
+                      <Link href={`/route/${route.id}`} className="btn-primary !py-2 !px-4 text-sm">Book Now</Link>
                     </div>
                   </div>
-                  <Link
-                    href={`/?origin=${encodeURIComponent(route.origin)}&destination=${encodeURIComponent(
-                      route.destination
-                    )}`}
-                  >
-                    <Button className="w-full text-white font-bold py-6 text-base rounded-lg shadow-md hover:shadow-xl transition-all" style={{ backgroundColor: TEAL_COLOR }}>
-                      Book Seat →
-                    </Button>
-                  </Link>
-                </CardContent>
-              </Card>
-            ))}
-          </div>
-        </div>
-      </section>
+                </StyledCard>
+              ))}
+            </div>
+          )}
+        </Container>
+      </Section>
 
-      {/* Why Book Direct Section - Blue Background */}
-      <section className="py-20" style={{ backgroundColor: "#1a3a5c" }}>
-        <div className="container mx-auto px-6">
-          <div className="text-center mb-14 max-w-3xl mx-auto">
-            <h2 className="text-sm font-bold text-[#00D9A3] mb-4 uppercase tracking-widest">WHY BOOK DIRECT</h2>
-            <h3 className="text-4xl md:text-5xl text-white font-extrabold mb-4 tracking-tight">Your seat. Your price.<br />Your journey.</h3>
-            <p className="text-blue-200 text-lg leading-relaxed">
-              No commissions, no middleman. Book directly through {operator.companyName}'s official portal and get the best seat
-              every time.
+      <Section variant="dark" className="py-14">
+        <Container>
+          <div className="text-center mb-8">
+            <Badge className="!bg-white/10 !text-[#00D9A3] border border-white/15 mb-4">Why Book Direct</Badge>
+            <Heading as="h3" className="text-white">Your Seat. Your Price. Your Journey.</Heading>
+            <Lead className="text-blue-200 max-w-3xl mx-auto text-base">No middleman, transparent pricing, instant tickets, and trusted operator service.</Lead>
+          </div>
+          <div className="grid md:grid-cols-2 lg:grid-cols-4 gap-4">
+            <StyledCard variant="bordered" className="!bg-white/5 !border-white/15 text-white text-center" hover={false}>
+              <p className="text-3xl font-extrabold" style={{ color: primaryColor }}>0%</p>
+              <p className="font-semibold mt-2">Extra Booking Fee</p>
+            </StyledCard>
+            <StyledCard variant="bordered" className="!bg-white/5 !border-white/15 text-white text-center" hover={false}>
+              <CheckCircle2 className="h-7 w-7 mx-auto" style={{ color: primaryColor }} />
+              <p className="font-semibold mt-2">Instant E-Ticket</p>
+            </StyledCard>
+            <StyledCard variant="bordered" className="!bg-white/5 !border-white/15 text-white text-center" hover={false}>
+              <Shield className="h-7 w-7 mx-auto" style={{ color: primaryColor }} />
+              <p className="font-semibold mt-2">Safe & Verified</p>
+            </StyledCard>
+            <StyledCard variant="bordered" className="!bg-white/5 !border-white/15 text-white text-center" hover={false}>
+              <CreditCard className="h-7 w-7 mx-auto" style={{ color: primaryColor }} />
+              <p className="font-semibold mt-2">Mobile Money Ready</p>
+            </StyledCard>
+          </div>
+        </Container>
+      </Section>
+
+      <Section variant="light" className="py-14">
+        <Container>
+          {operator.description && (
+            <StyledCard className="mb-8" hover={false}>
+              <Heading as="h4" className="text-gray-900 mb-3">About {operator.companyName}</Heading>
+              <p className="text-gray-700 leading-relaxed">{operator.description}</p>
+            </StyledCard>
+          )}
+
+          <div className="grid md:grid-cols-3 gap-4">
+            <StyledCard hover={false}>
+              <Phone className="h-5 w-5 mb-2" style={{ color: primaryColor }} />
+              <p className="text-xs uppercase tracking-widest text-gray-500 mb-1">Phone</p>
+              <p className="font-semibold text-gray-900">{operator.contact.phone || "Not available"}</p>
+            </StyledCard>
+            <StyledCard hover={false}>
+              <Mail className="h-5 w-5 mb-2" style={{ color: primaryColor }} />
+              <p className="text-xs uppercase tracking-widest text-gray-500 mb-1">Email</p>
+              <p className="font-semibold text-gray-900 break-all">{operator.contact.email || "Not available"}</p>
+            </StyledCard>
+            <StyledCard hover={false}>
+              <Users className="h-5 w-5 mb-2" style={{ color: primaryColor }} />
+              <p className="text-xs uppercase tracking-widest text-gray-500 mb-1">Contact Person</p>
+              <p className="font-semibold text-gray-900">{operator.contact.name || "Operator Team"}</p>
+            </StyledCard>
+          </div>
+        </Container>
+      </Section>
+
+      <footer className="bg-[#0d1b2a] text-white py-8 border-t-2" style={{ borderColor: primaryColor }}>
+        <Container>
+          <div className="flex flex-col md:flex-row items-center justify-between gap-3 text-sm">
+            <p className="text-slate-300">© {new Date().getFullYear()} {operator.companyName}. All rights reserved.</p>
+            <p className="text-slate-400">
+              Booking powered by <Link href="/" className="font-semibold hover:opacity-80" style={{ color: primaryColor }}>TransConnect</Link>
             </p>
           </div>
-
-          <div className="grid md:grid-cols-2 lg:grid-cols-4 gap-8 mb-12">
-            <div className="text-center bg-white bg-opacity-[0.08] backdrop-blur-md rounded-2xl p-8 border border-white border-opacity-10 hover:bg-opacity-[0.12] transition-all">
-              <div className="w-20 h-20 rounded-full flex items-center justify-center mx-auto mb-5 shadow-xl" style={{ backgroundColor: TEAL_COLOR }}>
-                <span className="text-4xl font-extrabold text-white">0%</span>
-              </div>
-              <h3 className="text-xl font-bold text-white mb-2">Booking Fee</h3>
-              <p className="text-sm text-blue-300 font-medium">No hidden charges</p>
-            </div>
-            <div className="text-center bg-white bg-opacity-[0.08] backdrop-blur-md rounded-2xl p-8 border border-white border-opacity-10 hover:bg-opacity-[0.12] transition-all">
-              <div className="w-20 h-20 rounded-full flex items-center justify-center mx-auto mb-5 shadow-xl" style={{ backgroundColor: TEAL_COLOR }}>
-                <CheckCircle2 className="w-10 h-10 text-white" />
-              </div>
-              <h3 className="text-xl font-bold text-white mb-2">Instant</h3>
-              <p className="text-sm text-blue-300 font-medium">E-Ticket</p>
-              <p className="text-sm text-blue-300 font-medium">On your phone</p>
-            </div>
-            <div className="text-center bg-white bg-opacity-[0.08] backdrop-blur-md rounded-2xl p-8 border border-white border-opacity-10 hover:bg-opacity-[0.12] transition-all">
-              <div className="w-20 h-20 rounded-full flex items-center justify-center mx-auto mb-5 shadow-xl" style={{ backgroundColor: TEAL_COLOR }}>
-                <span className="text-3xl font-extrabold text-white">24/7</span>
-              </div>
-              <h3 className="text-xl font-bold text-white mb-2">Support</h3>
-              <p className="text-sm text-blue-300 font-medium">Call us anytime</p>
-            </div>
-            <div className="text-center bg-white bg-opacity-[0.08] backdrop-blur-md rounded-2xl p-8 border border-white border-opacity-10 hover:bg-opacity-[0.12] transition-all">
-              <div className="w-20 h-20 rounded-full flex items-center justify-center mx-auto mb-5 shadow-xl" style={{ backgroundColor: TEAL_COLOR }}>
-                <CreditCard className="w-10 h-10 text-white" />
-              </div>
-              <h3 className="text-xl font-bold text-white mb-2">MTN</h3>
-              <p className="text-sm text-blue-300 font-medium">Mobile Money</p>
-              <p className="text-sm text-blue-300 font-medium">Airtel & Cash</p>
-            </div>
-          </div>
-
-          <div className="text-center">
-            <Button
-              size="lg"
-              className="text-white font-bold px-12 py-7 text-lg rounded-xl shadow-2xl hover:shadow-3xl transition-all"
-              style={{ backgroundColor: TEAL_COLOR }}
-              onClick={() => {
-                document.getElementById("search")?.scrollIntoView({ behavior: "smooth" });
-              }}
-            >
-              Get Started →
-            </Button>
-          </div>
-        </div>
-      </section>
-
-      {/* About Section */}
-      {operator.description && (
-        <section id="about" className="py-20 bg-white">
-          <div className="container mx-auto px-6">
-            <div className="max-w-4xl mx-auto text-center">
-              <h2 className="text-4xl font-extrabold text-gray-900 mb-8 tracking-tight">About {operator.companyName}</h2>
-              <p className="text-gray-700 leading-relaxed text-lg mb-10 font-medium">{operator.description}</p>
-              <div className="flex items-center justify-center gap-6 flex-wrap">
-                <div className="flex items-center gap-3 px-8 py-4 bg-gradient-to-r from-gray-50 to-gray-100 rounded-xl shadow-md">
-                  <Award className="w-6 h-6" style={{ color: TEAL_COLOR }} />
-                  <span className="font-bold text-gray-900 text-base">Licensed Operator</span>
-                </div>
-                <div className="flex items-center gap-3 px-8 py-4 bg-gradient-to-r from-gray-50 to-gray-100 rounded-xl shadow-md">
-                  <TrendingUp className="w-6 h-6" style={{ color: TEAL_COLOR }} />
-                  <span className="font-bold text-gray-900 text-base">{operator.stats.yearsInOperation || 10}+ Years Experience</span>
-                </div>
-                <div className="flex items-center gap-3 px-8 py-4 bg-gradient-to-r from-gray-50 to-gray-100 rounded-xl shadow-md">
-                  <Shield className="w-6 h-6" style={{ color: TEAL_COLOR }} />
-                  <span className="font-bold text-gray-900 text-base">Safety First</span>
-                </div>
-              </div>
-            </div>
-          </div>
-        </section>
-      )}
-
-      {/* Contact Section */}
-      <section id="contact" className="py-20 bg-gray-50">
-        <div className="container mx-auto px-6">
-          <div className="text-center mb-14">
-            <h2 className="text-4xl font-extrabold text-gray-900 mb-4 tracking-tight">Get In Touch</h2>
-            <p className="text-gray-600 text-lg">Have questions? We're here to help</p>
-          </div>
-
-          <div className="grid md:grid-cols-3 gap-8 max-w-5xl mx-auto">
-            <Card className="text-center border-0 hover:shadow-2xl transition-all duration-300 shadow-lg rounded-xl">
-              <CardContent className="pt-10 pb-10">
-                <div className="w-20 h-20 rounded-full flex items-center justify-center mx-auto mb-6 shadow-xl" style={{ backgroundColor: TEAL_COLOR }}>
-                  <Phone className="w-9 h-9 text-white" />
-                </div>
-                <h3 className="font-bold text-gray-900 mb-3 text-xl">Phone</h3>
-                <p className="text-gray-700 font-semibold text-base">{operator.contact.phone || "Not available"}</p>
-              </CardContent>
-            </Card>
-            <Card className="text-center border-0 hover:shadow-2xl transition-all duration-300 shadow-lg rounded-xl">
-              <CardContent className="pt-10 pb-10">
-                <div className="w-20 h-20 rounded-full flex items-center justify-center mx-auto mb-6 shadow-xl" style={{ backgroundColor: TEAL_COLOR }}>
-                  <Mail className="w-9 h-9 text-white" />
-                </div>
-                <h3 className="font-bold text-gray-900 mb-3 text-xl">Email</h3>
-                <p className="text-gray-700 font-semibold break-all text-base">{operator.contact.email || "Not available"}</p>
-              </CardContent>
-            </Card>
-            <Card className="text-center border-0 hover:shadow-2xl transition-all duration-300 shadow-lg rounded-xl">
-              <CardContent className="pt-10 pb-10">
-                <div className="w-20 h-20 rounded-full flex items-center justify-center mx-auto mb-6 shadow-xl" style={{ backgroundColor: TEAL_COLOR }}>
-                  <MapPin className="w-9 h-9 text-white" />
-                </div>
-                <h3 className="font-bold text-gray-900 mb-3 text-xl">Manager</h3>
-                <p className="text-gray-700 font-semibold text-base">{operator.contact.name}</p>
-              </CardContent>
-            </Card>
-          </div>
-        </div>
-      </section>
-
-      {/* Footer */}
-      <footer className="bg-[#0d1b2a] text-white py-16 border-t-4" style={{ borderColor: TEAL_COLOR }}>
-        <div className="container mx-auto px-6">
-          <div className="grid md:grid-cols-3 gap-12 mb-12">
-            {/* Company Info */}
-            <div>
-              <div className="flex items-center gap-3 mb-5">
-                {operator.brandLogoUrl && (
-                  <div className="bg-[#00D9A3] p-2.5 rounded-lg shadow-lg">
-                    <Image
-                      src={operator.brandLogoUrl}
-                      alt={`${operator.companyName} logo`}
-                      width={36}
-                      height={36}
-                      className="rounded"
-                    />
-                  </div>
-                )}
-                <h3 className="text-xl font-extrabold">{operator.companyName}</h3>
-              </div>
-              <p className="text-gray-400 text-sm leading-relaxed font-medium">{operator.tagline || "Your trusted travel partner"}</p>
-            </div>
-
-            {/* Routes */}
-            <div>
-              <h4 className="text-base font-extrabold mb-5 tracking-wider" style={{ color: TEAL_COLOR }}>
-                ROUTES
-              </h4>
-              <ul className="space-y-3 text-sm text-gray-300">
-                <li>
-                  <a href="#routes" className="hover:text-white transition-colors font-medium">
-                    Kampala → Gulu
-                  </a>
-                </li>
-                <li>
-                  <a href="#routes" className="hover:text-white transition-colors font-medium">
-                    Kampala → Mbarara
-                  </a>
-                </li>
-                <li>
-                  <a href="#routes" className="hover:text-white transition-colors font-medium">
-                    Kampala → Mbale
-                  </a>
-                </li>
-              </ul>
-            </div>
-
-            {/* Company Links */}
-            <div>
-              <h4 className="text-base font-extrabold mb-5 tracking-wider" style={{ color: TEAL_COLOR }}>
-                COMPANY
-              </h4>
-              <ul className="space-y-3 text-sm text-gray-300">
-                <li>
-                  <a href="#about" className="hover:text-white transition-colors font-medium">
-                    About Us
-                  </a>
-                </li>
-                <li>
-                  <a href="#contact" className="hover:text-white transition-colors font-medium">
-                    Contact
-                  </a>
-                </li>
-                <li>
-                  <a href="#schedule" className="hover:text-white transition-colors font-medium">
-                    Schedules
-                  </a>
-                </li>
-              </ul>
-            </div>
-          </div>
-
-          {/* Bottom Bar */}
-          <div className="border-t border-gray-700 pt-8">
-            <div className="flex flex-col md:flex-row items-center justify-between gap-4">
-              <p className="text-sm text-gray-400 font-medium">
-                © {new Date().getFullYear()} {operator.companyName}. All rights reserved.
-              </p>
-              <div className="flex items-center gap-2">
-                <span className="text-sm text-gray-400 font-medium">Powered by</span>
-                <Link href="/" className="font-extrabold hover:opacity-80 transition-opacity" style={{ color: TEAL_COLOR }}>
-                  TransConnect
-                </Link>
-              </div>
-            </div>
-          </div>
-        </div>
+        </Container>
       </footer>
     </div>
   );

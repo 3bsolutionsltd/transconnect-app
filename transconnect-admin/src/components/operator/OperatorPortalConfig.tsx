@@ -72,26 +72,29 @@ const OperatorPortalConfig = () => {
       });
 
       if (response.ok) {
-        const data: PortalConfigResponse = await response.json();
+        const data = await response.json();
+        
+        // Backend returns data nested under 'config' property
+        const configData = data.config || data;
         
         const loadedConfig = {
-          slug: data.slug || '',
-          brandLogoUrl: data.brandLogoUrl || '',
-          heroImageUrl: data.heroImageUrl || '',
-          brandColor: data.brandColor || '#16a34a',
-          tagline: data.tagline || '',
-          description: data.description || '',
-          portalEnabled: data.portalEnabled || false
+          slug: configData.slug || '',
+          brandLogoUrl: configData.brandLogoUrl || '',
+          heroImageUrl: configData.heroImageUrl || '',
+          brandColor: configData.brandColor || '#16a34a',
+          tagline: configData.tagline || '',
+          description: configData.description || '',
+          portalEnabled: configData.portalEnabled || false
         };
 
         setConfig(loadedConfig);
-        setOriginalSlug(data.slug || '');
-        setIsConfigured(data.isConfigured || false);
+        setOriginalSlug(configData.slug || '');
+        setIsConfigured(configData.isConfigured || false);
 
-        if (data.isConfigured && data.slug) {
+        if (configData.isConfigured && configData.slug) {
           setMessage({
             type: 'info',
-            text: `Your portal is live at: ${WEB_BASE_URL}/operator/${data.slug}`
+            text: `Your portal is live at: ${WEB_BASE_URL}/operator/${configData.slug}`
           });
         }
       } else {
@@ -156,14 +159,17 @@ const OperatorPortalConfig = () => {
         body: JSON.stringify(config)
       });
 
-      const data: PortalConfigResponse = await response.json();
+      const data = await response.json();
 
       if (response.ok) {
-        setOriginalSlug(data.slug || config.slug);
+        // Backend returns data nested under 'config' property
+        const configData = data.config || data;
+        
+        setOriginalSlug(configData.slug || config.slug);
         setIsConfigured(true);
         setMessage({ 
           type: 'success', 
-          text: `Portal configuration saved successfully! ${data.portalUrl ? `Your portal URL: ${data.portalUrl}` : ''}` 
+          text: `Portal configuration saved successfully! ${configData.portalUrl ? `Your portal URL: ${configData.portalUrl}` : ''}` 
         });
       } else {
         setMessage({ 

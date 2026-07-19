@@ -2,9 +2,10 @@
 
 ## Prerequisites
 - Backend server running on `http://localhost:5000`
+  - **Note:** Server binds to `0.0.0.0:5000` but access it via `localhost:5000` or `127.0.0.1:5000`
 - Feature flags enabled in `.env`:
-  - `ENABLE_OPERATOR_PORTAL=true`
-  - `ENABLE_OPERATOR_PORTAL_CONFIG=true`
+  - `ENABLE_OPERATOR_PORTAL=true` ✅
+  - `ENABLE_OPERATOR_PORTAL_CONFIG=true` ✅
 - Test operator account with JWT token
 
 ## Test Sequence

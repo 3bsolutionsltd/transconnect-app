@@ -21,6 +21,8 @@
  * ```
  */
 
+import { createElement, type ComponentType, type ReactNode } from 'react';
+
 /**
  * Available feature flags
  * Synced with backend feature flags for consistency
@@ -145,14 +147,14 @@ export function useFeatureFlag(feature: FeatureFlag): boolean {
  */
 export function withFeatureFlag<P extends object>(
   feature: FeatureFlag,
-  Component: React.ComponentType<P>,
-  fallback?: React.ReactNode
+  Component: ComponentType<P>,
+  fallback?: ReactNode
 ) {
   return function FeatureFlaggedComponent(props: P) {
     if (!isFeatureEnabled(feature)) {
       return fallback || null;
     }
-    return <Component {...props} />;
+    return createElement(Component, props);
   };
 }
 

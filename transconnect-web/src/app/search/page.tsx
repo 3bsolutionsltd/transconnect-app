@@ -1,23 +1,26 @@
 'use client';
-import React, { useState } from 'react';
-import { Suspense } from 'react';
+
+import React, { Suspense, useMemo, useState } from 'react';
 import { fetchRoutes } from '../../lib/api';
 import Link from 'next/link';
 import Header from '@/components/Header';
-import { ArrowLeft } from 'lucide-react';
-import { useRouter, useSearchParams } from 'next/navigation';
+import PortalFooter from '@/components/PortalFooter';
+import { Bus as BusIcon, Clock, MapPin, Search, Star, Users } from 'lucide-react';
+import { useSearchParams } from 'next/navigation';
+import { Section, Container, StyledCard, StyledButton } from '@/components/styled';
 
 function SearchContent() {
   const searchParams = useSearchParams();
-  const [origin, setOrigin] = useState(searchParams.get('origin') || '');
-  const [destination, setDestination] = useState(searchParams.get('destination') || '');
-  const [date, setDate] = useState(searchParams.get('date') || '');
+  const [origin, setOrigin] = useState(searchParams.get('origin') || 'Kampala');
+  const [destination, setDestination] = useState(searchParams.get('destination') || 'Gulu');
+  const [date, setDate] = useState(searchParams.get('date') || new Date().toISOString().split('T')[0]);
+  const [passengers, setPassengers] = useState(Number(searchParams.get('passengers') || 1));
   const [routes, setRoutes] = useState<any[]>([]);
   const [loading, setLoading] = useState(false);
-  const [error, setError] = useState<string>('');
-  const router = useRouter();
 
-  // Load routes on mount (pre-seeded from URL params)
+  const [maxPrice, setMaxPrice] = useState(80000);
+  const [minPrice] = useState(35000);
+
   React.useEffect(() => {
     handleSearch();
   }, []);
@@ -25,188 +28,183 @@ function SearchContent() {
   async function handleSearch(e?: React.FormEvent) {
     if (e) e.preventDefault();
     setLoading(true);
-    setError('');
     try {
       const params: any = {};
       if (origin) params.origin = origin;
       if (destination) params.destination = destination;
       if (date) params.travelDate = date;
-
       const result = await fetchRoutes(params);
       setRoutes(result || []);
-      
-      if (!result || result.length === 0) {
-        setError(origin || destination 
-          ? 'No routes match your search criteria. Try different locations or dates.'
-          : 'No routes available at the moment. Please try again later.');
-      }
-    } catch (err: any) {
-      console.error('Search error:', err);
-      setError('Unable to load routes. Please check your internet connection and try again.');
+    } catch {
       setRoutes([]);
     } finally {
       setLoading(false);
     }
   }
 
+  const filteredRoutes = useMemo(() => {
+    return routes.filter((route) => Number(route.price || 0) <= maxPrice);
+  }, [maxPrice, routes]);
+
   return (
-    <div className="min-h-screen bg-gray-50">
+    <div className="min-h-screen bg-[#f5f8fe]">
       <Header />
-      <div className="max-w-4xl mx-auto p-4 sm:p-6">
-        {/* Navigation */}
-        <div className="flex items-center justify-between mb-4 sm:mb-6">
-          <button
-            onClick={() => router.back()}
-            className="flex items-center space-x-2 text-gray-600 hover:text-gray-900 transition-colors touch-manipulation min-h-[44px] px-2 rounded-lg hover:bg-gray-100 active:bg-gray-200"
-          >
-            <ArrowLeft className="h-5 w-5" />
-            <span>Back</span>
-          </button>
-          <Link
-            href="/"
-            className="text-blue-600 hover:text-blue-800 transition-colors touch-manipulation px-3 py-2 rounded-lg hover:bg-blue-50"
-          >
-            Home
-          </Link>
-        </div>
 
-        <div className="card mb-6 sm:mb-8">
-          <h1 className="text-2xl sm:text-3xl font-bold text-gray-900 mb-4 sm:mb-6">Search Routes</h1>
-          <form onSubmit={handleSearch} className="space-y-4 sm:space-y-0 sm:grid sm:grid-cols-4 sm:gap-4 mb-4 sm:mb-6">
-            <input 
-              value={origin} 
-              onChange={(e) => setOrigin(e.target.value)} 
-              placeholder="From (e.g., Kampala)" 
-              className="form-input text-base" 
-            />
-            <input 
-              value={destination} 
-              onChange={(e) => setDestination(e.target.value)} 
-              placeholder="To (e.g., Jinja)" 
-              className="form-input text-base" 
-            />
-            <input 
-              type="date" 
-              value={date} 
-              onChange={(e) => setDate(e.target.value)} 
-              className="form-input text-base" 
-            />
-            <button type="submit" className="btn-primary w-full sm:w-auto touch-manipulation">
-              {loading ? 'Searching...' : 'Search Routes'}
-            </button>
+      <Section variant="gray" className="py-3 border-b border-[#dfe8f5]">
+        <Container>
+          <form onSubmit={handleSearch} className="grid grid-cols-1 md:grid-cols-12 gap-3">
+            <div className="relative md:col-span-3">
+              <MapPin className="h-4 w-4 text-[#8ca4c4] absolute left-3 top-1/2 -translate-y-1/2" />
+              <input value={origin} onChange={(e) => setOrigin(e.target.value)} className="tc-input !py-3 !pl-9" />
+            </div>
+            <div className="relative md:col-span-3">
+              <MapPin className="h-4 w-4 text-[#8ca4c4] absolute left-3 top-1/2 -translate-y-1/2" />
+              <input value={destination} onChange={(e) => setDestination(e.target.value)} className="tc-input !py-3 !pl-9" />
+            </div>
+            <div className="relative md:col-span-3">
+              <Clock className="h-4 w-4 text-[#8ca4c4] absolute left-3 top-1/2 -translate-y-1/2" />
+              <input type="date" value={date} onChange={(e) => setDate(e.target.value)} className="tc-input !py-3 !pl-9" />
+            </div>
+            <div className="relative md:col-span-2">
+              <Users className="h-4 w-4 text-[#8ca4c4] absolute left-3 top-1/2 -translate-y-1/2" />
+              <div className="tc-input !py-3 !pl-9 flex items-center justify-between">
+                <span>{passengers} Passenger</span>
+                <div className="flex gap-2">
+                  <button type="button" className="font-bold" onClick={() => setPassengers((v) => Math.max(1, v - 1))}>-</button>
+                  <button type="button" className="font-bold" onClick={() => setPassengers((v) => v + 1)}>+</button>
+                </div>
+              </div>
+            </div>
+            <StyledButton type="submit" variant="primary" className="md:col-span-1 !py-3 !px-3 w-full">
+              <Search className="h-4 w-4" />
+            </StyledButton>
           </form>
-        </div>
+        </Container>
+      </Section>
 
-        {loading ? (
-          <div className="flex justify-center items-center py-12">
-            <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600"></div>
-            <span className="ml-2 text-gray-600">Loading routes...</span>
-          </div>
-        ) : (
-          <div className="space-y-4">
-            {routes.length === 0 && !loading && (
-              <div className="card text-center py-8 sm:py-12">
-                <div className="text-gray-500 mb-2 text-base sm:text-lg">No routes found</div>
-                <div className="text-sm text-gray-400">
-                  {origin || destination 
-                    ? 'Try different search terms or clear filters to see all available routes'
-                    : 'Loading available routes... If this continues, please refresh the page'
-                  }
-                </div>
-                <button 
-                  onClick={() => {
-                    setOrigin('');
-                    setDestination('');
-                    setDate('');
-                    handleSearch();
-                  }}
-                  className="mt-4 text-blue-600 hover:text-blue-800 underline"
-                >
-                  Show all routes
-                </button>
+      <Section variant="gray" className="pt-5 pb-8">
+        <Container>
+          <div className="grid grid-cols-1 lg:grid-cols-[280px_1fr] gap-4">
+            <aside className="space-y-4">
+              <div className="flex items-center justify-between">
+                <h2 className="text-2xl font-black text-[#14263f]">{filteredRoutes.length} routes found</h2>
+                <button className="text-sm font-semibold text-[#0f8c6b]" onClick={() => setMaxPrice(80000)}>Clear all</button>
               </div>
-            )}
-            {routes.map((route: any) => (
-              <div key={route.id} className="card hover:shadow-md transition-shadow">
-                <div className="flex flex-col sm:flex-row sm:justify-between sm:items-start space-y-4 sm:space-y-0">
-                  <div className="flex-1">
-                    <div className="flex items-center justify-between mb-3">
-                      <div className="text-lg sm:text-xl font-semibold text-gray-900">
-                        {route.origin} → {route.destination}
-                        {route.via && (
-                          <span className="text-sm font-normal text-blue-600 ml-2">
-                            (via {route.via})
-                          </span>
-                        )}
-                      </div>
-                      {route.operator && (
-                        <div className="flex items-center space-x-2 bg-blue-50 px-3 py-1 rounded-full">
-                          <div className="w-2 h-2 bg-blue-500 rounded-full"></div>
-                          <span className="text-sm font-medium text-blue-700">
-                            {route.operator.companyName}
-                          </span>
-                        </div>
-                      )}
-                    </div>
-                    
-                    {/* Bus Information */}
-                    {route.bus && (
-                      <div className="flex flex-wrap items-center gap-4 text-sm text-gray-600 mb-3 p-2 bg-gray-50 rounded-lg">
-                        <div className="flex items-center space-x-1">
-                          <span className="font-medium">🚌 Bus:</span>
-                          <span>{route.bus.plateNumber}</span>
-                        </div>
-                        <div className="flex items-center space-x-1">
-                          <span className="font-medium">Model:</span>
-                          <span>{route.bus.model}</span>
-                        </div>
-                        <div className="flex items-center space-x-1">
-                          <span className="font-medium">Capacity:</span>
-                          <span>{route.bus.capacity} seats</span>
-                        </div>
-                      </div>
-                    )}
-                    
-                    <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3 sm:gap-4 text-sm text-gray-600 mb-4">
-                      <div>
-                        <span className="font-medium">Price:</span> UGX {route.price?.toLocaleString()}
-                      </div>
-                      <div>
-                        <span className="font-medium">Duration:</span> {Math.floor(route.duration / 60)}h {route.duration % 60}m
-                      </div>
-                      <div>
-                        <span className="font-medium">Departure:</span> {route.departureTime}
-                      </div>
-                      <div>
-                        <span className="font-medium">Distance:</span> {route.distance} km
-                      </div>
-                    </div>
-                    {route.availability && (
-                      <div className="text-sm">
-                        <span className={`badge ${route.availability.isAvailable ? 'badge-success' : 'badge-danger'}`}>
-                          {route.availability.availableSeats} seats available
-                        </span>
-                      </div>
-                    )}
-                  </div>
-                  <div className="flex items-center gap-3 sm:ml-4">
-                    <Link href={`/route/${route.id}`} className="btn-primary w-full sm:w-auto text-center touch-manipulation">
-                      View Details
-                    </Link>
-                  </div>
+
+              <StyledCard hover={false} className="!p-4">
+                <p className="text-xs font-bold uppercase text-[#8ca4c4] mb-3">Sort By</p>
+                <div className="space-y-2 text-sm text-[#3f5778]">
+                  <label className="flex items-center gap-2"><input type="radio" defaultChecked /> Price - Low to High</label>
+                  <label className="flex items-center gap-2"><input type="radio" /> Departure Time</label>
+                  <label className="flex items-center gap-2"><input type="radio" /> Duration</label>
+                  <label className="flex items-center gap-2"><input type="radio" /> Rating</label>
                 </div>
-              </div>
-            ))}
+              </StyledCard>
+
+              <StyledCard hover={false} className="!p-4">
+                <p className="text-xs font-bold uppercase text-[#8ca4c4] mb-3">Amenities</p>
+                <div className="space-y-2 text-sm text-[#3f5778]">
+                  <label className="flex items-center gap-2"><input type="checkbox" defaultChecked /> Air Conditioning</label>
+                  <label className="flex items-center gap-2"><input type="checkbox" defaultChecked /> USB Charging</label>
+                  <label className="flex items-center gap-2"><input type="checkbox" /> WiFi</label>
+                  <label className="flex items-center gap-2"><input type="checkbox" /> Reclining Seats</label>
+                </div>
+              </StyledCard>
+
+              <StyledCard hover={false} className="!p-4">
+                <p className="text-xs font-bold uppercase text-[#8ca4c4] mb-3">Price Range (UGX)</p>
+                <input
+                  type="range"
+                  min={minPrice}
+                  max={80000}
+                  value={maxPrice}
+                  onChange={(e) => setMaxPrice(Number(e.target.value))}
+                  className="w-full"
+                />
+                <div className="flex justify-between text-xs font-semibold text-[#425d83] mt-2">
+                  <span>{minPrice.toLocaleString()}</span>
+                  <span>{maxPrice.toLocaleString()}</span>
+                </div>
+              </StyledCard>
+            </aside>
+
+            <main className="space-y-4">
+              {loading && (
+                <StyledCard hover={false} className="text-center py-8">
+                  <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-[#00D9A3] mx-auto" />
+                  <p className="text-sm text-[#6f86a7] mt-3">Loading routes...</p>
+                </StyledCard>
+              )}
+
+              {!loading && filteredRoutes.length === 0 && (
+                <StyledCard hover={false} className="text-center py-12">
+                  <p className="text-xl font-bold text-[#3f5778] mb-2">No routes available</p>
+                  <p className="text-sm text-[#8ca4c4]">Try another date or destination.</p>
+                </StyledCard>
+              )}
+
+              {!loading && filteredRoutes.map((route: any) => (
+                <StyledCard key={route.id} hover={false} className="!p-0 overflow-hidden">
+                  <div className="grid grid-cols-1 md:grid-cols-[4px_1fr]">
+                    <div className="bg-[#00a878]" />
+                    <div className="p-5 grid grid-cols-1 xl:grid-cols-[1.2fr_1fr_1fr_auto] gap-4 items-center">
+                      <div>
+                        <div className="flex items-start gap-3">
+                          <div className="h-12 w-12 rounded-xl bg-[#ecf4ff] flex items-center justify-center text-[#214c86]">
+                            <BusIcon className="h-5 w-5" />
+                          </div>
+                          <div>
+                            <h3 className="text-2xl font-black text-[#132742]">{route.operator?.companyName || 'Operator'}</h3>
+                            <p className="text-xs text-[#8ca4c4] flex items-center gap-1"><Star className="h-3 w-3 text-[#f59e0b]" />4.7 • 203 reviews</p>
+                            <div className="flex gap-2 mt-2">
+                              <span className="px-2 py-0.5 rounded-full bg-[#eafaf5] text-[#0f8c6b] text-xs font-semibold">AC</span>
+                              <span className="px-2 py-0.5 rounded-full bg-[#f2ebff] text-[#7c3aed] text-xs font-semibold">USB</span>
+                              <span className="px-2 py-0.5 rounded-full bg-[#edf3ff] text-[#214c86] text-xs font-semibold">Mercedes</span>
+                            </div>
+                          </div>
+                        </div>
+                      </div>
+
+                      <div>
+                        <div className="flex items-baseline gap-3">
+                          <p className="text-5xl font-black text-[#132742]">{route.departureTime || '08:00'}</p>
+                          <p className="text-5xl font-black text-[#132742]">{route.arrivalTime || '14:30'}</p>
+                        </div>
+                        <p className="text-xs text-[#8ca4c4]">{route.origin} • {route.destination}</p>
+                        <p className="text-xs text-[#0f8c6b] font-semibold mt-1">{Math.floor((route.duration || 360) / 60)}h {(route.duration || 360) % 60}m • Direct</p>
+                      </div>
+
+                      <div className="text-right xl:text-left">
+                        <p className="text-6xl font-black text-[#0f8c6b]">{Number(route.price || 0).toLocaleString()}</p>
+                        <p className="text-xs uppercase text-[#8ca4c4]">UGX per seat</p>
+                        <p className="text-xs text-[#8ca4c4] mt-2">{route.availability?.availableSeats || 15} seats available</p>
+                      </div>
+
+                      <Link href={`/route/${route.id}`}>
+                        <StyledButton variant="primary" className="!px-6 !py-3">View Details</StyledButton>
+                      </Link>
+                    </div>
+                  </div>
+                </StyledCard>
+              ))}
+            </main>
           </div>
-        )}
-      </div>
+        </Container>
+      </Section>
+      <PortalFooter slim />
     </div>
   );
 }
 
 export default function SearchPage() {
   return (
-    <Suspense fallback={<div className="min-h-screen flex items-center justify-center"><div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600" /></div>}>
+    <Suspense
+      fallback={
+        <div className="min-h-screen flex items-center justify-center">
+          <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-[#00D9A3]" />
+        </div>
+      }
+    >
       <SearchContent />
     </Suspense>
   );

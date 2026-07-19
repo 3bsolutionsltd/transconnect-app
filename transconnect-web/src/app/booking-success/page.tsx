@@ -3,10 +3,11 @@ import React, { useEffect, useState } from 'react';
 import { Suspense } from 'react';
 import { useSearchParams, useRouter } from 'next/navigation';
 import Link from 'next/link';
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
-import { Button } from '@/components/ui/button';
-import { CheckCircle, Download, Printer, Calendar, MapPin, Clock, User } from 'lucide-react';
+import { CheckCircle, Download, Printer, Calendar, MapPin, User } from 'lucide-react';
 import { useAuth } from '@/contexts/AuthContext';
+import { Container, Heading, Lead, Section, StyledButton, StyledCard } from '@/components/styled';
+import PortalFooter from '@/components/PortalFooter';
+import TransConnectLogo from '@/components/branding/TransConnectLogo';
 
 function BookingSuccessContent() {
   const searchParams = useSearchParams();
@@ -78,7 +79,7 @@ function BookingSuccessContent() {
   if (loading) {
     return (
       <div className="min-h-screen bg-gray-50 flex items-center justify-center">
-        <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600"></div>
+        <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-[#00D9A3]"></div>
       </div>
     );
   }
@@ -87,7 +88,7 @@ function BookingSuccessContent() {
     return (
       <div className="min-h-screen bg-gray-50 flex items-center justify-center">
         <div className="text-center">
-          <h1 className="text-2xl font-bold text-gray-900 mb-4">Booking Not Found</h1>
+          <h1 className="tc-heading-4 text-gray-900 mb-4">Booking Not Found</h1>
           <Link href="/search" className="btn-primary">
             Search Routes
           </Link>
@@ -97,24 +98,33 @@ function BookingSuccessContent() {
   }
 
   return (
-    <div className="min-h-screen bg-gray-50 py-8">
-      <div className="max-w-2xl mx-auto px-4">
+    <Section variant="gray" className="min-h-screen py-8">
+      <Container className="max-w-2xl px-4">
         {/* Success Header */}
         <div className="text-center mb-8">
-          <CheckCircle className="h-16 w-16 text-green-500 mx-auto mb-4" />
-          <h1 className="text-3xl font-bold text-gray-900 mb-2">Booking Confirmed!</h1>
-          <p className="text-gray-600">Your ticket has been generated successfully</p>
+          <div className="flex justify-center mb-4">
+            <TransConnectLogo
+              usage="light"
+              width={120}
+              height={34}
+              imageClassName="h-7"
+              wordmarkClassName="text-2xl"
+            />
+          </div>
+          <CheckCircle className="h-16 w-16 text-[#00D9A3] mx-auto mb-4" />
+          <Heading as="h3" className="text-gray-900 mb-2">Booking Confirmed!</Heading>
+          <Lead className="text-gray-600 text-base">Your ticket has been generated successfully</Lead>
         </div>
 
         {/* Booking Details Card */}
-        <Card className="mb-6">
-          <CardHeader>
-            <CardTitle className="flex items-center">
+        <StyledCard className="mb-6" hover={false}>
+          <div className="mb-4">
+            <h2 className="tc-heading-4 text-lg flex items-center text-gray-900">
               <MapPin className="h-5 w-5 mr-2" />
               Trip Details
-            </CardTitle>
-          </CardHeader>
-          <CardContent className="space-y-4">
+            </h2>
+          </div>
+          <div className="space-y-4">
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
               <div>
                 <div className="text-sm text-gray-600">Route</div>
@@ -126,7 +136,7 @@ function BookingSuccessContent() {
               </div>
               <div>
                 <div className="text-sm text-gray-600">Departure Time</div>
-                <div className="font-semibold">{booking.route?.departureTime}</div>
+                <div className="font-semibold">{booking.route?.departureTime || 'TBD'}</div>
               </div>
               <div>
                 <div className="text-sm text-gray-600">Seat Number</div>
@@ -138,18 +148,16 @@ function BookingSuccessContent() {
               </div>
               <div>
                 <div className="text-sm text-gray-600">Total Amount</div>
-                <div className="font-semibold text-green-600">UGX {booking.totalAmount?.toLocaleString()}</div>
+                <div className="font-semibold text-[#00C28F]">UGX {booking.totalAmount?.toLocaleString()}</div>
               </div>
             </div>
-          </CardContent>
-        </Card>
+          </div>
+        </StyledCard>
 
         {/* QR Code Card */}
-        <Card className="mb-6">
-          <CardHeader>
-            <CardTitle className="text-center">Your Digital Ticket</CardTitle>
-          </CardHeader>
-          <CardContent className="text-center">
+        <StyledCard className="mb-6 text-center" hover={false}>
+          <h2 className="tc-heading-4 text-gray-900">Your Digital Ticket</h2>
+          <div className="text-center mt-4">
             <div className="bg-white p-6 rounded-lg inline-block border-2 border-gray-200">
               {booking.qrCode ? (
                 <img 
@@ -170,30 +178,28 @@ function BookingSuccessContent() {
             
             {/* Action Buttons */}
             <div className="flex justify-center space-x-4 mt-6">
-              <Button onClick={handleDownloadQR} variant="outline">
+              <StyledButton onClick={handleDownloadQR} variant="outline" size="sm" className="!px-5 !py-2.5">
                 <Download className="h-4 w-4 mr-2" />
                 Download QR
-              </Button>
-              <Button onClick={handlePrint} variant="outline">
+              </StyledButton>
+              <StyledButton onClick={handlePrint} variant="outline" size="sm" className="!px-5 !py-2.5">
                 <Printer className="h-4 w-4 mr-2" />
                 Print Ticket
-              </Button>
+              </StyledButton>
             </div>
-          </CardContent>
-        </Card>
+          </div>
+        </StyledCard>
 
         {/* Important Information */}
-        <Card className="mb-6">
-          <CardHeader>
-            <CardTitle className="text-sm">Important Information</CardTitle>
-          </CardHeader>
-          <CardContent className="text-sm text-gray-600 space-y-2">
+        <StyledCard className="mb-6" hover={false}>
+          <h3 className="font-semibold text-sm text-gray-900">Important Information</h3>
+          <div className="text-sm text-gray-600 space-y-2 mt-3">
             <div>• Arrive at the departure point 15 minutes before scheduled time</div>
             <div>• Keep this QR code accessible on your phone or printed copy</div>
             <div>• Contact customer service for any changes or cancellations</div>
             <div>• Booking reference: <span className="font-mono text-gray-900">{booking.id}</span></div>
-          </CardContent>
-        </Card>
+          </div>
+        </StyledCard>
 
         {/* Action Buttons */}
         <div className="flex justify-center space-x-4">
@@ -204,14 +210,15 @@ function BookingSuccessContent() {
             View My Bookings
           </Link>
         </div>
-      </div>
-    </div>
+      </Container>
+      <PortalFooter slim />
+    </Section>
   );
 }
 
 export default function BookingSuccessPage() {
   return (
-    <Suspense fallback={<div className="min-h-screen flex items-center justify-center"><div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600" /></div>}>
+    <Suspense fallback={<div className="min-h-screen flex items-center justify-center"><div className="animate-spin rounded-full h-8 w-8 border-b-2 border-[#00D9A3]" /></div>}>
       <BookingSuccessContent />
     </Suspense>
   );

@@ -4,16 +4,24 @@
 
 @layer base {
   :root {
+    /* TransConnect Brand Colors */
+    --primary: 165 100% 43%;         /* #00D9A3 - Teal */
+    --primary-light: 165 100% 45%;   /* #00E5B0 */
+    --primary-dark: 165 100% 38%;    /* #00C28F */
+    
+    --secondary: 210 50% 15%;        /* #0d1b2a - Navy */
+    --secondary-light: 210 50% 22%;  /* #1a3a5c */
+    --secondary-dark: 210 50% 10%;   /* #0a1520 */
+    
+    /* shadcn/ui variables */
     --background: 0 0% 100%;
     --foreground: 222.2 84% 4.9%;
     --card: 0 0% 100%;
     --card-foreground: 222.2 84% 4.9%;
     --popover: 0 0% 100%;
     --popover-foreground: 222.2 84% 4.9%;
-    --primary: 221.2 83.2% 53.3%;
     --primary-foreground: 210 40% 98%;
-    --secondary: 210 40% 96%;
-    --secondary-foreground: 222.2 84% 4.9%;
+    --secondary-foreground: 210 40% 98%;
     --muted: 210 40% 96%;
     --muted-foreground: 215.4 16.3% 46.9%;
     --accent: 210 40% 96%;
@@ -22,8 +30,8 @@
     --destructive-foreground: 210 40% 98%;
     --border: 214.3 31.8% 91.4%;
     --input: 214.3 31.8% 91.4%;
-    --ring: 221.2 83.2% 53.3%;
-    --radius: 0.5rem;
+    --ring: 165 100% 43%;  /* Use primary teal for focus rings */
+    --radius: 0.75rem;
   }
 
   .dark {
@@ -33,7 +41,7 @@
     --card-foreground: 210 40% 98%;
     --popover: 222.2 84% 4.9%;
     --popover-foreground: 210 40% 98%;
-    --primary: 217.2 91.2% 59.8%;
+    --primary: 165 100% 43%;
     --primary-foreground: 222.2 84% 4.9%;
     --secondary: 217.2 32.6% 17.5%;
     --secondary-foreground: 210 40% 98%;
@@ -45,7 +53,7 @@
     --destructive-foreground: 210 40% 98%;
     --border: 217.2 32.6% 17.5%;
     --input: 217.2 32.6% 17.5%;
-    --ring: 224.3 76.3% 94.1%;
+    --ring: 165 100% 43%;
   }
 
   * {
@@ -53,56 +61,242 @@
   }
 
   html {
-    font-family: 'Inter', system-ui, sans-serif;
+    font-family: 'Inter', system-ui, -apple-system, BlinkMacSystemFont, sans-serif;
   }
   
   body {
-    @apply bg-background text-foreground;
+    @apply bg-background text-foreground font-sans antialiased;
+  }
+
+  .tc-font-brand {
+    font-family: var(--font-poppins), 'Inter', system-ui, -apple-system, BlinkMacSystemFont, sans-serif;
   }
 }
 
 @layer components {
+  /* TransConnect Buttons */
   .btn-primary {
-    @apply bg-blue-600 hover:bg-blue-700 text-white font-medium py-2.5 px-5 rounded-lg transition-all duration-200 shadow-sm hover:shadow-md;
+    @apply bg-[#00D9A3] hover:bg-[#00E5B0] text-white font-bold py-3 px-8 rounded-xl transition-all duration-200 shadow-lg hover:shadow-xl;
   }
   
   .btn-secondary {
-    @apply bg-gray-200 hover:bg-gray-300 text-gray-900 font-medium py-2.5 px-5 rounded-lg transition-all duration-200;
+    @apply border-2 border-white text-white hover:bg-white hover:text-gray-900 font-bold py-3 px-8 rounded-xl transition-all duration-200;
   }
   
   .btn-outline {
-    @apply border-2 border-blue-600 text-blue-600 hover:bg-blue-600 hover:text-white font-medium py-2 px-4 rounded-lg transition-all duration-200;
+    @apply border-2 border-[#00D9A3] text-[#00D9A3] hover:bg-[#00D9A3] hover:text-white font-bold py-3 px-6 rounded-xl transition-all duration-200;
   }
   
-  .card {
-    @apply bg-white rounded-xl shadow-sm border border-gray-200 p-6 hover:shadow-md transition-shadow duration-200;
+  /* Cards */
+  .tc-card {
+    @apply bg-white rounded-xl shadow-lg border-0 p-6 hover:shadow-2xl transition-all duration-300;
   }
   
-  .form-input {
-    @apply w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-colors text-base;
+  .tc-card-bordered {
+    @apply bg-white rounded-xl border-2 border-gray-200 p-6 hover:border-[#00D9A3] transition-all duration-300;
   }
   
-  .form-select {
-    @apply w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 bg-white transition-colors text-base;
+  /* Form Inputs */
+  .tc-input {
+    @apply w-full px-5 py-4 border-2 border-gray-200 rounded-xl focus:ring-2 focus:ring-[#00D9A3] focus:border-transparent font-medium text-gray-900 text-base;
   }
   
-  .badge {
-    @apply inline-flex items-center px-3 py-1 rounded-full text-sm font-medium;
+  .tc-label {
+    @apply block text-xs font-bold text-gray-700 mb-3 uppercase tracking-widest;
   }
   
-  .badge-success {
-    @apply bg-green-100 text-green-800;
+  .tc-select {
+    @apply w-full px-5 py-4 border-2 border-gray-200 rounded-xl focus:ring-2 focus:ring-[#00D9A3] focus:border-transparent bg-white font-medium text-gray-900 text-base;
   }
   
-  .badge-danger {
-    @apply bg-red-100 text-red-800;
+  /* Badges */
+  .tc-badge {
+    @apply inline-flex items-center gap-2 px-5 py-2.5 rounded-full text-xs font-bold uppercase tracking-widest;
   }
   
+  .tc-badge-primary {
+    @apply tc-badge bg-[#00D9A3] text-white shadow-lg;
+  }
+  
+  .tc-badge-success {
+    @apply tc-badge bg-green-100 text-green-800;
+  }
+  
+  .tc-badge-warning {
+    @apply tc-badge bg-yellow-100 text-yellow-800;
+  }
+  
+  .tc-badge-error {
+    @apply tc-badge bg-red-100 text-red-800;
+  }
+  
+  /* Sections */
+  .tc-section-light {
+    @apply py-20 bg-white;
+  }
+  
+  .tc-section-gray {
+    @apply py-20 bg-gray-50;
+  }
+  
+  .tc-section-dark {
+    @apply py-20 bg-[#1a3a5c] text-white;
+  }
+  
+  .tc-container {
+    @apply container mx-auto px-6;
+  }
+  
+  /* Headings */
+  .tc-heading-1 {
+    @apply text-6xl md:text-7xl font-extrabold tracking-tight;
+  }
+  
+  .tc-heading-2 {
+    @apply text-4xl md:text-5xl font-extrabold tracking-tight;
+  }
+  
+  .tc-heading-3 {
+    @apply text-3xl md:text-4xl font-bold tracking-tight;
+  }
+  
+  .tc-heading-4 {
+    @apply text-2xl font-bold;
+  }
+  
+  /* Text */
+  .tc-text-lead {
+    @apply text-lg md:text-xl leading-relaxed font-medium;
+  }
+  
+  .tc-text-body {
+    @apply text-base leading-relaxed;
+  }
+
+  /* Auth pages */
+  .tc-auth-shell {
+    @apply min-h-screen flex items-center justify-center p-4;
+    background-image: linear-gradient(135deg, #ecfeff 0%, #ffffff 50%, #ecfeff 100%);
+  }
+
+  .tc-auth-brand-mark {
+    @apply p-3 rounded-xl shadow-lg text-white;
+    background-color: #00D9A3;
+  }
+
+  .tc-auth-feature-mark {
+    @apply w-16 h-16 rounded-full flex items-center justify-center mx-auto mb-4;
+    background-color: #dcfce7;
+    color: #00D9A3;
+  }
+
+  .tc-link-accent {
+    @apply font-semibold transition-colors;
+    color: #00D9A3;
+  }
+
+  .tc-link-accent:hover {
+    color: #00C28F;
+  }
+
+  .tc-link-soft {
+    @apply inline-flex items-center gap-2 text-sm text-gray-600 p-2 rounded-lg font-medium transition-colors;
+  }
+
+  .tc-link-soft:hover {
+    color: #00D9A3;
+    background-color: #ecfeff;
+  }
+
+  .tc-auth-layout {
+    @apply min-h-screen bg-[#f7fafe] grid;
+    grid-template-columns: minmax(360px, 38%) 1fr;
+  }
+
+  .tc-auth-panel {
+    @apply relative text-white p-10 lg:p-12 flex flex-col;
+    background: linear-gradient(165deg, #0f2948 0%, #14355f 46%, #0f6e69 100%);
+    overflow: hidden;
+  }
+
+  .tc-auth-panel::before {
+    content: '';
+    position: absolute;
+    inset: 0;
+    background:
+      linear-gradient(135deg, rgba(255,255,255,0.08) 0%, rgba(255,255,255,0) 32%),
+      linear-gradient(25deg, rgba(0, 217, 163, 0.18) 0%, rgba(0, 217, 163, 0) 50%);
+    pointer-events: none;
+  }
+
+  .tc-auth-panel-content {
+    @apply relative z-10 h-full flex flex-col;
+  }
+
+  .tc-auth-badge {
+    @apply inline-flex items-center gap-2 px-4 py-1 rounded-full text-[11px] font-bold uppercase tracking-widest;
+    background-color: rgba(5, 173, 210, 0.22);
+    border: 1px solid rgba(56, 209, 255, 0.3);
+    color: #45dcff;
+  }
+
+  .tc-auth-right {
+    @apply flex items-center justify-center p-6 lg:p-10;
+  }
+
+  .tc-auth-form-shell {
+    @apply w-full max-w-xl bg-white rounded-2xl border border-[#e8eef6] p-7 lg:p-10 shadow-sm;
+  }
+
+  .tc-social-btn {
+    @apply w-full h-11 px-4 rounded-xl border border-[#e3ebf7] bg-white text-[#1f3558] text-sm font-semibold flex items-center justify-center gap-2 transition-colors;
+  }
+
+  .tc-social-btn:hover {
+    @apply bg-[#f8fbff];
+  }
+
+  .tc-auth-separator {
+    @apply text-xs font-semibold text-[#8aa0bf] text-center my-4 relative;
+  }
+
+  .tc-auth-separator::before {
+    content: '';
+    position: absolute;
+    left: 0;
+    right: 0;
+    top: 50%;
+    border-top: 1px solid #e7eef8;
+  }
+
+  .tc-auth-separator span {
+    @apply px-3 relative;
+    background: white;
+  }
+
+  .tc-auth-metric {
+    @apply text-center;
+  }
+
+  @media (max-width: 1024px) {
+    .tc-auth-layout {
+      grid-template-columns: 1fr;
+    }
+
+    .tc-auth-panel {
+      @apply min-h-[320px] p-7;
+    }
+
+    .tc-auth-right {
+      @apply pt-0;
+    }
+  }
+
+  /* Mobile-specific optimizations */
   .badge-warning {
     @apply bg-yellow-100 text-yellow-800;
   }
 
-  /* Mobile-specific optimizations */
   .mobile-touch-target {
     @apply min-h-[44px] min-w-[44px]; /* Apple's recommended touch target size */
   }

@@ -69,7 +69,7 @@ function PaymentContent() {
 
   const handlePayment = async () => {
     if (!user) {
-      setErrorMessage('Please log in to complete payment');
+      setErrorMessage('Please sign in to complete payment');
       setPaymentStatus('failed');
       return;
     }
@@ -83,30 +83,7 @@ function PaymentContent() {
     setPaymentStatus('processing');
 
     try {
-      // Handle cash payments differently - no payment API call needed
-      if (selectedMethod === 'CASH') {
-        setPaymentStatus('success');
-        
-        // Show success notification
-        notificationService.showSuccess('Booking Confirmed', 'Please pay at the operator office or boarding point');
-        
-        // Wait a moment to show success, then redirect
-        setTimeout(() => {
-          const successData = encodeURIComponent(JSON.stringify({
-            ...bookingData,
-            paymentStatus: 'PENDING',
-            paymentMethod: 'CASH',
-            isCashPayment: true,
-            paymentRef: 'CASH-' + bookingData.id,
-            qrCode: bookingData.qrCode
-          }));
-          router.push(`/booking-success?booking=${successData}`);
-        }, 1500);
-        setProcessing(false);
-        return;
-      }
-      
-      // Call actual payment API for online methods (MTN, Airtel, PesaPal)
+      // Always initiate through backend so payment method/status is persisted.
       const paymentRequest = {
         bookingId: bookingData.id as string,
         method: selectedMethod,
@@ -126,8 +103,24 @@ function PaymentContent() {
           return;
         }
         
-        // For demo mode, payment should complete immediately
-        if (response.status === 'COMPLETED') {
+        // Cash flow remains pending until operator marks it paid.
+        if (selectedMethod === 'CASH' && response.status === 'PENDING') {
+          setPaymentStatus('success');
+          notificationService.showSuccess('Cash Payment Registered', 'Please pay at the operator office or boarding point.');
+
+          setTimeout(() => {
+            const successData = encodeURIComponent(JSON.stringify({
+              ...bookingData,
+              paymentStatus: 'PENDING',
+              paymentMethod: 'CASH',
+              paymentId: response.paymentId,
+              paymentRef: response.paymentReference,
+              isCashPayment: true,
+              qrCode: response.qrCode || bookingData.qrCode
+            }));
+            router.push(`/booking-success?booking=${successData}`);
+          }, 1200);
+        } else if (response.status === 'COMPLETED') {
           setPaymentStatus('success');
           
           // Show payment success notification
@@ -164,11 +157,11 @@ function PaymentContent() {
       // Handle specific error types
       let errorMsg = '';
       if (error.response?.status === 401) {
-        errorMsg = 'Please log in to complete payment';
+        errorMsg = 'Please sign in to complete payment';
         setErrorMessage(errorMsg);
         setTimeout(() => router.push('/login'), 2000);
       } else if (error.response?.status === 403) {
-        errorMsg = 'Authentication failed. Please log in again.';
+        errorMsg = 'Authentication failed. Please sign in again.';
         setErrorMessage(errorMsg);
         setTimeout(() => router.push('/login'), 2000);
       } else {

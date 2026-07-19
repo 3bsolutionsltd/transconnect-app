@@ -3,10 +3,11 @@ import React, { useState } from 'react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { authApi } from '@/lib/api';
-import { Button } from '@/components/ui/button';
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
-import { Bus, Eye, EyeOff } from 'lucide-react';
+import { Eye, EyeOff, Mail, Lock, LogIn, Smartphone } from 'lucide-react';
 import toast from 'react-hot-toast';
+import { Heading, StyledButton } from '@/components/styled';
+import TransConnectLogo from '@/components/branding/TransConnectLogo';
+import { COPYRIGHT_ATTRIBUTION } from '@/lib/links';
 
 export default function LoginPage() {
   const [email, setEmail] = useState('');
@@ -36,99 +37,149 @@ export default function LoginPage() {
   }
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-blue-50 to-indigo-100 flex items-center justify-center p-4">
-      <div className="w-full max-w-md">
-        {/* Header */}
-        <div className="text-center mb-6 sm:mb-8">
-          <div className="flex items-center justify-center mb-4">
-            <Bus className="h-10 w-10 sm:h-12 sm:w-12 text-blue-600" />
-            <h1 className="ml-3 text-2xl sm:text-3xl font-bold text-gray-900">TransConnect</h1>
+    <div className="tc-auth-layout">
+      <aside className="tc-auth-panel">
+        <div className="tc-auth-panel-content">
+          <div className="flex items-center gap-3 mb-16">
+            <TransConnectLogo
+              width={188}
+              height={52}
+              priority
+              usage="dark"
+              imageClassName="h-8 sm:h-9"
+              className="shadow-sm"
+              wordmarkClassName="text-2xl"
+            />
           </div>
-          <p className="text-gray-600 text-sm sm:text-base">Sign in to your account</p>
-        </div>
 
-        <Card>
-          <CardHeader className="text-center pb-4">
-            <CardTitle className="text-xl sm:text-2xl">Welcome Back</CardTitle>
-          </CardHeader>
-          <CardContent className="px-4 sm:px-6 pb-6">
-            <form onSubmit={handleSubmit} className="space-y-4">
-              <div>
-                <label htmlFor="email" className="block text-sm font-medium text-gray-700 mb-1">
-                  Email Address
-                </label>
+          <span className="tc-auth-badge mb-8">Uganda's #1 Bus Booking Platform</span>
+          <h1 className="text-6xl font-black leading-[0.95] tracking-tight max-w-md mb-6">
+            Welcome
+            <br />
+            back,
+            <br />
+            <span className="text-[#57e0be]">Traveller.</span>
+          </h1>
+          <p className="text-lg text-[#c6d7ef] max-w-md leading-relaxed mb-12">
+            Sign in to view your tickets, manage bookings, and book your next journey across Uganda in seconds.
+          </p>
+
+          <div className="mt-auto border-t border-white/15 pt-7 grid grid-cols-4 gap-4 max-w-md">
+            <div className="tc-auth-metric">
+              <p className="text-4xl font-black text-[#57e0be]">50K+</p>
+              <p className="text-xs text-[#9fb6d6]">Travellers</p>
+            </div>
+            <div className="tc-auth-metric">
+              <p className="text-4xl font-black text-[#57e0be]">120+</p>
+              <p className="text-xs text-[#9fb6d6]">Routes</p>
+            </div>
+            <div className="tc-auth-metric">
+              <p className="text-4xl font-black text-[#57e0be]">4.8</p>
+              <p className="text-xs text-[#9fb6d6]">App Rating</p>
+            </div>
+            <div className="tc-auth-metric">
+              <p className="text-4xl font-black text-[#57e0be]">24/7</p>
+              <p className="text-xs text-[#9fb6d6]">Support</p>
+            </div>
+          </div>
+        </div>
+      </aside>
+
+      <main className="tc-auth-right">
+        <div className="tc-auth-form-shell">
+          <div className="text-center mb-7">
+            <Heading as="h2" className="text-[#192c45] mb-2">Sign in to your account</Heading>
+            <p className="text-[#89a0bf]">Enter your credentials to access your bookings and tickets.</p>
+          </div>
+
+          <div className="grid grid-cols-2 gap-3 mb-4">
+            <button type="button" className="tc-social-btn">Google</button>
+            <button type="button" className="tc-social-btn">Facebook</button>
+          </div>
+
+          <div className="tc-auth-separator"><span>or sign in with email</span></div>
+
+          <form onSubmit={handleSubmit} className="space-y-4">
+            <div>
+              <label htmlFor="email" className="tc-label">
+                Email Address
+              </label>
+              <div className="relative">
+                <Mail className="h-4 w-4 text-[#8ca4c4] absolute left-4 top-1/2 -translate-y-1/2" />
                 <input
                   id="email"
                   type="email"
                   value={email}
                   onChange={(e) => setEmail(e.target.value)}
                   placeholder="Enter your email"
-                  className="form-input text-base"
+                  className="tc-input !pl-10"
                   required
                 />
               </div>
+            </div>
 
-              <div>
-                <label htmlFor="password" className="block text-sm font-medium text-gray-700 mb-1">
-                  Password
-                </label>
-                <div className="relative">
-                  <input
-                    id="password"
-                    type={showPassword ? 'text' : 'password'}
-                    value={password}
-                    onChange={(e) => setPassword(e.target.value)}
-                    placeholder="Enter your password"
-                    className="form-input pr-12 text-base"
-                    required
-                  />
-                  <button
-                    type="button"
-                    onClick={() => setShowPassword(!showPassword)}
-                    className="absolute right-3 top-1/2 transform -translate-y-1/2 text-gray-400 hover:text-gray-600 touch-manipulation min-h-[44px] min-w-[44px] flex items-center justify-center"
-                    aria-label={showPassword ? 'Hide password' : 'Show password'}
-                  >
-                    {showPassword ? <EyeOff className="h-5 w-5" /> : <Eye className="h-5 w-5" />}
-                  </button>
-                </div>
+            <div>
+              <label htmlFor="password" className="tc-label">
+                Password
+              </label>
+              <div className="relative">
+                <Lock className="h-4 w-4 text-[#8ca4c4] absolute left-4 top-1/2 -translate-y-1/2" />
+                <input
+                  id="password"
+                  type={showPassword ? 'text' : 'password'}
+                  value={password}
+                  onChange={(e) => setPassword(e.target.value)}
+                  placeholder="Enter your password"
+                  className="tc-input !pl-10 pr-12"
+                  required
+                />
+                <button
+                  type="button"
+                  onClick={() => setShowPassword(!showPassword)}
+                  className="absolute right-3 top-1/2 transform -translate-y-1/2 text-gray-400 hover:text-[#00D9A3] touch-manipulation min-h-[44px] min-w-[44px] flex items-center justify-center transition-colors"
+                  aria-label={showPassword ? 'Hide password' : 'Show password'}
+                >
+                  {showPassword ? <EyeOff className="h-5 w-5" /> : <Eye className="h-5 w-5" />}
+                </button>
               </div>
-
-              <Button 
-                type="submit" 
-                className="w-full btn-primary py-3 text-base font-semibold touch-manipulation" 
-                disabled={loading}
-              >
-                {loading ? 'Signing In...' : 'Sign In'}
-              </Button>
-            </form>
-
-            {/* Forgot Password Link */}
-            <div className="mt-4 text-center">
-              <Link 
-                href="/forgot-password" 
-                className="text-sm text-blue-600 hover:text-blue-700 font-medium touch-manipulation inline-block p-1"
-              >
-                Forgot your password?
-              </Link>
             </div>
 
-            <div className="mt-6 text-center">
-              <p className="text-sm text-gray-600">
-                Don't have an account?{' '}
-                <Link href="/register" className="text-blue-600 hover:text-blue-700 font-medium touch-manipulation inline-block p-1">
-                  Sign up here
-                </Link>
-              </p>
+            <div className="flex items-center justify-between text-sm">
+              <label className="flex items-center gap-2 text-[#5c708f]">
+                <input type="checkbox" className="h-4 w-4 rounded border-[#b8cae3] text-[#00D9A3]" defaultChecked />
+                Remember me
+              </label>
+              <Link href="/forgot-password" className="tc-link-accent">Forgot password?</Link>
             </div>
-          </CardContent>
-        </Card>
 
-        <div className="mt-6 text-center">
-          <Link href="/" className="text-sm text-gray-500 hover:text-gray-700 touch-manipulation inline-block p-2">
-            ← Back to Home
-          </Link>
+            <StyledButton
+              type="submit" 
+              variant="primary" 
+              size="lg"
+              className="w-full touch-manipulation !py-3.5 !text-lg" 
+              disabled={loading}
+            >
+              <LogIn className="h-4 w-4 mr-2" />
+              {loading ? 'Signing In...' : 'Sign In'}
+            </StyledButton>
+
+            <div className="tc-auth-separator"><span>or</span></div>
+            <button type="button" className="tc-social-btn !h-12 !bg-[#eaf2ff] !text-[#21416f]">
+              <Smartphone className="h-4 w-4" />
+              Sign in with Phone Number (OTP)
+            </button>
+          </form>
+
+          <div className="text-center text-sm mt-6 text-[#8ca4c4]">
+            Don't have an account?{' '}
+            <Link href="/register" className="tc-link-accent">Create one free →</Link>
+          </div>
+
+          <div className="mt-8 pt-5 border-t border-[#e7eef8] text-center text-xs text-[#90a6c4]">
+            {COPYRIGHT_ATTRIBUTION}
+          </div>
         </div>
-      </div>
+      </main>
     </div>
   );
 }
