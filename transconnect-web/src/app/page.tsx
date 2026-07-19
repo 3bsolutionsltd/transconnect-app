@@ -1,7 +1,7 @@
 'use client';
 
 import Link from 'next/link';
-import { Bus, Calendar, Clock3, CreditCard, MapPin, QrCode, Search, Shield, Smartphone, Users } from 'lucide-react';
+import { Apple, Bus, Calendar, Clock3, CreditCard, MapPin, Play, QrCode, Search, Shield, Smartphone, Users } from 'lucide-react';
 import Header from '@/components/Header';
 import { useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
@@ -415,9 +415,16 @@ export default function HomePage() {
                       wordmarkClassName="text-lg"
                     />
                   </div>
-                  <Badge className="inline-flex !bg-white/15 !text-[#7ee8d0] border border-white/25 !px-4 !py-1.5 uppercase tracking-[0.08em] text-[11px] font-bold">
-                    Available on Android & iOS
-                  </Badge>
+                  <div className="flex flex-wrap items-center gap-2.5">
+                    <span className="inline-flex items-center gap-1.5 rounded-full border border-white/25 bg-white/15 px-3 py-1.5 text-[11px] font-bold uppercase tracking-[0.08em] text-[#7ee8d0]">
+                      <Play className="h-3 w-3" />
+                      Android
+                    </span>
+                    <span className="inline-flex items-center gap-1.5 rounded-full border border-white/25 bg-white/15 px-3 py-1.5 text-[11px] font-bold uppercase tracking-[0.08em] text-[#c9f6ff]">
+                      <Apple className="h-3 w-3" />
+                      iOS
+                    </span>
+                  </div>
                 </div>
 
                 <h3 className="text-3xl sm:text-4xl lg:text-[2.9rem] leading-[1.03] font-black mb-4 [text-wrap:balance] max-w-[14ch]">Take TransConnect wherever you go</h3>
