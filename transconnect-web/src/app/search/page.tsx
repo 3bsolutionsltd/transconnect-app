@@ -227,14 +227,19 @@ function SearchContent() {
                 <StyledCard key={route.id} hover={false} className="!p-0 overflow-hidden">
                   <div className="grid grid-cols-1 md:grid-cols-[4px_1fr]">
                     <div className="bg-[#00a878]" />
-                    <div className="p-5 grid grid-cols-1 xl:grid-cols-[1.2fr_1fr_1fr_auto] gap-4 items-center">
+                    <div className="p-5 sm:p-6 grid grid-cols-1 xl:grid-cols-[1.25fr_0.95fr_0.8fr_auto] gap-4 xl:gap-5 items-center">
                       <div>
-                        <div className="flex items-start gap-3">
-                          <OperatorLogoBadge operator={route?.operator || route?.operatorInfo} size="lg" />
-                          <div>
-                            <h3 className="text-2xl font-black text-[#132742]">{route.operator?.companyName || route.operatorInfo?.companyName || route.operatorName || 'Operator'}</h3>
-                            <p className="text-xs text-[#8ca4c4] flex items-center gap-1"><Star className="h-3 w-3 text-[#f59e0b]" />4.7 • 203 reviews</p>
-                            <div className="flex gap-2 mt-2">
+                        <div className="flex items-start gap-3.5">
+                          <OperatorLogoBadge operator={route?.operator || route?.operatorInfo} size="xl" />
+                          <div className="min-w-0">
+                            <div className="flex flex-wrap items-center gap-2">
+                              <h3 className="text-2xl font-black text-[#132742] leading-tight">{route.operator?.companyName || route.operatorInfo?.companyName || route.operatorName || 'Operator'}</h3>
+                              <span className="inline-flex items-center rounded-full border border-[#cfeedd] bg-[#f2fbf7] px-2.5 py-1 text-[10px] font-bold uppercase tracking-[0.08em] text-[#0f8c6b]">
+                                Trusted
+                              </span>
+                            </div>
+                            <p className="text-xs text-[#8ca4c4] flex items-center gap-1 mt-1"><Star className="h-3 w-3 text-[#f59e0b]" />4.7 • 203 reviews</p>
+                            <div className="flex flex-wrap gap-2 mt-2">
                               <span className="px-2 py-0.5 rounded-full bg-[#eafaf5] text-[#0f8c6b] text-xs font-semibold">AC</span>
                               <span className="px-2 py-0.5 rounded-full bg-[#f2ebff] text-[#7c3aed] text-xs font-semibold">USB</span>
                               <span className="px-2 py-0.5 rounded-full bg-[#edf3ff] text-[#214c86] text-xs font-semibold">Mercedes</span>
@@ -244,22 +249,22 @@ function SearchContent() {
                       </div>
 
                       <div>
-                        <div className="flex items-baseline gap-3">
-                          <p className="text-5xl font-black text-[#132742]">{route.departureTime || '08:00'}</p>
-                          <p className="text-5xl font-black text-[#132742]">{route.arrivalTime || '14:30'}</p>
+                        <div className="flex items-baseline gap-2.5">
+                          <p className="text-4xl sm:text-5xl font-black text-[#132742] leading-none">{route.departureTime || '08:00'}</p>
+                          <p className="text-4xl sm:text-5xl font-black text-[#132742] leading-none">{route.arrivalTime || '14:30'}</p>
                         </div>
-                        <p className="text-xs text-[#8ca4c4]">{route.origin} • {route.destination}</p>
+                        <p className="text-xs text-[#8ca4c4] mt-1">{route.origin} • {route.destination}</p>
                         <p className="text-xs text-[#0f8c6b] font-semibold mt-1">{Math.floor((route.duration || 360) / 60)}h {(route.duration || 360) % 60}m • Direct</p>
                       </div>
 
-                      <div className="text-right xl:text-left">
-                        <p className="text-6xl font-black text-[#0f8c6b]">{Number(route.price || 0).toLocaleString()}</p>
-                        <p className="text-xs uppercase text-[#8ca4c4]">UGX per seat</p>
+                      <div className="text-left xl:text-right">
+                        <p className="text-5xl sm:text-6xl font-black text-[#0f8c6b] leading-none">{Number(route.price || 0).toLocaleString()}</p>
+                        <p className="text-xs uppercase text-[#8ca4c4] mt-1">UGX per seat</p>
                         <p className="text-xs text-[#8ca4c4] mt-2">{route.availability?.availableSeats || 15} seats available</p>
                       </div>
 
-                      <Link href={`/route/${route.id}`}>
-                        <StyledButton variant="primary" className="!px-6 !py-3">View Details</StyledButton>
+                      <Link href={`/route/${route.id}`} className="self-start xl:self-center">
+                        <StyledButton variant="primary" className="!px-5 !py-2.5 !rounded-xl !shadow-md">View Details</StyledButton>
                       </Link>
                     </div>
                   </div>

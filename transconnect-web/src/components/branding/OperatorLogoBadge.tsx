@@ -13,18 +13,20 @@ type OperatorLike = {
   avatarUrl?: string | null;
 };
 
-type BadgeSize = 'sm' | 'md' | 'lg';
+type BadgeSize = 'sm' | 'md' | 'lg' | 'xl';
 
 const sizeClasses: Record<BadgeSize, string> = {
   sm: 'h-8 w-8',
   md: 'h-10 w-10',
   lg: 'h-12 w-12',
+  xl: 'h-14 w-14',
 };
 
 const iconClasses: Record<BadgeSize, string> = {
   sm: 'h-3.5 w-3.5',
   md: 'h-4 w-4',
   lg: 'h-5 w-5',
+  xl: 'h-6 w-6',
 };
 
 function firstTruthyLogo(operator?: OperatorLike | null): string {
