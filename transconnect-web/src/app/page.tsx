@@ -405,18 +405,22 @@ export default function HomePage() {
 
             <div className="relative grid grid-cols-1 lg:grid-cols-[1.12fr_0.88fr] gap-8 lg:gap-12 items-center">
               <div className="max-w-2xl">
-                <div className="mb-5 flex flex-wrap items-center gap-3">
-                  <TransConnectLogo
-                    usage="dark"
-                    width={112}
-                    height={32}
-                    imageClassName="h-6"
-                    wordmarkClassName="text-xl"
-                  />
-                  <Badge className="!bg-white/15 !text-[#7ee8d0] border border-white/25">Available on Android & iOS</Badge>
+                <div className="mb-6 space-y-3">
+                  <div className="inline-flex items-center rounded-2xl border border-white/20 bg-white/10 px-3 py-2 backdrop-blur-sm">
+                    <TransConnectLogo
+                      usage="dark"
+                      width={104}
+                      height={30}
+                      imageClassName="h-6"
+                      wordmarkClassName="text-lg"
+                    />
+                  </div>
+                  <Badge className="inline-flex !bg-white/15 !text-[#7ee8d0] border border-white/25 !px-4 !py-1.5 uppercase tracking-[0.08em] text-[11px] font-bold">
+                    Available on Android & iOS
+                  </Badge>
                 </div>
 
-                <h3 className="text-3xl sm:text-4xl lg:text-[2.9rem] leading-[1.03] font-black mb-4 [text-wrap:balance] max-w-[15ch]">Take TransConnect wherever you go</h3>
+                <h3 className="text-3xl sm:text-4xl lg:text-[2.9rem] leading-[1.03] font-black mb-4 [text-wrap:balance] max-w-[14ch]">Take TransConnect wherever you go</h3>
                 <p className="text-[#d0def3] mb-6 max-w-xl text-base sm:text-lg">Manage bookings, view QR tickets, and track your bus in real-time from your pocket.</p>
 
                 <div className="flex flex-wrap items-center gap-3">
