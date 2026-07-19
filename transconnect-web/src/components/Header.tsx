@@ -14,9 +14,10 @@ import {
   X,
   Search,
   Ticket,
-  UserCircle
+  UserCircle,
+  ChevronDown
 } from 'lucide-react';
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import NotificationCenter from '@/components/notifications/NotificationCenter';
 import TransConnectLogo from '@/components/branding/TransConnectLogo';
 import PlayStoreCTA from '@/components/PlayStoreCTA';
@@ -24,9 +25,14 @@ import PlayStoreCTA from '@/components/PlayStoreCTA';
 export default function Header() {
   const { user, isAuthenticated, logout } = useAuth();
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
+  const [accountMenuOpen, setAccountMenuOpen] = useState(false);
   const pathname = usePathname();
 
   const isAdmin = user?.role === 'ADMIN' || user?.role === 'OPERATOR';
+
+  useEffect(() => {
+    setAccountMenuOpen(false);
+  }, [pathname]);
 
   function linkClass(href: string) {
     const isActive = pathname === href || pathname?.startsWith(`${href}/`);
@@ -53,23 +59,13 @@ export default function Header() {
           </Link>
 
           {/* Desktop Navigation */}
-          <nav className="hidden lg:flex items-center gap-5 text-[1.03rem]">
+          <nav className="hidden lg:flex items-center gap-4 text-[0.98rem]">
             <Link href="/search" className={`font-medium transition-colors ${linkClass('/search')}`}>
               <span className="whitespace-nowrap">Search Routes</span>
             </Link>
             <Link href="/trusted-operators" className={`font-medium transition-colors ${linkClass('/trusted-operators')}`}>
               <span className="whitespace-nowrap">Trusted Operators</span>
             </Link>
-            {isAuthenticated && (
-              <>
-              <Link href="/bookings" className={`font-medium transition-colors ${linkClass('/bookings')}`}>
-                <span className="whitespace-nowrap">My Bookings</span>
-              </Link>
-              <Link href="/profile" className={`font-medium transition-colors ${linkClass('/profile')}`}>
-                <span className="whitespace-nowrap">My Profile</span>
-              </Link>
-              </>
-            )}
             {isAdmin && (
               <Link href="/admin" className={`font-medium transition-colors ${linkClass('/admin')}`}>
                 <span className="whitespace-nowrap">Admin</span>
@@ -81,34 +77,59 @@ export default function Header() {
           <div className="hidden lg:flex items-center space-x-3">
             {isAuthenticated ? (
               <div className="flex items-center space-x-3">
-                <PlayStoreCTA compact source="header_desktop_utility" className="hidden xl:inline-flex" />
                 <div className="h-10 rounded-xl bg-[#13273d] border border-[#1f3a58] text-slate-300 hover:text-white flex items-center justify-center px-2">
                   <NotificationCenter />
                 </div>
-                <div className="flex items-center space-x-2 bg-[#13273d] border border-[#1f3a58] rounded-xl px-3 py-2 min-w-0">
-                  <User className="h-4 w-4 text-slate-300" />
-                  <span className="text-slate-100 font-medium text-sm whitespace-nowrap max-w-[140px] overflow-hidden text-ellipsis">
-                    {user?.firstName} {user?.lastName}
-                  </span>
-                  {isAdmin && (
-                    <span className="px-2 py-1 bg-[#e8f5f2] text-[#1a3a5c] text-xs font-medium rounded-full">
-                      {user?.role}
+                <div className="relative">
+                  <button
+                    type="button"
+                    onClick={() => setAccountMenuOpen((open) => !open)}
+                    className="flex items-center space-x-2 bg-[#13273d] border border-[#1f3a58] rounded-xl px-3 py-2 min-w-0 hover:bg-[#193451] transition-colors"
+                    aria-label="Open account menu"
+                    aria-expanded={accountMenuOpen}
+                  >
+                    <User className="h-4 w-4 text-slate-300" />
+                    <span className="text-slate-100 font-medium text-sm whitespace-nowrap max-w-[120px] overflow-hidden text-ellipsis">
+                      {user?.firstName} {user?.lastName}
                     </span>
+                    <ChevronDown className="h-4 w-4 text-slate-300" />
+                  </button>
+                  {accountMenuOpen && (
+                    <div className="absolute right-0 mt-2 w-52 rounded-xl border border-[#1f3a58] bg-[#13273d] shadow-xl overflow-hidden">
+                      <Link href="/bookings" className="block px-4 py-2 text-sm text-slate-100 hover:bg-[#1b3e60]" onClick={() => setAccountMenuOpen(false)}>
+                        My Bookings
+                      </Link>
+                      <Link href="/profile" className="block px-4 py-2 text-sm text-slate-100 hover:bg-[#1b3e60]" onClick={() => setAccountMenuOpen(false)}>
+                        My Profile
+                      </Link>
+                      {isAdmin && (
+                        <>
+                          <Link href="/admin" className="block px-4 py-2 text-sm text-slate-100 hover:bg-[#1b3e60]" onClick={() => setAccountMenuOpen(false)}>
+                            Admin Dashboard
+                          </Link>
+                          <Link href="/admin/routes" className="block px-4 py-2 text-sm text-slate-100 hover:bg-[#1b3e60]" onClick={() => setAccountMenuOpen(false)}>
+                            Manage Routes
+                          </Link>
+                          <Link href="/admin/analytics" className="block px-4 py-2 text-sm text-slate-100 hover:bg-[#1b3e60]" onClick={() => setAccountMenuOpen(false)}>
+                            Analytics
+                          </Link>
+                        </>
+                      )}
+                      <button
+                        type="button"
+                        onClick={logout}
+                        className="w-full text-left px-4 py-2 text-sm text-[#fecaca] hover:bg-[#2a1820] border-t border-[#1f3a58]"
+                        aria-label="Sign out of your account"
+                      >
+                        <LogOut className="inline h-4 w-4 mr-2" />
+                        Sign Out
+                      </button>
+                    </div>
                   )}
                 </div>
-                <Button
-                  size="sm"
-                  onClick={logout}
-                  aria-label="Sign out of your account"
-                  className="bg-[#2a1820] hover:bg-[#3a1f29] text-[#fecaca] border border-[#ef4444] shadow-sm font-semibold"
-                >
-                  <LogOut className="h-4 w-4 mr-2"/>
-                  Sign Out
-                </Button>
               </div>
             ) : (
               <div className="flex items-center space-x-3">
-                <PlayStoreCTA compact source="header_desktop_guest" className="hidden xl:inline-flex" />
                 <Link href="/login">
                   <Button
                     variant="outline"
