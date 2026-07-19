@@ -22,14 +22,14 @@ export default function TransConnectLogo({
   usage = 'light',
   showWordmark = true
 }: TransConnectLogoProps) {
-  const safeWidth = Math.max(width, 80);
+  const safeWidth = Math.max(width, 24);
 
   return (
     <div className={['inline-flex min-w-0 items-center gap-2.5', className ?? ''].join(' ').trim()}>
       <div
         className={[
           'inline-flex items-center justify-center shrink-0',
-          usage === 'dark' ? 'bg-white rounded-md px-3 py-2' : ''
+          usage === 'dark' ? 'bg-white rounded-md px-2 py-1.5' : ''
         ].join(' ').trim()}
       >
         <Image
@@ -38,9 +38,8 @@ export default function TransConnectLogo({
           width={safeWidth}
           height={height}
           priority={priority}
-          style={{ width: '100%', maxWidth: `${safeWidth}px`, height: 'auto' }}
           className={[
-            'h-auto w-auto object-contain',
+            'h-auto w-auto max-w-full object-contain',
             imageClassName ?? ''
           ].join(' ').trim()}
         />

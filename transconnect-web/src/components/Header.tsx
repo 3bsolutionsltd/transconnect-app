@@ -42,12 +42,12 @@ export default function Header() {
           {/* Logo */}
           <Link href="/" aria-label="TransConnect home" className="flex items-center touch-manipulation">
             <TransConnectLogo
-              width={158}
-              height={44}
+              width={42}
+              height={42}
               priority
               usage="dark"
-              imageClassName="h-6 sm:h-7"
-              className="shadow-sm"
+              imageClassName="h-7 w-7 sm:h-8 sm:w-8"
+              className="min-w-0"
               wordmarkClassName="text-base sm:text-lg"
             />
           </Link>
