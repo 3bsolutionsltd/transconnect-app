@@ -21,7 +21,7 @@ export function middleware(request: NextRequest) {
       redirectUrl.protocol = 'http:'
       redirectUrl.host = 'localhost:3001'
     } else if (bareHost === 'staging.transconnect.app' || bareHost === 'www.staging.transconnect.app') {
-      redirectUrl.hostname = 'staging-admin.transconnect.app'
+      redirectUrl.hostname = 'admin-staging.transconnect.app'
     } else {
       redirectUrl.hostname = 'admin.transconnect.app'
     }

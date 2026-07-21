@@ -45,10 +45,10 @@ export default function Header() {
       }
 
       if (host === 'staging.transconnect.app' || host === 'www.staging.transconnect.app') {
-        return 'https://staging-admin.transconnect.app';
+        return 'https://admin-staging.transconnect.app';
       }
 
-      if (host === 'staging-admin.transconnect.app' || host === 'admin.transconnect.app') {
+      if (host === 'admin-staging.transconnect.app' || host === 'staging-admin.transconnect.app' || host === 'admin.transconnect.app') {
         return `${protocol}//${host}`;
       }
     }
