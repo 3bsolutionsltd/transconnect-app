@@ -95,8 +95,20 @@ export default function LoginPage() {
           </div>
 
           <div className="grid grid-cols-2 gap-3 mb-4">
-            <button type="button" className="tc-social-btn">Google</button>
-            <button type="button" className="tc-social-btn">Facebook</button>
+            <button
+              type="button"
+              className="tc-social-btn"
+              onClick={() => toast('Google sign-in is coming soon. Please use email or phone OTP for now.', { icon: '⏳' })}
+            >
+              Google
+            </button>
+            <button
+              type="button"
+              className="tc-social-btn"
+              onClick={() => toast('Facebook sign-in is coming soon. Please use email or phone OTP for now.', { icon: '⏳' })}
+            >
+              Facebook
+            </button>
           </div>
 
           <div className="tc-auth-separator"><span>or sign in with email</span></div>
@@ -166,7 +178,11 @@ export default function LoginPage() {
             </StyledButton>
 
             <div className="tc-auth-separator"><span>or</span></div>
-            <button type="button" className="tc-social-btn !h-12 !bg-[#eaf2ff] !text-[#21416f]">
+            <button
+              type="button"
+              className="tc-social-btn !h-12 !bg-[#eaf2ff] !text-[#21416f]"
+              onClick={() => router.push('/login/phone-otp')}
+            >
               <Smartphone className="h-4 w-4" />
               Sign in with Phone Number (OTP)
             </button>

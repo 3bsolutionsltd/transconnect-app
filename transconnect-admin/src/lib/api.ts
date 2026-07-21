@@ -95,5 +95,74 @@ export const api = {
   }
 };
 
+export interface AuthNotificationsHealthResponse {
+  success: boolean;
+  timestamp: string;
+  environment: string;
+  auth: {
+    emailSignup: {
+      registerEndpoint: string;
+      verifyEndpoint: string;
+      resendEndpoint: string;
+      emailOtpConfigured: boolean;
+      smtpConfigured: boolean;
+      emailOtpStatus: {
+        configured: boolean;
+        error?: string;
+      };
+    };
+    phoneOtpSignupLogin: {
+      requestEndpoint: string;
+      verifyEndpoint: string;
+      otpExpirySeconds: number;
+      demoMode: boolean;
+      providerReady: boolean;
+      providerStatus: any;
+      otpStore: {
+        type: string;
+        productionSafe: boolean;
+      };
+    };
+  };
+  notifications: {
+    channels: {
+      email: { configured: boolean; from: string | null };
+      sms: { configured: boolean; providers: any };
+      push: { configured: boolean; provider: string };
+      inApp: { configured: boolean };
+    };
+    adminWorkflow: {
+      adminEmailConfigured: boolean;
+      adminEmailTarget: string | null;
+      note: string;
+    };
+  };
+  risks: string[];
+}
+
+export interface AuthNotificationsTestResponse {
+  success: boolean;
+  channel: 'email' | 'sms' | 'both';
+  message: string;
+  timestamp: string;
+  results: {
+    email?: { success: boolean; messageId?: string; error?: string; target?: string };
+    sms?: { success: boolean; messageId?: string; error?: string; provider?: string; target?: string };
+  };
+}
+
+export const systemHealthApi = {
+  getAuthNotificationsHealth: async (): Promise<AuthNotificationsHealthResponse> => {
+    return api.get<AuthNotificationsHealthResponse>('/admin/system-health/auth-notifications');
+  },
+  sendAuthNotificationTest: async (payload: {
+    channel: 'email' | 'sms' | 'both';
+    email?: string;
+    phoneNumber?: string;
+  }): Promise<AuthNotificationsTestResponse> => {
+    return api.post<AuthNotificationsTestResponse>('/admin/system-health/auth-notifications/test', payload);
+  },
+};
+
 export { ApiError };
 export type { ApiResponse };

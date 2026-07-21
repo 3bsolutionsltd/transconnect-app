@@ -22,6 +22,9 @@ export default function RegisterPage() {
   const [showPassword, setShowPassword] = useState(false);
   const [showConfirmPassword, setShowConfirmPassword] = useState(false);
   const [loading, setLoading] = useState(false);
+  const [emailVerificationStep, setEmailVerificationStep] = useState(false);
+  const [verificationEmail, setVerificationEmail] = useState('');
+  const [emailOtp, setEmailOtp] = useState('');
   const router = useRouter();
 
   function handleInputChange(e: React.ChangeEvent<HTMLInputElement>) {
@@ -60,12 +63,55 @@ export default function RegisterPage() {
       
       const result = await authApi.register(userData);
       console.log('Registration successful:', result); // Debug log
-      
-      toast.success(`Welcome to TransConnect, ${result.user.firstName}!`);
-      router.push('/search');
+
+      if (result?.verificationRequired) {
+        setVerificationEmail(result?.user?.email || userData.email);
+        setEmailVerificationStep(true);
+        toast.success(result?.verificationDelivery?.message || 'Account created. Enter the verification code sent to your email.');
+      } else if (result?.token && result?.user) {
+        toast.success(`Welcome to TransConnect, ${result.user.firstName}!`);
+        router.push('/search');
+      } else {
+        toast.success('Account created successfully. Please sign in.');
+        router.push('/login');
+      }
     } catch (error: any) {
       console.error('Registration error:', error);
       toast.error(error.response?.data?.error || 'Registration failed. Please try again.');
+    } finally {
+      setLoading(false);
+    }
+  }
+
+  async function handleVerifyEmailOtp(e: React.FormEvent) {
+    e.preventDefault();
+    if (emailOtp.length !== 6) {
+      toast.error('Please enter the 6-digit verification code');
+      return;
+    }
+
+    setLoading(true);
+    try {
+      const result = await authApi.verifyEmailOtp(verificationEmail, emailOtp);
+      toast.success(result?.message || 'Email verified successfully');
+      router.push('/search');
+    } catch (error: any) {
+      console.error('Email OTP verification error:', error);
+      toast.error(error.response?.data?.error || 'Verification failed. Please try again.');
+    } finally {
+      setLoading(false);
+    }
+  }
+
+  async function handleResendEmailOtp() {
+    if (!verificationEmail) return;
+    setLoading(true);
+    try {
+      const result = await authApi.resendEmailVerification(verificationEmail);
+      toast.success(result?.message || 'Verification code resent successfully');
+    } catch (error: any) {
+      console.error('Resend email OTP error:', error);
+      toast.error(error.response?.data?.error || 'Failed to resend code. Please try again.');
     } finally {
       setLoading(false);
     }
@@ -114,16 +160,35 @@ export default function RegisterPage() {
         <div className="tc-auth-form-shell">
           <div className="text-center mb-7">
             <Heading as="h2" className="text-[#192c45] mb-2">Create your account</Heading>
-            <p className="text-[#89a0bf]">Fill in the details below — takes less than 2 minutes.</p>
+            <p className="text-[#89a0bf]">
+              {emailVerificationStep
+                ? 'Enter the 6-digit code sent to your email to activate your account.'
+                : 'Fill in the details below — takes less than 2 minutes.'}
+            </p>
           </div>
 
-          <div className="grid grid-cols-2 gap-3 mb-4">
-            <button type="button" className="tc-social-btn">Continue with Google</button>
-            <button type="button" className="tc-social-btn">Continue with Facebook</button>
-          </div>
+          {!emailVerificationStep && (
+            <div className="grid grid-cols-2 gap-3 mb-4">
+              <button
+                type="button"
+                className="tc-social-btn"
+                onClick={() => toast('Google sign-up is coming soon. Please use email or phone OTP for now.', { icon: '⏳' })}
+              >
+                Continue with Google
+              </button>
+              <button
+                type="button"
+                className="tc-social-btn"
+                onClick={() => toast('Facebook sign-up is coming soon. Please use email or phone OTP for now.', { icon: '⏳' })}
+              >
+                Continue with Facebook
+              </button>
+            </div>
+          )}
 
-          <div className="tc-auth-separator"><span>or register with email</span></div>
+          <div className="tc-auth-separator"><span>{emailVerificationStep ? 'verify your email' : 'or register with email'}</span></div>
 
+          {!emailVerificationStep ? (
           <form onSubmit={handleSubmit} className="space-y-4">
             <div className="grid grid-cols-2 gap-4">
               <div>
@@ -276,10 +341,62 @@ export default function RegisterPage() {
               {loading ? 'Creating Account...' : 'Create Account'}
             </StyledButton>
 
-            <button type="button" className="tc-social-btn !h-12">
+            <button
+              type="button"
+              className="tc-social-btn !h-12"
+              onClick={() => router.push('/login/phone-otp')}
+            >
               Register with Phone Number (OTP)
             </button>
           </form>
+          ) : (
+          <form onSubmit={handleVerifyEmailOtp} className="space-y-4">
+            <div>
+              <label htmlFor="verificationEmail" className="tc-label">Email Address</label>
+              <input
+                id="verificationEmail"
+                type="email"
+                value={verificationEmail}
+                readOnly
+                className="tc-input bg-[#f3f7fd]"
+              />
+            </div>
+
+            <div>
+              <label htmlFor="emailOtp" className="tc-label">Verification Code</label>
+              <input
+                id="emailOtp"
+                type="text"
+                value={emailOtp}
+                onChange={(e) => setEmailOtp(e.target.value.replace(/\D/g, '').slice(0, 6))}
+                placeholder="Enter 6-digit code"
+                className="tc-input text-center tracking-[0.35em]"
+                inputMode="numeric"
+                maxLength={6}
+                required
+              />
+            </div>
+
+            <StyledButton
+              type="submit"
+              variant="primary"
+              size="lg"
+              className="w-full touch-manipulation mt-2 !py-3.5 !text-lg"
+              disabled={loading || emailOtp.length !== 6}
+            >
+              {loading ? 'Verifying...' : 'Verify Email & Continue'}
+            </StyledButton>
+
+            <button
+              type="button"
+              className="tc-social-btn !h-12"
+              onClick={handleResendEmailOtp}
+              disabled={loading}
+            >
+              Resend Verification Code
+            </button>
+          </form>
+          )}
 
           <div className="text-center text-sm mt-6 text-[#8ca4c4]">
             Already have an account? <Link href="/login" className="tc-link-accent">Sign in →</Link>

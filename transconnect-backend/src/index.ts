@@ -31,6 +31,7 @@ import operatorPortalRoutes from './routes/operator-portal';
 import adminOperatorUserRoutes from './routes/admin-operator-users';
 import databaseAdminRoutes from './routes/admin/database';
 import systemFixesRoutes from './routes/admin/system-fixes';
+import systemHealthRoutes from './routes/admin/system-health';
 import adminSeedRoutes from './routes/admin-seed';
 import agentRoutes from './routes/agents';
 import segmentRoutes from './routes/segments'; // NEW: Route segments management
@@ -170,6 +171,7 @@ app.use('/api/operator-management', operatorManagementRoutes);
 app.use('/api/admin/operator-users', adminOperatorUserRoutes);
 app.use('/api/admin/database', databaseAdminRoutes);
 app.use('/api/admin/system-fixes', systemFixesRoutes);
+app.use('/api/admin/system-health', systemHealthRoutes);
 app.use('/api/admin', adminSeedRoutes);
 app.use('/api/agents', agentRoutes);
 

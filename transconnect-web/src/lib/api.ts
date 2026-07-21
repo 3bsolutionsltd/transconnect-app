@@ -73,6 +73,34 @@ export const authApi = {
     return response.data;
   },
 
+  async verifyEmailOtp(email: string, otp: string) {
+    const response = await api.post('/auth/verify-email-otp', { email, otp });
+    if (response.data.token && typeof window !== 'undefined') {
+      localStorage.setItem('token', response.data.token);
+      localStorage.setItem('user', JSON.stringify(response.data.user));
+    }
+    return response.data;
+  },
+
+  async resendEmailVerification(email: string) {
+    const response = await api.post('/auth/resend-email-verification', { email });
+    return response.data;
+  },
+
+  async requestPhoneOtp(phoneNumber: string) {
+    const response = await api.post('/auth/request-otp', { phoneNumber });
+    return response.data;
+  },
+
+  async verifyPhoneOtp(phoneNumber: string, otp: string) {
+    const response = await api.post('/auth/verify-otp', { phoneNumber, otp });
+    if (response.data.token && typeof window !== 'undefined') {
+      localStorage.setItem('token', response.data.token);
+      localStorage.setItem('user', JSON.stringify(response.data.user));
+    }
+    return response.data;
+  },
+
   logout() {
     if (typeof window !== 'undefined') {
       localStorage.removeItem('token');
@@ -100,6 +128,13 @@ export const authApi = {
       return !!localStorage.getItem('token');
     }
     return false;
+  },
+
+  setSession(user: any, token: string) {
+    if (typeof window !== 'undefined') {
+      localStorage.setItem('token', token);
+      localStorage.setItem('user', JSON.stringify(user));
+    }
   }
 };
 
