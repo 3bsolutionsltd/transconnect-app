@@ -3,13 +3,29 @@ import { NextRequest, NextResponse } from 'next/server'
 export function middleware(request: NextRequest) {
   const hostname = request.headers.get('host') || ''
   const url = request.nextUrl.clone()
+  const bareHost = hostname.split(':')[0]
   
   console.log(`[Middleware] Host: ${hostname}, Path: ${url.pathname}`)
 
   // Handle admin path on main domain - redirect to admin subdomain
-  if ((hostname === 'transconnect.app' || hostname === 'www.transconnect.app' || hostname === 'localhost:3000') && url.pathname.startsWith('/admin')) {
+  if ((
+    bareHost === 'transconnect.app' ||
+    bareHost === 'www.transconnect.app' ||
+    bareHost === 'staging.transconnect.app' ||
+    bareHost === 'www.staging.transconnect.app' ||
+    hostname === 'localhost:3000'
+  ) && url.pathname.startsWith('/admin')) {
     const redirectUrl = new URL(request.url)
-    redirectUrl.hostname = 'admin.transconnect.app'
+
+    if (hostname === 'localhost:3000') {
+      redirectUrl.protocol = 'http:'
+      redirectUrl.host = 'localhost:3001'
+    } else if (bareHost === 'staging.transconnect.app' || bareHost === 'www.staging.transconnect.app') {
+      redirectUrl.hostname = 'staging-admin.transconnect.app'
+    } else {
+      redirectUrl.hostname = 'admin.transconnect.app'
+    }
+
     redirectUrl.pathname = url.pathname.replace('/admin', '') || '/'
     console.log(`[Middleware] Redirecting admin to: ${redirectUrl.toString()}`)
     return NextResponse.redirect(redirectUrl, 301)

@@ -30,6 +30,37 @@ export default function Header() {
 
   const isAdmin = user?.role === 'ADMIN' || user?.role === 'OPERATOR';
 
+  const getAdminPortalBaseUrl = () => {
+    const fromEnv = process.env.NEXT_PUBLIC_ADMIN_PORTAL_URL?.trim();
+    if (fromEnv) {
+      return fromEnv.replace(/\/+$/, '');
+    }
+
+    if (typeof window !== 'undefined') {
+      const host = window.location.hostname;
+      const protocol = window.location.protocol;
+
+      if (host === 'localhost' || host === '127.0.0.1') {
+        return `${protocol}//localhost:3001`;
+      }
+
+      if (host === 'staging.transconnect.app' || host === 'www.staging.transconnect.app') {
+        return 'https://staging-admin.transconnect.app';
+      }
+
+      if (host === 'staging-admin.transconnect.app' || host === 'admin.transconnect.app') {
+        return `${protocol}//${host}`;
+      }
+    }
+
+    return 'https://admin.transconnect.app';
+  };
+
+  const getAdminPortalUrl = (path = '/') => {
+    const normalizedPath = path.startsWith('/') ? path : `/${path}`;
+    return `${getAdminPortalBaseUrl()}${normalizedPath === '/' ? '' : normalizedPath}`;
+  };
+
   useEffect(() => {
     setAccountMenuOpen(false);
   }, [pathname]);
@@ -67,9 +98,9 @@ export default function Header() {
               <span className="whitespace-nowrap">Trusted Operators</span>
             </Link>
             {isAdmin && (
-              <Link href="/admin" className={`font-medium transition-colors ${linkClass('/admin')}`}>
+              <a href={getAdminPortalUrl('/')} className="font-medium transition-colors text-slate-300 hover:text-white">
                 <span className="whitespace-nowrap">Admin</span>
-              </Link>
+              </a>
             )}
           </nav>
 
@@ -104,15 +135,15 @@ export default function Header() {
                       </Link>
                       {isAdmin && (
                         <>
-                          <Link href="/admin" className="block px-4 py-2 text-sm text-slate-100 hover:bg-[#1b3e60]" onClick={() => setAccountMenuOpen(false)}>
+                          <a href={getAdminPortalUrl('/')} className="block px-4 py-2 text-sm text-slate-100 hover:bg-[#1b3e60]" onClick={() => setAccountMenuOpen(false)}>
                             Admin Dashboard
-                          </Link>
-                          <Link href="/admin/routes" className="block px-4 py-2 text-sm text-slate-100 hover:bg-[#1b3e60]" onClick={() => setAccountMenuOpen(false)}>
+                          </a>
+                          <a href={getAdminPortalUrl('/routes')} className="block px-4 py-2 text-sm text-slate-100 hover:bg-[#1b3e60]" onClick={() => setAccountMenuOpen(false)}>
                             Manage Routes
-                          </Link>
-                          <Link href="/admin/analytics" className="block px-4 py-2 text-sm text-slate-100 hover:bg-[#1b3e60]" onClick={() => setAccountMenuOpen(false)}>
+                          </a>
+                          <a href={getAdminPortalUrl('/analytics')} className="block px-4 py-2 text-sm text-slate-100 hover:bg-[#1b3e60]" onClick={() => setAccountMenuOpen(false)}>
                             Analytics
-                          </Link>
+                          </a>
                         </>
                       )}
                       <button
@@ -203,30 +234,30 @@ export default function Header() {
               )}
               {isAdmin && (
                 <>
-                  <Link 
-                    href="/admin" 
+                  <a
+                    href={getAdminPortalUrl('/')} 
                     className="block px-3 py-3 text-slate-300 hover:text-white font-medium rounded-lg hover:bg-[#13273d] transition-colors touch-manipulation"
                     onClick={() => setMobileMenuOpen(false)}
                   >
                     <BarChart3 className="inline h-4 w-4 mr-2" />
                     Dashboard
-                  </Link>
-                  <Link 
-                    href="/admin/routes" 
+                  </a>
+                  <a
+                    href={getAdminPortalUrl('/routes')} 
                     className="block px-3 py-3 text-slate-300 hover:text-white font-medium rounded-lg hover:bg-[#13273d] transition-colors touch-manipulation"
                     onClick={() => setMobileMenuOpen(false)}
                   >
                     <Bus className="inline h-4 w-4 mr-2" />
                     Routes
-                  </Link>
-                  <Link 
-                    href="/admin/analytics" 
+                  </a>
+                  <a
+                    href={getAdminPortalUrl('/analytics')} 
                     className="block px-3 py-3 text-slate-300 hover:text-white font-medium rounded-lg hover:bg-[#13273d] transition-colors touch-manipulation"
                     onClick={() => setMobileMenuOpen(false)}
                   >
                     <BarChart3 className="inline h-4 w-4 mr-2" />
                     Analytics
-                  </Link>
+                  </a>
                 </>
               )}
               
