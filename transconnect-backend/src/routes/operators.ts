@@ -6,6 +6,62 @@ import { validateAndNormalizeContact } from '../utils/contact-validation';
 
 const router = Router();
 
+const FIELD_OPERATOR_VIEW_ROLES = ['MASTER_FIELD_OPERATOR', 'ADMIN', 'MANAGER'];
+
+// Master field operator view: all operators with company, contact, and status summary
+router.get('/field-ops/all', authenticateToken, async (req: Request, res: Response) => {
+  try {
+    const userRole = (req as any).user.role;
+
+    if (!FIELD_OPERATOR_VIEW_ROLES.includes(userRole)) {
+      return res.status(403).json({
+        error: 'Only master field operators can view all operator information',
+      });
+    }
+
+    const operators = await prisma.operator.findMany({
+      include: {
+        user: {
+          select: {
+            firstName: true,
+            lastName: true,
+            email: true,
+            phone: true,
+          },
+        },
+      },
+      orderBy: {
+        createdAt: 'desc',
+      },
+    });
+
+    res.json({
+      success: true,
+      count: operators.length,
+      operators: operators.map((operator) => ({
+        id: operator.id,
+        companyName: operator.companyName,
+        license: operator.license,
+        contact: {
+          name: `${operator.user.firstName} ${operator.user.lastName}`.trim(),
+          email: operator.user.email,
+          phone: operator.user.phone,
+        },
+        status: {
+          approved: operator.approved,
+          portalEnabled: operator.portalEnabled,
+          managedByAgent: operator.managedByAgent,
+        },
+        createdAt: operator.createdAt,
+        updatedAt: operator.updatedAt,
+      })),
+    });
+  } catch (error) {
+    console.error('Error fetching field operator view of operators:', error);
+    res.status(500).json({ error: 'Failed to fetch operators for field operations' });
+  }
+});
+
 // Get all operators (enhanced for agent integration)
 router.get('/', async (req: Request, res: Response) => {
   try {

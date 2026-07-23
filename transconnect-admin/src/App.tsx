@@ -29,6 +29,7 @@ import QRScannerPage from './components/QRScannerPage';
 import AgentManagement from './components/AgentManagement';
 import OperatorLayout from './components/operator/OperatorLayout';
 import MasterBookings from './components/MasterBookings';
+import FieldOperatorDirectory from './components/FieldOperatorDirectory';
 
 // Dashboard Component
 const Dashboard = () => {
@@ -513,6 +514,7 @@ const AdminLayout = () => {
   const { user, logout } = useAuth();
   const location = useLocation();
   const isAdmin = user?.role === 'ADMIN';
+  const isMasterFieldOperator = user?.role === 'MASTER_FIELD_OPERATOR';
 
   // Admin-only navigation - operators don't see these
   const adminNavigation = isAdmin
@@ -526,6 +528,12 @@ const AdminLayout = () => {
         { name: 'Analytics', href: '/analytics', icon: BarChart3 },
         { name: 'Users', href: '/users', icon: Users },
         { name: 'Settings', href: '/settings', icon: Settings },
+      ]
+    : isMasterFieldOperator
+    ? [
+        { name: 'Dashboard', href: '/', icon: Home },
+        { name: 'Bookings', href: '/bookings', icon: Calendar },
+        { name: 'Operators', href: '/operators-directory', icon: Building2 },
       ]
     : [
         { name: 'Dashboard', href: '/', icon: Home },
@@ -665,6 +673,7 @@ const AdminLayout = () => {
               <Route path="/qr-scanner" element={isAdmin ? <QRScannerPage /> : <MasterBookings />} />
               <Route path="/analytics" element={isAdmin ? <Analytics /> : <MasterBookings />} />
               <Route path="/users" element={isAdmin ? <UserManagement /> : <MasterBookings />} />
+              <Route path="/operators-directory" element={isMasterFieldOperator ? <FieldOperatorDirectory /> : <MasterBookings />} />
               <Route path="/settings" element={isAdmin ? <div>Settings page coming soon...</div> : <MasterBookings />} />
             </Routes>
           </div>
