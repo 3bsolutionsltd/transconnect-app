@@ -131,7 +131,8 @@ Contact support for rebooking assistance.`
 
   public async sendSMS(data: SMSData): Promise<{ success: boolean; messageId?: string; error?: string }> {
     // Development/Demo mode - always succeed and log
-    const isDemoMode = process.env.NODE_ENV !== 'production' || process.env.DEMO_MODE === 'true';
+    const nodeEnv = process.env.NODE_ENV || 'development';
+    const isDemoMode = process.env.DEMO_MODE === 'true' || nodeEnv === 'development' || nodeEnv === 'test';
     
     if (isDemoMode) {
       console.log(`📱 [DEMO MODE] SMS to ${data.phoneNumber}:`);

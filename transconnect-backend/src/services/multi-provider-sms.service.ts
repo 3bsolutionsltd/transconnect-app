@@ -7,6 +7,7 @@ export interface MultiProviderSMSData {
   template?: string;
   templateData?: Record<string, any>;
   preferredProvider?: 'esms' | 'twilio' | 'auto';
+  allowFallback?: boolean;
 }
 
 export interface SMSResult {
@@ -68,6 +69,8 @@ export class MultiProviderSMSService {
 
   public async sendSMS(data: MultiProviderSMSData): Promise<SMSResult> {
     const primaryProvider = this.selectProvider(data.phoneNumber, data.preferredProvider);
+    const explicitProviderRequested = data.preferredProvider === 'esms' || data.preferredProvider === 'twilio';
+    const allowFallback = data.allowFallback ?? !explicitProviderRequested;
     
     console.log(`📱 SMS Routing Decision:`);
     console.log(`   Phone: ${data.phoneNumber}`);
@@ -78,6 +81,10 @@ export class MultiProviderSMSService {
     const result = await this.trySendWithProvider(data, primaryProvider);
     
     if (result.success) {
+      return result;
+    }
+
+    if (!allowFallback) {
       return result;
     }
 
@@ -164,7 +171,10 @@ Show this SMS as backup ticket.`;
     });
   }
 
-  public async sendTestSMS(phoneNumber: string): Promise<SMSResult> {
+  public async sendTestSMS(
+    phoneNumber: string,
+    options: { preferredProvider?: 'esms' | 'twilio' | 'auto'; allowFallback?: boolean } = {}
+  ): Promise<SMSResult> {
     return this.sendSMS({
       phoneNumber,
       message: `🧪 TransConnect Multi-Provider SMS Test
@@ -172,7 +182,8 @@ Time: ${new Date().toLocaleString()}
 This message was routed automatically to the best provider for your region.
 • African numbers → eSMS Africa (UGX 30)
 • International → Twilio (USD ~0.05)`,
-      preferredProvider: 'auto'
+      preferredProvider: options.preferredProvider || 'auto',
+      allowFallback: options.allowFallback,
     });
   }
 
