@@ -28,10 +28,11 @@ export class EmailOTPService {
 
   private async initializeTransporter(): Promise<void> {
     try {
-      const smtpHost = process.env.SMTP_HOST;
-      const smtpPort = parseInt(process.env.SMTP_PORT || '587');
-      const smtpUser = process.env.SMTP_USER;
-      const smtpPass = process.env.SMTP_PASS;
+      const smtpHost = process.env.SMTP_HOST || process.env.EMAIL_HOST;
+      const smtpPort = parseInt(process.env.SMTP_PORT || process.env.EMAIL_PORT || '587');
+      const smtpUser = process.env.SMTP_USER || process.env.EMAIL_USER || process.env.SAMTP_USER;
+      const smtpPass = process.env.SMTP_PASS || process.env.EMAIL_PASS;
+      const smtpSecure = (process.env.SMTP_SECURE || '').toLowerCase() === 'true';
 
       if (!smtpHost || !smtpUser || !smtpPass) {
         console.warn('Email configuration incomplete. Email OTP service will be disabled.');
@@ -41,7 +42,7 @@ export class EmailOTPService {
       this.transporter = nodemailer.createTransport({
         host: smtpHost,
         port: smtpPort,
-        secure: smtpPort === 465,
+        secure: smtpSecure || smtpPort === 465,
         auth: {
           user: smtpUser,
           pass: smtpPass,

@@ -15,9 +15,9 @@ export class ESMSAfricaService {
   private isConfigured: boolean = false;
 
   private constructor() {
-    this.accountId = process.env.ESMS_AFRICA_ACCOUNT_ID || '';
-    this.apiKey = process.env.ESMS_AFRICA_API_KEY || '';
-    this.senderId = process.env.ESMS_AFRICA_SENDER_ID || ''; // Empty default for better delivery
+    this.accountId = process.env.ESMS_AFRICA_ACCOUNT_ID || process.env.ESMS_USERNAME || process.env.ESMS_ACCOUNT_ID || '';
+    this.apiKey = process.env.ESMS_AFRICA_API_KEY || process.env.ESMS_API_KEY || '';
+    this.senderId = process.env.ESMS_AFRICA_SENDER_ID || process.env.ESMS_SENDER_ID || ''; // Empty default for better delivery
     this.apiUrl = 'https://api.esmsafrica.io/api/sms/send';
     
     this.isConfigured = !!(this.accountId && this.apiKey);
@@ -28,7 +28,7 @@ export class ESMSAfricaService {
       console.log(`🏷️  Sender ID: ${this.senderId || 'default/empty'}`);
       console.log('ℹ️  Using empty sender ID for better delivery rates');
     } else {
-      console.warn('⚠️ eSMS Africa configuration incomplete. Check ESMS_AFRICA_ACCOUNT_ID and ESMS_AFRICA_API_KEY');
+      console.warn('⚠️ eSMS Africa configuration incomplete. Check ESMS_AFRICA_ACCOUNT_ID/ESMS_USERNAME and ESMS_AFRICA_API_KEY/ESMS_API_KEY');
     }
   }
 
@@ -269,6 +269,8 @@ export class ESMSAfricaService {
         console.error('   Environment check:');
         console.error(`   • ESMS_AFRICA_ACCOUNT_ID: ${process.env.ESMS_AFRICA_ACCOUNT_ID}`);
         console.error(`   • ESMS_AFRICA_API_KEY: ${process.env.ESMS_AFRICA_API_KEY?.substring(0, 8)}...${process.env.ESMS_AFRICA_API_KEY?.slice(-8)}`);
+        console.error(`   • ESMS_USERNAME: ${process.env.ESMS_USERNAME}`);
+        console.error(`   • ESMS_API_KEY: ${process.env.ESMS_API_KEY?.substring(0, 8)}...${process.env.ESMS_API_KEY?.slice(-8)}`);
         console.error('   Possible issues:');
         console.error('   • API key is incorrect/expired');
         console.error('   • Account is suspended/inactive');
@@ -387,7 +389,7 @@ export class ESMSAfricaService {
       configured: this.isConfigured,
       accountId: this.accountId ? `${this.accountId.substring(0, 4)}***` : 'Not set',
       senderId: this.senderId,
-      error: !this.isConfigured ? 'Check ESMS_AFRICA_ACCOUNT_ID and ESMS_AFRICA_API_KEY environment variables' : undefined
+      error: !this.isConfigured ? 'Check ESMS_AFRICA_ACCOUNT_ID/ESMS_USERNAME and ESMS_AFRICA_API_KEY/ESMS_API_KEY environment variables' : undefined
     };
   }
 
