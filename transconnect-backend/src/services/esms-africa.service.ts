@@ -9,27 +9,44 @@ export interface ESMSAfricaSMSData {
 export class ESMSAfricaService {
   private static instance: ESMSAfricaService;
   private accountId: string;
+  private username: string;
   private apiKey: string;
   private senderId: string;
   private apiUrl: string;
   private isConfigured: boolean = false;
 
   private constructor() {
-    this.accountId = process.env.ESMS_AFRICA_ACCOUNT_ID || process.env.ESMS_USERNAME || process.env.ESMS_ACCOUNT_ID || '';
+    this.accountId = process.env.ESMS_AFRICA_ACCOUNT_ID || process.env.ESMS_ACCOUNT_ID || '';
+    this.username = process.env.ESMS_USERNAME || '';
+    if (!this.accountId && this.username) {
+      // Backward compatibility for environments that store account identifier under ESMS_USERNAME.
+      this.accountId = this.username;
+    }
     this.apiKey = process.env.ESMS_AFRICA_API_KEY || process.env.ESMS_API_KEY || '';
-    this.senderId = process.env.ESMS_AFRICA_SENDER_ID || process.env.ESMS_SENDER_ID || ''; // Empty default for better delivery
-    this.apiUrl = 'https://api.esmsafrica.io/api/sms/send';
+    this.senderId = process.env.ESMS_AFRICA_SENDER_ID || process.env.ESMS_SENDER_ID || '';
+    this.apiUrl = process.env.ESMS_API_BASE_URL || 'https://sms.esmsafrica.io/api/messages/send';
     
-    this.isConfigured = !!(this.accountId && this.apiKey);
+    // Official API key auth only requires a Bearer key.
+    this.isConfigured = !!this.apiKey;
     
     if (this.isConfigured) {
       console.log('✅ eSMS Africa service initialized successfully');
-      console.log(`📱 Account ID: ${this.accountId}`);
+      console.log(`📱 Account ID: ${this.accountId || 'not required in Bearer mode'}`);
+      if (this.username) {
+        console.log(`👤 Username: ${this.username}`);
+      }
       console.log(`🏷️  Sender ID: ${this.senderId || 'default/empty'}`);
-      console.log('ℹ️  Using empty sender ID for better delivery rates');
+      console.log(`🔗 API URL: ${this.apiUrl}`);
     } else {
-      console.warn('⚠️ eSMS Africa configuration incomplete. Check ESMS_AFRICA_ACCOUNT_ID/ESMS_USERNAME and ESMS_AFRICA_API_KEY/ESMS_API_KEY');
+      console.warn('⚠️ eSMS Africa configuration incomplete. Check ESMS_AFRICA_API_KEY or ESMS_API_KEY');
     }
+  }
+
+  private buildAuthHeaders(): Record<string, string> {
+    return {
+      Authorization: `Bearer ${this.apiKey}`,
+      'Content-Type': 'application/json',
+    };
   }
 
   public static getInstance(): ESMSAfricaService {
@@ -126,46 +143,11 @@ export class ESMSAfricaService {
       };
     }
 
-    // API vs Platform delivery issue - test different formats
-    const testApiFormats = process.env.ESMS_TEST_API_FORMATS === 'true';
-    
-    if (testApiFormats) {
-      console.log('🧪 Testing different API formats for delivery...');
-      
-      // Test multiple formats to find working one
-      const formats = [
-        { name: 'Current Format', payload: { phoneNumber: data.phoneNumber, text: data.message } },
-        { name: 'No Plus Sign', payload: { phoneNumber: data.phoneNumber.replace('+', ''), text: data.message } },
-        { name: 'With Country', payload: { phoneNumber: data.phoneNumber, text: data.message, country: 'UG' } },
-        { name: 'With Route', payload: { phoneNumber: data.phoneNumber, text: data.message, route: 'transactional' } }
-      ];
-      
-      for (const format of formats) {
-        console.log(`🔍 Testing ${format.name}:`, format.payload);
-        // We'll still send with current format but log alternatives
-      }
-    }
-
-    // Delivery issues detection - if we get SUCCESS but phones aren't receiving
-    const hasDeliveryIssues = process.env.ESMS_DELIVERY_ISSUES === 'true';
-    
-    if (hasDeliveryIssues) {
-      console.log('⚠️ eSMS Africa API delivery issues detected - using email fallback strategy');
-      console.log(`📱 Would send SMS to ${data.phoneNumber}: ${data.message}`);
-      console.log('🎯 API shows SUCCESS but phone delivery failing (platform works)');
-      console.log('💡 Need to fix API format/endpoint - platform delivery confirmed working');
-      return { 
-        success: false, 
-        error: 'eSMS Africa API delivery issues - platform works, API format wrong',
-        provider: 'eSMS Africa (API Format Issue)'
-      };
-    }
-
     if (!this.isConfigured) {
       console.log(`📱 eSMS Africa would send SMS to ${data.phoneNumber}: ${data.message}`);
       return { 
         success: false, 
-        error: 'eSMS Africa not configured. Check ESMS_AFRICA_ACCOUNT_ID and ESMS_AFRICA_API_KEY.',
+        error: 'eSMS Africa not configured. Check ESMS_AFRICA_API_KEY or ESMS_API_KEY.',
         provider: 'eSMS Africa'
       };
     }
@@ -183,73 +165,52 @@ export class ESMSAfricaService {
       const formattedPhone = this.formatPhoneNumber(data.phoneNumber);
       
       console.log(`📱 Sending SMS via eSMS Africa to ${formattedPhone}...`);
-      
-      // Test different API formats since platform works but API doesn't
-      const testAlternativeFormats = process.env.ESMS_TRY_ALT_FORMATS === 'true';
-      
-      let payload: any;
-      
-      if (testAlternativeFormats) {
-        // Try format that might work better for API
-        console.log('🧪 Trying alternative API format...');
-        payload = {
-          phone: formattedPhone.replace('+', ''), // Remove + sign
-          message: data.message,
-          sender: 'SMS', // Simple sender
-          type: 'text',
-          route: 1 // Route 1 might be transactional
-        };
-        console.log('📤 Using alternative format for delivery test');
+
+      // Official eSMS Africa format per documentation.
+      const payload: any = {
+        to: formattedPhone,
+        text: data.message,
+      };
+
+      const senderId = data.senderId || this.senderId;
+      if (senderId && senderId.trim() !== '') {
+        payload.sender_id = senderId;
+        console.log(`📤 Using Sender ID: ${senderId}`);
       } else {
-        // Official eSMS Africa format per documentation
-        payload = {
-          phoneNumber: formattedPhone,
-          text: data.message
-        };
-        
-        // Only add senderId if it's not empty (better delivery rates)
-        const senderId = data.senderId || this.senderId;
-        if (senderId && senderId.trim() !== '') {
-          payload.senderId = senderId;
-          console.log(`📤 Using Sender ID: ${senderId}`);
-        } else {
-          console.log('📤 Using default sender (no custom ID for better delivery)');
-        }
+        console.log('📤 Using default sender ID');
       }
 
       console.log(`🔍 eSMS Africa request payload:`, JSON.stringify(payload, null, 2));
       console.log(`🔍 eSMS Africa headers:`, {
-        'X-Account-ID': this.accountId,
-        'X-API-Key': `${this.apiKey.substring(0, 8)}...${this.apiKey.slice(-8)}`,
+        Authorization: `Bearer ${this.apiKey.substring(0, 12)}...`,
         'Content-Type': 'application/json'
       });
       console.log(`🔍 Full API Key Length: ${this.apiKey.length} characters`);
+      console.log(`🔍 Endpoint: ${this.apiUrl}`);
 
       const response = await axios.post(
         this.apiUrl,
         payload,
         {
-          headers: {
-            'X-Account-ID': this.accountId,
-            'X-API-Key': this.apiKey,
-            'Content-Type': 'application/json'
-          },
+          headers: this.buildAuthHeaders(),
           timeout: 10000 // 10 second timeout
         }
       );
 
-      if (response.data.status === 'SUCCESS') {
-        console.log(`✅ eSMS Africa SMS sent successfully! Message ID: ${response.data.messageId}`);
+      if (response.data.status === 'SUCCESS' || response.data.status === 'submitted' || response.data.status === 'scheduled') {
+        const messageId = response.data.messageId || response.data.id;
+        console.log(`✅ eSMS Africa SMS sent successfully! Message ID: ${messageId}`);
         return {
           success: true,
-          messageId: response.data.messageId,
+          messageId,
           provider: 'eSMS Africa'
         };
       } else {
-        console.error('❌ eSMS Africa SMS failed:', response.data.reason || 'Unknown error');
+        const errorMessage = response.data.reason || response.data?.detail?.message || response.data?.detail || 'Unknown error';
+        console.error('❌ eSMS Africa SMS failed:', errorMessage);
         return {
           success: false,
-          error: response.data.reason || 'SMS sending failed',
+          error: String(errorMessage),
           provider: 'eSMS Africa'
         };
       }
@@ -260,10 +221,10 @@ export class ESMSAfricaService {
       // Enhanced debugging for 401 errors
       if (error.response?.status === 401) {
         console.error('🔑 Authentication failed - checking credentials:');
-        console.error(`   Account ID: ${this.accountId}`);
+        console.error(`   Account ID: ${this.accountId || 'not required in Bearer mode'}`);
         console.error(`   API Key: ${this.apiKey?.substring(0, 8)}...${this.apiKey?.slice(-8)}`); // Fixed substring
         console.error(`   Full API Key Length: ${this.apiKey?.length} characters`);
-        console.error(`   Expected: a323393abcee40489cc09bdf5a646fd0 (32 chars)`);
+        console.error(`   Expected key prefix: esms_live_ or esms_test_`);
         console.error(`   Sender ID: ${this.senderId}`);
         console.error(`   API URL: ${this.apiUrl}`);
         console.error('   Environment check:');
@@ -273,14 +234,14 @@ export class ESMSAfricaService {
         console.error(`   • ESMS_API_KEY: ${process.env.ESMS_API_KEY?.substring(0, 8)}...${process.env.ESMS_API_KEY?.slice(-8)}`);
         console.error('   Possible issues:');
         console.error('   • API key is incorrect/expired');
+        console.error('   • Using test key in live context or live key in test context');
         console.error('   • Account is suspended/inactive');
-        console.error('   • Wrong account ID');
         console.error('   • Environment variable not set correctly');
       }
       
       return {
         success: false,
-        error: error.response?.data?.reason || error.message || 'Failed to send SMS via eSMS Africa',
+        error: error.response?.data?.reason || error.response?.data?.detail?.message || error.response?.data?.detail || error.message || 'Failed to send SMS via eSMS Africa',
         provider: 'eSMS Africa'
       };
     }
@@ -298,20 +259,16 @@ export class ESMSAfricaService {
       
       // Official eSMS Africa test format per documentation
       const testPayload = {
-        phoneNumber: '+256700000000', // Test number
+        to: '+256700000000', // Test number
         text: 'Credential verification test - ignore',
-        senderId: this.senderId
+        ...(this.senderId ? { sender_id: this.senderId } : {})
       };
 
       const response = await axios.post(
         this.apiUrl,
         testPayload,
         {
-          headers: {
-            'X-Account-ID': this.accountId,
-            'X-API-Key': this.apiKey,
-            'Content-Type': 'application/json'
-          },
+          headers: this.buildAuthHeaders(),
           timeout: 10000
         }
       );
@@ -389,7 +346,7 @@ export class ESMSAfricaService {
       configured: this.isConfigured,
       accountId: this.accountId ? `${this.accountId.substring(0, 4)}***` : 'Not set',
       senderId: this.senderId,
-      error: !this.isConfigured ? 'Check ESMS_AFRICA_ACCOUNT_ID/ESMS_USERNAME and ESMS_AFRICA_API_KEY/ESMS_API_KEY environment variables' : undefined
+      error: !this.isConfigured ? 'Check ESMS_AFRICA_API_KEY or ESMS_API_KEY environment variables' : undefined
     };
   }
 
