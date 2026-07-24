@@ -10,6 +10,7 @@ beforeAll(() => {
 // Mock Prisma for testing
 export const mockPrisma = {
   user: {
+    findFirst: jest.fn(),
     findUnique: jest.fn(),
     create: jest.fn(),
     findMany: jest.fn(),

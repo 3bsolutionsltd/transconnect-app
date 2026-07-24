@@ -1,16 +1,13 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import { 
   Globe, 
   Save, 
   ExternalLink, 
   AlertCircle, 
   CheckCircle, 
-  Image as ImageIcon,
-  Palette,
   Eye,
   Info
 } from 'lucide-react';
-import { useAuth } from '../../contexts/AuthContext';
 
 interface PortalConfig {
   slug: string;
@@ -22,21 +19,7 @@ interface PortalConfig {
   portalEnabled: boolean;
 }
 
-interface PortalConfigResponse {
-  success: boolean;
-  slug?: string;
-  brandLogoUrl?: string;
-  heroImageUrl?: string;
-  brandColor?: string;
-  tagline?: string;
-  description?: string;
-  portalEnabled?: boolean;
-  portalUrl?: string;
-  isConfigured?: boolean;
-}
-
 const OperatorPortalConfig = () => {
-  const { user } = useAuth();
   const [config, setConfig] = useState<PortalConfig>({
     slug: '',
     brandLogoUrl: '',
@@ -46,7 +29,6 @@ const OperatorPortalConfig = () => {
     description: '',
     portalEnabled: false
   });
-  const [originalSlug, setOriginalSlug] = useState<string>('');
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [message, setMessage] = useState<{ type: 'success' | 'error' | 'info'; text: string } | null>(null);
@@ -55,11 +37,7 @@ const OperatorPortalConfig = () => {
   const API_BASE_URL = (process.env.REACT_APP_API_URL || 'http://localhost:5000/api').replace(/\/api\/?$/, '') + '/api';
   const WEB_BASE_URL = process.env.REACT_APP_WEB_URL || 'http://localhost:3000';
 
-  useEffect(() => {
-    loadConfig();
-  }, []);
-
-  async function loadConfig() {
+  const loadConfig = useCallback(async () => {
     try {
       setLoading(true);
       const token = localStorage.getItem('admin_token');
@@ -88,7 +66,6 @@ const OperatorPortalConfig = () => {
         };
 
         setConfig(loadedConfig);
-        setOriginalSlug(configData.slug || '');
         setIsConfigured(configData.isConfigured || false);
 
         if (configData.isConfigured && configData.slug) {
@@ -109,7 +86,11 @@ const OperatorPortalConfig = () => {
     } finally {
       setLoading(false);
     }
-  }
+  }, [API_BASE_URL, WEB_BASE_URL]);
+
+  useEffect(() => {
+    loadConfig();
+  }, [loadConfig]);
 
   async function handleSave() {
     // Validation
@@ -165,7 +146,6 @@ const OperatorPortalConfig = () => {
         // Backend returns data nested under 'config' property
         const configData = data.config || data;
         
-        setOriginalSlug(configData.slug || config.slug);
         setIsConfigured(true);
         setMessage({ 
           type: 'success', 

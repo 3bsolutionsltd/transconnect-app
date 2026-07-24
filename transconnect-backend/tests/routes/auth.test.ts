@@ -7,10 +7,30 @@ import jwt from 'jsonwebtoken';
 jest.mock('../../src/lib/prisma', () => ({
   prisma: {
     user: {
+      findFirst: jest.fn(),
       findUnique: jest.fn(),
       create: jest.fn(),
     },
   }
+}));
+
+jest.mock('../../src/tools/agents/otp.tool', () => ({
+  sendOtpForIdentifier: jest.fn().mockResolvedValue({
+    otp: '123456',
+    expiry: new Date(Date.now() + 10 * 60 * 1000),
+  }),
+  verifyOtpCodeForIdentifier: jest.fn(),
+  sendOtp: jest.fn(),
+  verifyOtpCode: jest.fn(),
+}));
+
+jest.mock('../../src/services/email-otp.service', () => ({
+  __esModule: true,
+  default: {
+    getInstance: () => ({
+      sendOTP: jest.fn().mockResolvedValue({ success: true }),
+    }),
+  },
 }));
 
 jest.mock('bcryptjs');
@@ -44,6 +64,9 @@ app.use('/auth', authRoutes);
 describe('Auth Routes', () => {
   beforeEach(() => {
     jest.clearAllMocks();
+    mockPrisma.user.findFirst.mockReset();
+    mockPrisma.user.findUnique.mockReset();
+    mockPrisma.user.create.mockReset();
   });
 
   describe('POST /auth/register', () => {
@@ -59,10 +82,9 @@ describe('Auth Routes', () => {
     it('should register a new user successfully', async () => {
       const testUser = createTestUser();
       
-      mockPrisma.user.findUnique.mockResolvedValue(null);
+      mockPrisma.user.findFirst.mockResolvedValue(null);
       (mockBcrypt.hash as jest.Mock).mockResolvedValue('hashedPassword');
       mockPrisma.user.create.mockResolvedValue(testUser);
-      (mockJwt.sign as jest.Mock).mockReturnValue('test-token');
 
       const response = await request(app)
         .post('/auth/register')
@@ -70,12 +92,17 @@ describe('Auth Routes', () => {
 
       expect(response.status).toBe(201);
       expect(response.body).toHaveProperty('user');
-      expect(response.body).toHaveProperty('token');
+      expect(response.body.verificationRequired).toBe(true);
+      expect(response.body.verificationChannel).toBe('email');
       expect(response.body.user.email).toBe(validUserData.email);
-      expect(response.body.token).toBe('test-token');
 
-      expect(mockPrisma.user.findUnique).toHaveBeenCalledWith({
-        where: { email: validUserData.email }
+      expect(mockPrisma.user.findFirst).toHaveBeenCalledWith({
+        where: {
+          OR: [
+            { email: validUserData.email },
+            { phone: validUserData.phone },
+          ],
+        },
       });
       expect(mockBcrypt.hash).toHaveBeenCalledWith(validUserData.password, 12);
       expect(mockPrisma.user.create).toHaveBeenCalled();
@@ -83,14 +110,14 @@ describe('Auth Routes', () => {
 
     it('should return 400 if user already exists', async () => {
       const existingUser = createTestUser();
-      mockPrisma.user.findUnique.mockResolvedValue(existingUser);
+      mockPrisma.user.findFirst.mockResolvedValue(existingUser);
 
       const response = await request(app)
         .post('/auth/register')
         .send(validUserData);
 
       expect(response.status).toBe(400);
-      expect(response.body.error).toBe('User already exists');
+      expect(response.body.error).toBe('A user with this email or phone number already exists');
     });
 
     it('should return 400 for invalid email', async () => {
@@ -138,7 +165,7 @@ describe('Auth Routes', () => {
     });
 
     it('should handle server errors gracefully', async () => {
-      mockPrisma.user.findUnique.mockRejectedValue(new Error('Database error'));
+      mockPrisma.user.findFirst.mockRejectedValue(new Error('Database error'));
 
       const response = await request(app)
         .post('/auth/register')
