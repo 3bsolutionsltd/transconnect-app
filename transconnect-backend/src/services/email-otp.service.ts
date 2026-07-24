@@ -31,8 +31,8 @@ export class EmailOTPService {
       const smtpHost = process.env.SMTP_HOST || process.env.EMAIL_HOST;
       const smtpPort = parseInt(process.env.SMTP_PORT || process.env.EMAIL_PORT || '587');
       const smtpUser = process.env.SMTP_USER || process.env.EMAIL_USER;
-      const smtpPass = process.env.SMTP_PASS || process.env.EMAIL_PASS;
-      const smtpSecure = (process.env.SMTP_SECURE || '').toLowerCase() === 'true';
+      const smtpPass = process.env.SMTP_PASS || process.env.EMAIL_PASS || process.env.SMTP_PASSWORD || process.env.EMAIL_PASSWORD;
+      const smtpSecure = (process.env.SMTP_SECURE || process.env.EMAIL_SECURE || '').toLowerCase() === 'true';
 
       if (!smtpHost || !smtpUser || !smtpPass) {
         console.warn('Email configuration incomplete. Email OTP service will be disabled.');
@@ -159,7 +159,7 @@ export class EmailOTPService {
       console.log(`📧 Sending Email OTP to ${data.email}...`);
       
       const result = await this.transporter.sendMail({
-        from: process.env.SMTP_USER,
+        from: process.env.SMTP_FROM || process.env.EMAIL_FROM || process.env.SMTP_USER || process.env.EMAIL_USER,
         to: data.email,
         subject,
         html,
@@ -189,7 +189,7 @@ export class EmailOTPService {
   public getStatus(): { configured: boolean; error?: string } {
     return {
       configured: this.isConfigured,
-      error: !this.isConfigured ? 'Check SMTP_HOST, SMTP_USER, and SMTP_PASS environment variables' : undefined
+      error: !this.isConfigured ? 'Check SMTP_HOST/EMAIL_HOST, SMTP_USER/EMAIL_USER, and SMTP_PASS/EMAIL_PASS (or SMTP_PASSWORD/EMAIL_PASSWORD) environment variables' : undefined
     };
   }
 }
