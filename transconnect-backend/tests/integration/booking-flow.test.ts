@@ -16,6 +16,25 @@ jest.mock('../../src/services/routeSegmentService', () => ({
   searchRoutesWithSegments: jest.fn()
 }));
 
+jest.mock('../../src/tools/agents/otp.tool', () => ({
+  sendOtpForIdentifier: jest.fn().mockResolvedValue({
+    otp: '123456',
+    expiry: new Date(Date.now() + 10 * 60 * 1000),
+  }),
+  verifyOtpCodeForIdentifier: jest.fn(),
+  sendOtp: jest.fn(),
+  verifyOtpCode: jest.fn(),
+}));
+
+jest.mock('../../src/services/email-otp.service', () => ({
+  __esModule: true,
+  default: {
+    getInstance: () => ({
+      sendOTP: jest.fn().mockResolvedValue({ success: true }),
+    }),
+  },
+}));
+
 // Mock bcrypt
 jest.mock('bcryptjs', () => ({
   hash: jest.fn().mockResolvedValue('hashedPassword'),
@@ -50,12 +69,26 @@ describe('Complete Booking Flow Integration', () => {
 
   beforeEach(() => {
     jest.clearAllMocks();
+
+    mockPrisma.user.findUnique.mockReset();
+    mockPrisma.user.findFirst.mockReset?.();
+    mockPrisma.user.create.mockReset();
+
+    mockPrisma.route.findUnique.mockReset();
+
+    mockPrisma.booking.findFirst.mockReset();
+    mockPrisma.booking.create.mockReset();
+    mockPrisma.booking.findMany.mockReset();
+    mockPrisma.booking.findUnique.mockReset();
+    mockPrisma.booking.update.mockReset();
+
+    (searchRoutesWithSegments as jest.Mock).mockReset();
   });
 
   describe('End-to-End Booking Process', () => {
     it('should complete full user journey: register -> login -> search routes -> book -> view booking', async () => {
       // Step 1: User Registration
-      mockPrisma.user.findUnique.mockResolvedValueOnce(null); // No existing user
+      mockPrisma.user.findFirst.mockResolvedValueOnce(null); // No existing user
       mockPrisma.user.create.mockResolvedValueOnce(testUser);
 
       const registerResponse = await request(app)
@@ -70,10 +103,23 @@ describe('Complete Booking Flow Integration', () => {
         });
 
       expect(registerResponse.status).toBe(201);
-      expect(registerResponse.body).toHaveProperty('token');
       expect(registerResponse.body).toHaveProperty('user');
+      expect(registerResponse.body.verificationRequired).toBe(true);
 
-      const token = registerResponse.body.token;
+      // Step 1b: Login after verification (mocked as already verified)
+      mockPrisma.user.findUnique.mockResolvedValueOnce(testUser);
+
+      const loginResponse = await request(app)
+        .post('/auth/login')
+        .send({
+          email: 'newuser@example.com',
+          password: 'password123',
+        });
+
+      expect(loginResponse.status).toBe(200);
+      expect(loginResponse.body).toHaveProperty('token');
+
+      const token = loginResponse.body.token;
 
       // Step 2: Search for routes (origin+destination triggers segment-based search)
       const mockSegmentResult = [{
