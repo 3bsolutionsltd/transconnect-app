@@ -188,14 +188,40 @@ export class ESMSAfricaService {
       console.log(`🔍 Full API Key Length: ${this.apiKey.length} characters`);
       console.log(`🔍 Endpoint: ${this.apiUrl}`);
 
-      const response = await axios.post(
-        this.apiUrl,
-        payload,
-        {
-          headers: this.buildAuthHeaders(),
-          timeout: 10000 // 10 second timeout
+      let response;
+      try {
+        response = await axios.post(
+          this.apiUrl,
+          payload,
+          {
+            headers: this.buildAuthHeaders(),
+            timeout: 10000 // 10 second timeout
+          }
+        );
+      } catch (firstError: any) {
+        const status = firstError?.response?.status;
+        const detail = firstError?.response?.data?.detail;
+        const reason = firstError?.response?.data?.reason;
+        const message = String(detail?.message || detail || reason || firstError?.message || '').toLowerCase();
+        const senderRejected = status === 403 && message.includes('sender id');
+
+        if (senderRejected && payload.sender_id) {
+          console.warn('⚠️ Sender ID rejected by eSMS API. Retrying once without sender_id...');
+          const retryPayload = { ...payload };
+          delete retryPayload.sender_id;
+
+          response = await axios.post(
+            this.apiUrl,
+            retryPayload,
+            {
+              headers: this.buildAuthHeaders(),
+              timeout: 10000,
+            }
+          );
+        } else {
+          throw firstError;
         }
-      );
+      }
 
       if (response.data.status === 'SUCCESS' || response.data.status === 'submitted' || response.data.status === 'scheduled') {
         const messageId = response.data.messageId || response.data.id;
