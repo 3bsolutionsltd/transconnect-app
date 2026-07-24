@@ -30,7 +30,7 @@ export class EmailOTPService {
     try {
       const smtpHost = process.env.SMTP_HOST || process.env.EMAIL_HOST;
       const smtpPort = parseInt(process.env.SMTP_PORT || process.env.EMAIL_PORT || '587');
-      const smtpUser = process.env.SMTP_USER || process.env.EMAIL_USER || process.env.SAMTP_USER;
+      const smtpUser = process.env.SMTP_USER || process.env.EMAIL_USER;
       const smtpPass = process.env.SMTP_PASS || process.env.EMAIL_PASS;
       const smtpSecure = (process.env.SMTP_SECURE || '').toLowerCase() === 'true';
 

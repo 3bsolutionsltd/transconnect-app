@@ -20,9 +20,9 @@ router.get('/auth-notifications', authenticateToken, requireRole(['ADMIN']), asy
     const firebaseService = FirebaseService.getInstance();
 
     const smtpHost = process.env.SMTP_HOST || process.env.EMAIL_HOST;
-    const smtpUser = process.env.SMTP_USER || process.env.EMAIL_USER || process.env.SAMTP_USER;
+    const smtpUser = process.env.SMTP_USER || process.env.EMAIL_USER;
     const smtpPass = process.env.SMTP_PASS || process.env.EMAIL_PASS;
-    const smtpFrom = process.env.SMTP_FROM || process.env.EMAIL_FROM || process.env.SMTP_USER || process.env.EMAIL_USER || process.env.SAMTP_USER;
+    const smtpFrom = process.env.SMTP_FROM || process.env.EMAIL_FROM || process.env.SMTP_USER || process.env.EMAIL_USER;
 
     const smtpConfigured = hasAny(smtpHost) && hasAny(smtpUser) && hasAny(smtpPass);
     const smsStatus = smsService.getProviderStatus();
