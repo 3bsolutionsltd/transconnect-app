@@ -19,10 +19,30 @@ router.get('/auth-notifications', authenticateToken, requireRole(['ADMIN']), asy
     const smsService = MultiProviderSMSService.getInstance();
     const firebaseService = FirebaseService.getInstance();
 
-    const smtpHost = process.env.SMTP_HOST || process.env.EMAIL_HOST;
-    const smtpUser = process.env.SMTP_USER || process.env.EMAIL_USER;
-    const smtpPass = process.env.SMTP_PASS || process.env.EMAIL_PASS || process.env.SMTP_PASSWORD || process.env.EMAIL_PASSWORD;
-    const smtpFrom = process.env.SMTP_FROM || process.env.EMAIL_FROM || process.env.SMTP_USER || process.env.EMAIL_USER;
+    const smtpHost =
+      process.env.SMTP_HOST ||
+      process.env.EMAIL_HOST ||
+      process.env.SMTP_SERVER ||
+      process.env.MAIL_HOST;
+    const smtpUser =
+      process.env.SMTP_USER ||
+      process.env.EMAIL_USER ||
+      process.env.SMTP_USERNAME ||
+      process.env.EMAIL_USERNAME ||
+      process.env.MAIL_USERNAME ||
+      process.env.MAIL_USER;
+    const smtpPass =
+      process.env.SMTP_PASS ||
+      process.env.EMAIL_PASS ||
+      process.env.SMTP_PASSWORD ||
+      process.env.EMAIL_PASSWORD ||
+      process.env.MAIL_PASSWORD ||
+      process.env.MAIL_PASS;
+    const smtpFrom =
+      process.env.SMTP_FROM ||
+      process.env.EMAIL_FROM ||
+      process.env.MAIL_FROM ||
+      smtpUser;
 
     const smtpConfigured = hasAny(smtpHost) && hasAny(smtpUser) && hasAny(smtpPass);
     const smsStatus = smsService.getProviderStatus();

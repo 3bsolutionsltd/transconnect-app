@@ -28,11 +28,35 @@ export class EmailOTPService {
 
   private async initializeTransporter(): Promise<void> {
     try {
-      const smtpHost = process.env.SMTP_HOST || process.env.EMAIL_HOST;
-      const smtpPort = parseInt(process.env.SMTP_PORT || process.env.EMAIL_PORT || '587');
-      const smtpUser = process.env.SMTP_USER || process.env.EMAIL_USER;
-      const smtpPass = process.env.SMTP_PASS || process.env.EMAIL_PASS || process.env.SMTP_PASSWORD || process.env.EMAIL_PASSWORD;
-      const smtpSecure = (process.env.SMTP_SECURE || process.env.EMAIL_SECURE || '').toLowerCase() === 'true';
+      const smtpHost =
+        process.env.SMTP_HOST ||
+        process.env.EMAIL_HOST ||
+        process.env.SMTP_SERVER ||
+        process.env.MAIL_HOST;
+
+      const smtpPort = parseInt(
+        process.env.SMTP_PORT || process.env.EMAIL_PORT || process.env.MAIL_PORT || '587'
+      );
+
+      const smtpUser =
+        process.env.SMTP_USER ||
+        process.env.EMAIL_USER ||
+        process.env.SMTP_USERNAME ||
+        process.env.EMAIL_USERNAME ||
+        process.env.MAIL_USERNAME ||
+        process.env.MAIL_USER;
+
+      const smtpPass =
+        process.env.SMTP_PASS ||
+        process.env.EMAIL_PASS ||
+        process.env.SMTP_PASSWORD ||
+        process.env.EMAIL_PASSWORD ||
+        process.env.MAIL_PASSWORD ||
+        process.env.MAIL_PASS;
+
+      const smtpSecure =
+        (process.env.SMTP_SECURE || process.env.EMAIL_SECURE || process.env.MAIL_SECURE || '').toLowerCase() ===
+        'true';
 
       if (!smtpHost || !smtpUser || !smtpPass) {
         console.warn('Email configuration incomplete. Email OTP service will be disabled.');
@@ -159,7 +183,16 @@ export class EmailOTPService {
       console.log(`📧 Sending Email OTP to ${data.email}...`);
       
       const result = await this.transporter.sendMail({
-        from: process.env.SMTP_FROM || process.env.EMAIL_FROM || process.env.SMTP_USER || process.env.EMAIL_USER,
+        from:
+          process.env.SMTP_FROM ||
+          process.env.EMAIL_FROM ||
+          process.env.MAIL_FROM ||
+          process.env.SMTP_USER ||
+          process.env.EMAIL_USER ||
+          process.env.SMTP_USERNAME ||
+          process.env.EMAIL_USERNAME ||
+          process.env.MAIL_USERNAME ||
+          process.env.MAIL_USER,
         to: data.email,
         subject,
         html,
