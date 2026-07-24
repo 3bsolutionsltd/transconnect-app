@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from 'react';
+import React, { useCallback, useEffect, useState } from 'react';
 import { AlertTriangle, CheckCircle2, RefreshCw, ShieldAlert, ShieldCheck, XCircle } from 'lucide-react';
 import { AuthNotificationsHealthResponse, AuthNotificationsTestResponse, systemHealthApi } from '../lib/api';
 
@@ -87,7 +87,7 @@ const AuthNotificationsHealth: React.FC = () => {
   const [testResult, setTestResult] = useState<AuthNotificationsTestResponse | null>(null);
   const [testError, setTestError] = useState<string | null>(null);
 
-  const load = async () => {
+  const load = useCallback(async () => {
     setLoading(true);
     setError(null);
     try {
@@ -101,7 +101,7 @@ const AuthNotificationsHealth: React.FC = () => {
     } finally {
       setLoading(false);
     }
-  };
+  }, [testEmail]);
 
   const runTest = async (channel: 'email' | 'sms' | 'both') => {
     setTestLoading(channel);
@@ -123,7 +123,7 @@ const AuthNotificationsHealth: React.FC = () => {
 
   useEffect(() => {
     load();
-  }, []);
+  }, [load]);
 
   const readyScore = data
     ? [
