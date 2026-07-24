@@ -19,11 +19,16 @@ router.get('/auth-notifications', authenticateToken, requireRole(['ADMIN']), asy
     const smsService = MultiProviderSMSService.getInstance();
     const firebaseService = FirebaseService.getInstance();
 
-    const smtpConfigured = hasAny(process.env.SMTP_HOST) && hasAny(process.env.SMTP_USER) && hasAny(process.env.SMTP_PASS);
+    const smtpHost = process.env.SMTP_HOST || process.env.EMAIL_HOST;
+    const smtpUser = process.env.SMTP_USER || process.env.EMAIL_USER || process.env.SAMTP_USER;
+    const smtpPass = process.env.SMTP_PASS || process.env.EMAIL_PASS;
+    const smtpFrom = process.env.SMTP_FROM || process.env.EMAIL_FROM || process.env.SMTP_USER || process.env.EMAIL_USER || process.env.SAMTP_USER;
+
+    const smtpConfigured = hasAny(smtpHost) && hasAny(smtpUser) && hasAny(smtpPass);
     const smsStatus = smsService.getProviderStatus();
     const pushConfigured = firebaseService.isFirebaseConfigured();
 
-    const adminEmailTarget = process.env.ADMIN_NOTIFICATION_EMAIL || process.env.SUPPORT_EMAIL || process.env.SMTP_FROM || '';
+    const adminEmailTarget = process.env.ADMIN_NOTIFICATION_EMAIL || process.env.SUPPORT_EMAIL || smtpFrom || '';
     const adminNotificationConfigured = hasAny(adminEmailTarget);
 
     const risks: string[] = [];
@@ -73,7 +78,7 @@ router.get('/auth-notifications', authenticateToken, requireRole(['ADMIN']), asy
         channels: {
           email: {
             configured: smtpConfigured,
-            from: process.env.SMTP_FROM || process.env.SMTP_USER || null,
+            from: smtpFrom || null,
           },
           sms: {
             configured: smsService.isReady(),
