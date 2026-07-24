@@ -73,10 +73,14 @@ export class EmailOTPService {
         },
       });
 
-      // Verify connection
-      await this.transporter!.verify();
       this.isConfigured = true;
       console.log('✅ Email OTP service initialized successfully');
+      // Best-effort verification: log errors but don't disable the service.
+      try {
+        await this.transporter.verify();
+      } catch (verifyError) {
+        console.warn('⚠️ Email SMTP verify failed, but transporter is configured for send attempts:', verifyError);
+      }
     } catch (error) {
       console.error('❌ Failed to initialize Email OTP service:', error);
       this.isConfigured = false;
@@ -173,7 +177,7 @@ export class EmailOTPService {
       console.log(`📧 Email OTP would be sent to ${data.email}: ${data.otp}`);
       return { 
         success: false, 
-        error: 'Email service not configured. Check SMTP credentials.' 
+        error: 'Email service not configured. Check SMTP credentials.'
       };
     }
 
