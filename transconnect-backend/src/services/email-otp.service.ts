@@ -130,7 +130,8 @@ export class EmailOTPService {
 
   public async sendOTP(data: EmailOTPData): Promise<{ success: boolean; messageId?: string; error?: string }> {
     // Demo mode - just log the email
-    const isDemoMode = process.env.NODE_ENV !== 'production' || process.env.DEMO_MODE === 'true';
+    const nodeEnv = process.env.NODE_ENV || 'development';
+    const isDemoMode = process.env.DEMO_MODE === 'true' || nodeEnv === 'development' || nodeEnv === 'test';
     
     if (isDemoMode) {
       console.log(`📧 [DEMO MODE] Email OTP to ${data.email}:`);

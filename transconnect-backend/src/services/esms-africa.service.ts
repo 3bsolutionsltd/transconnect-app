@@ -111,7 +111,8 @@ export class ESMSAfricaService {
 
   public async sendSMS(data: ESMSAfricaSMSData): Promise<{ success: boolean; messageId?: string; error?: string; provider?: string }> {
     // Demo mode - log instead of sending
-    const isDemoMode = process.env.NODE_ENV !== 'production' || process.env.DEMO_MODE === 'true';
+    const nodeEnv = process.env.NODE_ENV || 'development';
+    const isDemoMode = process.env.DEMO_MODE === 'true' || nodeEnv === 'development' || nodeEnv === 'test';
     
     if (isDemoMode) {
       console.log(`📱 [DEMO MODE] eSMS Africa SMS to ${data.phoneNumber}:`);

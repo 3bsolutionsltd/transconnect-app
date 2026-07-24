@@ -12,7 +12,7 @@ const hasAny = (...values: Array<string | undefined>) => values.some((value) => 
 router.get('/auth-notifications', authenticateToken, requireRole(['ADMIN']), async (_req, res) => {
   try {
     const nodeEnv = process.env.NODE_ENV || 'development';
-    const demoMode = nodeEnv !== 'production' || process.env.DEMO_MODE === 'true';
+    const demoMode = process.env.DEMO_MODE === 'true' || nodeEnv === 'development' || nodeEnv === 'test';
     const otpExpirySeconds = parseInt(process.env.OTP_EXPIRY || '600', 10);
 
     const emailOtp = EmailOTPService.getInstance();
@@ -127,6 +127,7 @@ router.post('/auth-notifications/test', authenticateToken, requireRole(['ADMIN']
 
     const emailOtp = EmailOTPService.getInstance();
     const smsService = MultiProviderSMSService.getInstance();
+    const smsTestProvider = ((process.env.SMS_TEST_PROVIDER || 'esms').toLowerCase() as 'esms' | 'twilio' | 'auto');
 
     const results: {
       email?: { success: boolean; messageId?: string; error?: string; target?: string };
@@ -155,7 +156,10 @@ router.post('/auth-notifications/test', authenticateToken, requireRole(['ADMIN']
       if (!phoneTarget) {
         results.sms = { success: false, error: 'No phone target provided or found on admin user profile.' };
       } else {
-        const smsResult = await smsService.sendTestSMS(phoneTarget);
+        const smsResult = await smsService.sendTestSMS(phoneTarget, {
+          preferredProvider: smsTestProvider,
+          allowFallback: false,
+        });
         results.sms = {
           success: smsResult.success,
           messageId: smsResult.messageId,

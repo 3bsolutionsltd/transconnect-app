@@ -17,7 +17,8 @@ export async function sendOtpForIdentifier(identifier: string, channel: OtpChann
   const key = makeOtpKey(identifier, channel);
 
   // In demo mode, use a fixed OTP for easier testing
-  const isDemoMode = process.env.NODE_ENV !== 'production' || process.env.DEMO_MODE === 'true';
+  const nodeEnv = process.env.NODE_ENV || 'development';
+  const isDemoMode = process.env.DEMO_MODE === 'true' || nodeEnv === 'development' || nodeEnv === 'test';
   const otp = isDemoMode ? '123456' : Math.floor(100000 + Math.random() * 900000).toString();
   const expiry = Date.now() + (parseInt(process.env.OTP_EXPIRY || '600') * 1000); // 10 minutes default
 
