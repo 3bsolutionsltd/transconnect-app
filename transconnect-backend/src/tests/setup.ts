@@ -13,7 +13,16 @@ global.console = {
 // Set test environment variables — preserve existing env vars so CI-injected values take precedence
 process.env.NODE_ENV = 'test';
 process.env.JWT_SECRET = process.env.JWT_SECRET || 'test-jwt-secret';
-process.env.DATABASE_URL = process.env.DATABASE_URL || 'postgresql://test:test@localhost:5432/transconnect_test';
+
+const resolvedTestDbUrl = process.env.TEST_DATABASE_URL || process.env.DATABASE_URL;
+if (resolvedTestDbUrl) {
+  process.env.DATABASE_URL = resolvedTestDbUrl;
+} else {
+  // Keep an explicit placeholder so failures are clear and deterministic.
+  process.env.DATABASE_URL = 'postgresql://test:test@localhost:5432/transconnect_test';
+  // eslint-disable-next-line no-console
+  console.warn('TEST_DATABASE_URL or DATABASE_URL is not set; integration tests may fail to connect to DB.');
+}
 
 // Mock environment variables for payment services
 process.env.MTN_API_BASE_URL = process.env.MTN_API_BASE_URL || 'https://sandbox.momodeveloper.mtn.com';
