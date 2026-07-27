@@ -116,7 +116,7 @@ router.post('/', [
   body('lastName').notEmpty().withMessage('Last name is required'),
   body('email').isEmail().withMessage('Valid email is required'),
   body('phone').notEmpty().withMessage('Phone number is required'),
-  body('password').isLength({ min: 6 }).withMessage('Password must be at least 6 characters'),
+  body('password').optional().isLength({ min: 6 }).withMessage('Password must be at least 6 characters'),
   body('role').isIn(['MANAGER', 'DRIVER', 'CONDUCTOR', 'TICKETER', 'MAINTENANCE']).withMessage('Valid operator role is required'),
   body('permissions').optional().isArray().withMessage('Permissions must be an array')
 ], async (req: Request, res: Response) => {
@@ -168,27 +168,53 @@ router.post('/', [
       }
     });
 
+    let user = existingUser;
+
     if (existingUser) {
-      return res.status(400).json({ 
-        error: 'A user with this email or phone number already exists' 
+      const existingOperatorUser = await prisma.operatorUser.findFirst({
+        where: {
+          userId: existingUser.id,
+          operatorId,
+        },
+      });
+
+      if (existingOperatorUser) {
+        return res.status(400).json({ error: 'This user is already assigned to the selected operator' });
+      }
+
+      // Promote a passenger account for operator access while keeping same identity.
+      user = await prisma.user.update({
+        where: { id: existingUser.id },
+        data: {
+          firstName,
+          lastName,
+          email: normalizedEmail,
+          phone: normalizedPhone,
+          role: existingUser.role,
+          verified: true,
+        },
+      });
+    } else {
+      if (!password) {
+        return res.status(400).json({ error: 'Password is required when creating a brand new user' });
+      }
+
+      // Hash password
+      const hashedPassword = await bcrypt.hash(password, 10);
+
+      // Create user first
+      user = await prisma.user.create({
+        data: {
+          firstName,
+          lastName,
+          email: normalizedEmail,
+          phone: normalizedPhone,
+          password: hashedPassword,
+          role: 'OPERATOR',
+          verified: true
+        }
       });
     }
-
-    // Hash password
-    const hashedPassword = await bcrypt.hash(password, 10);
-
-    // Create user first
-    const user = await prisma.user.create({
-      data: {
-        firstName,
-        lastName,
-        email: normalizedEmail,
-        phone: normalizedPhone,
-        password: hashedPassword,
-        role: 'OPERATOR',
-        verified: true
-      }
-    });
 
     // Create operator user relationship
     const operatorUser = await prisma.operatorUser.create({
