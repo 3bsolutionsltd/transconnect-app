@@ -93,6 +93,11 @@ const PLATFORM_ROLE_OPTIONS = [
   'PASSENGER',
 ] as const;
 
+const ADDITIONAL_ROLE_OPTIONS = [
+  'OPERATOR',
+  'OPERATOR_FIELD_OPERATOR',
+] as const;
+
 const normalizeEmail = (email: string) => email.trim().toLowerCase();
 
 const sanitizePhone = (phone: string) => phone.trim();
@@ -1441,6 +1446,7 @@ const UserManagement: React.FC = () => {
 
                 <div className="space-y-3 border-t pt-3">
                   <label className="block text-sm font-medium text-gray-700">Assign Additional Role</label>
+                  <p className="text-xs text-gray-500">Additional roles are additive only. To change ADMIN, MASTER FIELD OPERATOR, or PASSENGER use Primary Role above.</p>
                   <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
                     <select
                       value={assignRoleForm.role}
@@ -1453,7 +1459,7 @@ const UserManagement: React.FC = () => {
                       className="px-3 py-2 border rounded-md text-sm"
                       disabled={roleActionLoading}
                     >
-                      {PLATFORM_ROLE_OPTIONS.map(role => (
+                      {ADDITIONAL_ROLE_OPTIONS.map(role => (
                         <option key={role} value={role}>{formatRoleLabel(role)}</option>
                       ))}
                     </select>
