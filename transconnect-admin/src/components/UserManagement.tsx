@@ -65,6 +65,26 @@ interface Operator {
   approved: boolean;
 }
 
+interface UserRoleDetails {
+  userId: string;
+  email: string;
+  primaryRole: User['role'];
+  effectiveRoles: string[];
+  operatorAssignment?: {
+    id: string;
+    operatorId: string;
+    role: 'MANAGER' | 'DRIVER' | 'CONDUCTOR' | 'TICKETER' | 'MAINTENANCE';
+    active: boolean;
+  } | null;
+  fieldOperatorScopes?: Array<{
+    id: string;
+    operatorId: string;
+    operator?: {
+      companyName: string;
+    };
+  }>;
+}
+
 const PLATFORM_ROLE_OPTIONS = [
   'ADMIN',
   'MASTER_FIELD_OPERATOR',
@@ -113,6 +133,15 @@ const UserManagement: React.FC = () => {
   const [showCreatePlatformUserModal, setShowCreatePlatformUserModal] = useState(false);
   const [createPlatformUserLoading, setCreatePlatformUserLoading] = useState(false);
   const [savingUserScope, setSavingUserScope] = useState(false);
+  const [roleDetails, setRoleDetails] = useState<UserRoleDetails | null>(null);
+  const [roleActionLoading, setRoleActionLoading] = useState(false);
+  const [primaryRoleDraft, setPrimaryRoleDraft] = useState<User['role']>('PASSENGER');
+  const [assignRoleForm, setAssignRoleForm] = useState({
+    role: 'OPERATOR' as User['role'],
+    operatorId: '',
+    operatorRole: 'TICKETER' as 'MANAGER' | 'DRIVER' | 'CONDUCTOR' | 'TICKETER' | 'MAINTENANCE',
+    operatorScopeIds: [] as string[],
+  });
 
   const [createPlatformUserForm, setCreatePlatformUserForm] = useState({
     firstName: '',
@@ -361,6 +390,120 @@ const UserManagement: React.FC = () => {
       alert(error.message || 'Failed to update field operator scope');
     } finally {
       setSavingUserScope(false);
+    }
+  };
+
+  const fetchUserRoleDetails = async (userId: string) => {
+    try {
+      const response = await api.get(`/users/${userId}/roles`);
+      const details = (response?.data || response) as UserRoleDetails;
+      setRoleDetails(details);
+      setPrimaryRoleDraft(details.primaryRole);
+
+      setSelectedUser(prev => {
+        if (!prev) return prev;
+
+        return {
+          ...prev,
+          role: details.primaryRole,
+          fieldOperatorScopes: (details.fieldOperatorScopes || []).map(scope => ({
+            operatorId: scope.operatorId,
+            operator: {
+              id: scope.operatorId,
+              companyName: scope.operator?.companyName || 'Unknown Operator',
+            },
+          })),
+        };
+      });
+    } catch (error: any) {
+      console.error('Error fetching user role details:', error);
+      setRoleDetails(null);
+      alert(error.message || 'Failed to load user role details');
+    }
+  };
+
+  const openUserDetailsModal = async (user: User) => {
+    setSelectedUser(user);
+    setShowUserModal(true);
+    setRoleDetails(null);
+    setPrimaryRoleDraft(user.role);
+    setAssignRoleForm({
+      role: 'OPERATOR',
+      operatorId: '',
+      operatorRole: 'TICKETER',
+      operatorScopeIds: [],
+    });
+    await fetchUserRoleDetails(user.id);
+  };
+
+  const handleAssignRole = async () => {
+    if (!selectedUser) return;
+
+    if (assignRoleForm.role === 'OPERATOR' && !assignRoleForm.operatorId) {
+      alert('Please select an operator for OPERATOR role assignment');
+      return;
+    }
+
+    if (assignRoleForm.role === 'OPERATOR_FIELD_OPERATOR' && assignRoleForm.operatorScopeIds.length === 0) {
+      alert('Please select at least one operator scope for OPERATOR FIELD OPERATOR');
+      return;
+    }
+
+    try {
+      setRoleActionLoading(true);
+      await api.post(`/users/${selectedUser.id}/roles/assign`, {
+        role: assignRoleForm.role,
+        operatorId: assignRoleForm.operatorId || undefined,
+        operatorRole: assignRoleForm.operatorRole,
+        operatorScopeIds: assignRoleForm.operatorScopeIds,
+      });
+
+      await fetchUsers();
+      await fetchUserRoleDetails(selectedUser.id);
+      alert('Role assigned successfully');
+    } catch (error: any) {
+      console.error('Error assigning role:', error);
+      alert(error.message || 'Failed to assign role');
+    } finally {
+      setRoleActionLoading(false);
+    }
+  };
+
+  const handleRemoveRole = async (role: User['role']) => {
+    if (!selectedUser) return;
+
+    if (!window.confirm(`Remove ${formatRoleLabel(role)} role from this user?`)) {
+      return;
+    }
+
+    try {
+      setRoleActionLoading(true);
+      await api.post(`/users/${selectedUser.id}/roles/remove`, { role });
+      await fetchUsers();
+      await fetchUserRoleDetails(selectedUser.id);
+      alert('Role removed successfully');
+    } catch (error: any) {
+      console.error('Error removing role:', error);
+      alert(error.message || 'Failed to remove role');
+    } finally {
+      setRoleActionLoading(false);
+    }
+  };
+
+  const handleSwitchPrimaryRole = async () => {
+    if (!selectedUser) return;
+
+    try {
+      setRoleActionLoading(true);
+      await api.put(`/users/${selectedUser.id}/roles/primary`, { role: primaryRoleDraft });
+      await fetchUsers();
+      await fetchUserRoleDetails(selectedUser.id);
+      alert('Primary role updated successfully');
+    } catch (error: any) {
+      console.error('Error switching primary role:', error);
+      alert(error.message || 'Failed to switch primary role');
+    } finally {
+      setRoleActionLoading(false);
     }
   };
 
@@ -1124,10 +1267,7 @@ const UserManagement: React.FC = () => {
                   <td className="px-6 py-4">
                     <div className="flex items-center space-x-2">
                       <button
-                        onClick={() => {
-                          setSelectedUser(user);
-                          setShowUserModal(true);
-                        }}
+                        onClick={() => openUserDetailsModal(user)}
                         className="p-2 text-blue-600 hover:bg-blue-50 rounded-md transition-colors"
                         title="View details"
                       >
@@ -1247,6 +1387,145 @@ const UserManagement: React.FC = () => {
                     <p className="text-sm text-gray-900">{selectedUser.bookingsCount || 0}</p>
                   </div>
                 )}
+              </div>
+
+              <div className="border rounded-lg p-4 bg-gray-50 space-y-4">
+                <div className="flex items-center justify-between gap-3">
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700">Primary Role</label>
+                    <p className="text-xs text-gray-500">Controls default authorization context for the account.</p>
+                  </div>
+                  <div className="flex items-center gap-2">
+                    <select
+                      value={primaryRoleDraft}
+                      onChange={(e) => setPrimaryRoleDraft(e.target.value as User['role'])}
+                      className="px-3 py-2 border rounded-md text-sm"
+                      disabled={roleActionLoading || !roleDetails}
+                    >
+                      {(roleDetails?.effectiveRoles || [selectedUser.role]).map(role => (
+                        <option key={role} value={role}>{formatRoleLabel(role)}</option>
+                      ))}
+                    </select>
+                    <button
+                      onClick={handleSwitchPrimaryRole}
+                      disabled={roleActionLoading || !roleDetails}
+                      className="px-3 py-2 text-sm bg-blue-600 text-white rounded-md hover:bg-blue-700 disabled:opacity-50"
+                    >
+                      Set Primary
+                    </button>
+                  </div>
+                </div>
+
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-2">Effective Roles</label>
+                  <div className="flex flex-wrap gap-2">
+                    {(roleDetails?.effectiveRoles || [selectedUser.role]).map(role => (
+                      <div key={role} className="inline-flex items-center gap-2 px-2 py-1 rounded-full bg-white border text-xs">
+                        <span className={`inline-flex px-2 py-0.5 rounded-full font-semibold ${getRoleBadgeColor(role)}`}>
+                          {formatRoleLabel(role)}
+                        </span>
+                        {role !== 'PASSENGER' && (
+                          <button
+                            onClick={() => handleRemoveRole(role as User['role'])}
+                            className="text-red-600 hover:text-red-700"
+                            disabled={roleActionLoading}
+                            title={`Remove ${formatRoleLabel(role)}`}
+                          >
+                            ×
+                          </button>
+                        )}
+                      </div>
+                    ))}
+                  </div>
+                </div>
+
+                <div className="space-y-3 border-t pt-3">
+                  <label className="block text-sm font-medium text-gray-700">Assign Additional Role</label>
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                    <select
+                      value={assignRoleForm.role}
+                      onChange={(e) => setAssignRoleForm({
+                        role: e.target.value as User['role'],
+                        operatorId: '',
+                        operatorRole: 'TICKETER',
+                        operatorScopeIds: [],
+                      })}
+                      className="px-3 py-2 border rounded-md text-sm"
+                      disabled={roleActionLoading}
+                    >
+                      {PLATFORM_ROLE_OPTIONS.map(role => (
+                        <option key={role} value={role}>{formatRoleLabel(role)}</option>
+                      ))}
+                    </select>
+
+                    {assignRoleForm.role === 'OPERATOR' && (
+                      <select
+                        value={assignRoleForm.operatorRole}
+                        onChange={(e) => setAssignRoleForm({
+                          ...assignRoleForm,
+                          operatorRole: e.target.value as 'MANAGER' | 'DRIVER' | 'CONDUCTOR' | 'TICKETER' | 'MAINTENANCE',
+                        })}
+                        className="px-3 py-2 border rounded-md text-sm"
+                        disabled={roleActionLoading}
+                      >
+                        <option value="MANAGER">Manager</option>
+                        <option value="DRIVER">Driver</option>
+                        <option value="CONDUCTOR">Conductor</option>
+                        <option value="TICKETER">Ticketer</option>
+                        <option value="MAINTENANCE">Maintenance</option>
+                      </select>
+                    )}
+                  </div>
+
+                  {assignRoleForm.role === 'OPERATOR' && (
+                    <select
+                      value={assignRoleForm.operatorId}
+                      onChange={(e) => setAssignRoleForm({ ...assignRoleForm, operatorId: e.target.value })}
+                      className="w-full px-3 py-2 border rounded-md text-sm"
+                      disabled={roleActionLoading}
+                    >
+                      <option value="">Select operator</option>
+                      {operators.map(operator => (
+                        <option key={operator.id} value={operator.id}>{operator.companyName}</option>
+                      ))}
+                    </select>
+                  )}
+
+                  {assignRoleForm.role === 'OPERATOR_FIELD_OPERATOR' && (
+                    <div className="max-h-32 overflow-y-auto border rounded-md p-2 bg-white">
+                      {operators.map(operator => {
+                        const checked = assignRoleForm.operatorScopeIds.includes(operator.id);
+                        return (
+                          <label key={operator.id} className="flex items-center gap-2 py-1 text-sm">
+                            <input
+                              type="checkbox"
+                              checked={checked}
+                              onChange={(e) => {
+                                const operatorScopeIds = e.target.checked
+                                  ? [...assignRoleForm.operatorScopeIds, operator.id]
+                                  : assignRoleForm.operatorScopeIds.filter(id => id !== operator.id);
+                                setAssignRoleForm({ ...assignRoleForm, operatorScopeIds });
+                              }}
+                              className="rounded border-gray-300 text-blue-600 focus:ring-blue-500"
+                              disabled={roleActionLoading}
+                            />
+                            <span>{operator.companyName}</span>
+                          </label>
+                        );
+                      })}
+                    </div>
+                  )}
+
+                  <div className="flex justify-end">
+                    <button
+                      onClick={handleAssignRole}
+                      disabled={roleActionLoading}
+                      className="px-3 py-2 text-sm bg-green-600 text-white rounded-md hover:bg-green-700 disabled:opacity-50"
+                    >
+                      {roleActionLoading ? 'Saving…' : 'Assign Role'}
+                    </button>
+                  </div>
+                </div>
               </div>
 
               {selectedUser.role === 'OPERATOR_FIELD_OPERATOR' && (
