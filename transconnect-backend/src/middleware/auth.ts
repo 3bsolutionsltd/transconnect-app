@@ -48,10 +48,14 @@ export const authenticateToken = async (req: AuthRequest, res: Response, next: N
     }
 
     const roles = new Set<string>([user.role]);
-    if (user.operatorUser?.active) {
+    const scopedFieldOperators = Array.isArray((user as any).fieldOperatorScopes)
+      ? (user as any).fieldOperatorScopes
+      : [];
+
+    if ((user as any).operatorUser?.active) {
       roles.add('OPERATOR');
     }
-    if (user.fieldOperatorScopes.length > 0) {
+    if (scopedFieldOperators.length > 0) {
       roles.add('OPERATOR_FIELD_OPERATOR');
     }
 
