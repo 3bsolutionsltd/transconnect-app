@@ -46,9 +46,10 @@ jobs:
           script: |
             set -e
             cd /opt/transconnect/app
-            git fetch origin
+            git fetch --all --tags --prune origin
             git checkout main
-            git pull origin main
+            git reset --hard origin/main
+            git clean -fd
 
             BUILD_FLAG=""
             if [ "${{ github.event.inputs.force_build }}" = "true" ]; then
