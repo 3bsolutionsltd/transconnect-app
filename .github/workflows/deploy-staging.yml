@@ -46,7 +46,7 @@ jobs:
           script: |
             set -e
             cd /opt/transconnect/app
-            git fetch --all --tags --prune origin
+            git fetch --all --tags --prune
             git checkout main
             git reset --hard origin/main
             git clean -fd
