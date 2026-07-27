@@ -59,7 +59,14 @@ export default function RegisterPage() {
       
       const result = await authApi.register(userData);
       console.log('Registration successful:', result); // Debug log
-      
+
+      if (result?.verificationRequired) {
+        const signupEmail = String(result?.user?.email || userData.email || '').trim().toLowerCase();
+        toast.success('Account created. Enter the code sent to your email to continue.');
+        router.push(`/verify-email?email=${encodeURIComponent(signupEmail)}&source=register`);
+        return;
+      }
+
       toast.success(`Welcome to TransConnect, ${result.user.firstName}!`);
       router.push('/search');
     } catch (error: any) {

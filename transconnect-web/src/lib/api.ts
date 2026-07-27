@@ -73,6 +73,20 @@ export const authApi = {
     return response.data;
   },
 
+  async verifyEmailOtp(payload: { email: string; otp: string }) {
+    const response = await api.post('/auth/verify-email-otp', payload);
+    if (response.data.token && typeof window !== 'undefined') {
+      localStorage.setItem('token', response.data.token);
+      localStorage.setItem('user', JSON.stringify(response.data.user));
+    }
+    return response.data;
+  },
+
+  async resendEmailVerification(email: string) {
+    const response = await api.post('/auth/resend-email-verification', { email });
+    return response.data;
+  },
+
   logout() {
     if (typeof window !== 'undefined') {
       localStorage.removeItem('token');

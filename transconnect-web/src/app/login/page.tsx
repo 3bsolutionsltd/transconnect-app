@@ -25,11 +25,22 @@ export default function LoginPage() {
     setLoading(true);
     try {
       const result = await authApi.login(email, password);
-      toast.success(`Welcome back, ${result.user.name}!`);
+      toast.success(`Welcome back, ${result.user?.firstName || 'Passenger'}!`);
       router.push('/search');
     } catch (error: any) {
       console.error('Login error:', error);
-      toast.error(error.response?.data?.message || 'Login failed. Please try again.');
+      const requiresVerification =
+        error?.response?.status === 403 &&
+        error?.response?.data?.code === 'EMAIL_VERIFICATION_REQUIRED';
+
+      if (requiresVerification) {
+        const normalizedEmail = String(email).trim().toLowerCase();
+        toast.error('Your account is not verified yet. Enter your email code to continue.');
+        router.push(`/verify-email?email=${encodeURIComponent(normalizedEmail)}&source=login`);
+        return;
+      }
+
+      toast.error(error.response?.data?.error || 'Login failed. Please try again.');
     } finally {
       setLoading(false);
     }
