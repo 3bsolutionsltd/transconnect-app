@@ -273,7 +273,9 @@ const UserManagement: React.FC = () => {
   const fetchOperators = async () => {
     try {
       const response = await api.get('/operators');
-      const operatorsData = Array.isArray(response) ? response : (response.data || []);
+      const operatorsData = Array.isArray(response)
+        ? response
+        : (response.operators || response.data?.operators || response.data || []);
       setOperators(operatorsData);
     } catch (error: any) {
       console.error('Error fetching operators:', error);
@@ -1407,7 +1409,7 @@ const UserManagement: React.FC = () => {
                       className="px-3 py-2 border rounded-md text-sm"
                       disabled={roleActionLoading || !roleDetails}
                     >
-                      {(roleDetails?.effectiveRoles || [selectedUser.role]).map(role => (
+                      {PLATFORM_ROLE_OPTIONS.map(role => (
                         <option key={role} value={role}>{formatRoleLabel(role)}</option>
                       ))}
                     </select>
