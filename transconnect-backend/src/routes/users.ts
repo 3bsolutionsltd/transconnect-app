@@ -7,6 +7,7 @@ import { validateAndNormalizeContact } from '../utils/contact-validation';
 const router = Router();
 
 const PLATFORM_MANAGED_ROLES = ['ADMIN', 'OPERATOR', 'PASSENGER', 'MASTER_FIELD_OPERATOR', 'OPERATOR_FIELD_OPERATOR'];
+const ADDITIVE_ASSIGNABLE_ROLES = ['OPERATOR', 'OPERATOR_FIELD_OPERATOR'];
 
 const getEffectiveRoles = (user: {
   role: string;
@@ -310,6 +311,12 @@ router.post('/:id/roles/assign', authenticateToken, async (req: Request, res: Re
       return res.status(400).json({ error: 'Valid role is required' });
     }
 
+    if (!ADDITIVE_ASSIGNABLE_ROLES.includes(role)) {
+      return res.status(400).json({
+        error: 'Only OPERATOR and OPERATOR_FIELD_OPERATOR can be assigned as additional roles. Use primary role switch for other roles.',
+      });
+    }
+
     const updatedUser = await prisma.$transaction(async tx => {
       const existingUser = await tx.user.findUnique({
         where: { id },
@@ -318,18 +325,6 @@ router.post('/:id/roles/assign', authenticateToken, async (req: Request, res: Re
 
       if (!existingUser) {
         throw new Error('USER_NOT_FOUND');
-      }
-
-      let nextPrimaryRole = existingUser.role;
-      if (role === 'ADMIN' || role === 'MASTER_FIELD_OPERATOR') {
-        nextPrimaryRole = role;
-      }
-
-      if (nextPrimaryRole !== existingUser.role) {
-        await tx.user.update({
-          where: { id },
-          data: { role: nextPrimaryRole as any },
-        });
       }
 
       if (role === 'OPERATOR') {
