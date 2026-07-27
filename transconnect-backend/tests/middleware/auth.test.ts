@@ -26,7 +26,9 @@ const createTestUser = () => ({
   phone: '+256700000000',
   role: 'PASSENGER',
   verified: true,
-  password: '$2a$12$LQv3c1yqBWVHxkd0LHAkCOYz6TtxMQJqhN8/LewKTEW1HV4.7.QYK' // "password123"
+  password: '$2a$12$LQv3c1yqBWVHxkd0LHAkCOYz6TtxMQJqhN8/LewKTEW1HV4.7.QYK', // "password123"
+  operatorUser: null,
+  fieldOperatorScopes: []
 });
 
 describe('Auth Middleware', () => {
@@ -71,12 +73,65 @@ describe('Auth Middleware', () => {
       expect(mockJwt.verify).toHaveBeenCalledWith('valid-token', process.env.JWT_SECRET);
       expect(mockPrisma.user.findUnique).toHaveBeenCalledWith({
         where: { id: testUser.id },
-        select: { id: true, email: true, role: true, verified: true }
+        select: {
+          id: true,
+          email: true,
+          role: true,
+          verified: true,
+          operatorUser: {
+            select: {
+              id: true,
+              active: true,
+            },
+          },
+          fieldOperatorScopes: {
+            where: { active: true },
+            select: { id: true },
+          },
+        }
       });
       expect((mockRequest as any).user).toEqual({
         id: testUser.id,
         email: testUser.email,
-        role: testUser.role
+        role: testUser.role,
+        roles: ['PASSENGER']
+      });
+      expect(nextFunction).toHaveBeenCalled();
+    });
+
+    it('should derive OPERATOR and OPERATOR_FIELD_OPERATOR effective roles', async () => {
+      const testUser = {
+        ...createTestUser(),
+        role: 'PASSENGER',
+        operatorUser: {
+          id: 'op-user-1',
+          active: true,
+        },
+        fieldOperatorScopes: [{ id: 'scope-1' }],
+      };
+
+      mockRequest.headers = {
+        authorization: 'Bearer valid-token'
+      };
+
+      (mockJwt.verify as jest.Mock).mockReturnValue({
+        userId: testUser.id,
+        email: testUser.email,
+        role: testUser.role,
+      });
+      mockPrisma.user.findUnique.mockResolvedValue(testUser);
+
+      await authenticateToken(
+        mockRequest as Request,
+        mockResponse as Response,
+        nextFunction
+      );
+
+      expect((mockRequest as any).user).toEqual({
+        id: testUser.id,
+        email: testUser.email,
+        role: 'PASSENGER',
+        roles: ['PASSENGER', 'OPERATOR', 'OPERATOR_FIELD_OPERATOR'],
       });
       expect(nextFunction).toHaveBeenCalled();
     });
@@ -219,6 +274,26 @@ describe('Auth Middleware', () => {
 
     it('should allow access when user has required role', () => {
       const middleware = requireRole(['PASSENGER', 'ADMIN']);
+
+      middleware(
+        mockRequest as Request,
+        mockResponse as Response,
+        nextFunction
+      );
+
+      expect(nextFunction).toHaveBeenCalled();
+      expect(mockResponse.status).not.toHaveBeenCalled();
+    });
+
+    it('should allow access from effective roles array', () => {
+      (mockRequest as any).user = {
+        userId: 'test-user-id',
+        email: 'test@example.com',
+        role: 'PASSENGER',
+        roles: ['PASSENGER', 'OPERATOR']
+      };
+
+      const middleware = requireRole(['OPERATOR']);
 
       middleware(
         mockRequest as Request,
