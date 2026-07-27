@@ -7,6 +7,7 @@ interface AuthRequest extends Request {
     id: string;
     email: string;
     role: string;
+    roles?: string[];
   };
 }
 
@@ -24,17 +25,41 @@ export const authenticateToken = async (req: AuthRequest, res: Response, next: N
     // Verify user still exists and is verified
     const user = await prisma.user.findUnique({
       where: { id: decoded.userId },
-      select: { id: true, email: true, role: true, verified: true }
+      select: {
+        id: true,
+        email: true,
+        role: true,
+        verified: true,
+        operatorUser: {
+          select: {
+            id: true,
+            active: true,
+          },
+        },
+        fieldOperatorScopes: {
+          where: { active: true },
+          select: { id: true },
+        },
+      }
     });
 
     if (!user || !user.verified) {
       return res.status(401).json({ error: 'Invalid or unverified user' });
     }
 
+    const roles = new Set<string>([user.role]);
+    if (user.operatorUser?.active) {
+      roles.add('OPERATOR');
+    }
+    if (user.fieldOperatorScopes.length > 0) {
+      roles.add('OPERATOR_FIELD_OPERATOR');
+    }
+
     req.user = {
       id: user.id,
       email: user.email,
-      role: user.role
+      role: user.role,
+      roles: Array.from(roles),
     };
 
     next();
@@ -69,7 +94,10 @@ export const requireRole = (roles: string[]) => {
       return res.status(401).json({ error: 'Authentication required' });
     }
 
-    if (!roles.includes(req.user.role)) {
+    const userRoles = req.user.roles ?? [req.user.role];
+    const hasRequiredRole = roles.some(role => userRoles.includes(role));
+
+    if (!hasRequiredRole) {
       return res.status(403).json({ error: 'Insufficient permissions' });
     }
 
