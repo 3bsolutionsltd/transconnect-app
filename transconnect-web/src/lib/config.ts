@@ -56,6 +56,19 @@ export const endpoints = {
     validate: `${API_BASE_URL}/qr/validate`,
     booking: (bookingId: string) => `${API_BASE_URL}/qr/booking/${bookingId}`,
   },
+  // Operator Portal endpoints
+  operatorPortal: {
+    getBySlug: (slug: string) => `${API_BASE_URL}/operator-portal/slug/${slug}`,
+    getRoutes: (operatorId: string, filters?: { origin?: string; destination?: string }) => {
+      const params = new URLSearchParams();
+      if (filters?.origin) params.set('origin', filters.origin);
+      if (filters?.destination) params.set('destination', filters.destination);
+      const queryString = params.toString();
+      return `${API_BASE_URL}/operator-portal/${operatorId}/routes${queryString ? `?${queryString}` : ''}`;
+    },
+    getStats: (operatorId: string) => `${API_BASE_URL}/operator-portal/${operatorId}/stats`,
+    getFeatureStatus: `${API_BASE_URL}/operator-portal/feature/status`,
+  },
   // Health check
   health: `${API_BASE_URL.replace('/api', '')}/health`,
 };

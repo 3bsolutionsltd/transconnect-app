@@ -9,15 +9,17 @@ import { Card, CardContent } from '@/components/ui/card';
 import { useAuth } from '@/contexts/AuthContext';
 import { transferApi } from '@/lib/api';
 import Header from '@/components/Header';
+import PortalFooter from '@/components/PortalFooter';
 import toast from 'react-hot-toast';
 import { format } from 'date-fns';
+import { Container, Heading, Section } from '@/components/styled';
 
 const STATUS_CONFIG: Record<string, { label: string; color: string; bg: string; Icon: any }> = {
   PENDING:   { label: 'Pending Review', color: 'text-yellow-700', bg: 'bg-yellow-50 border-yellow-200', Icon: Clock },
   APPROVED:  { label: 'Approved',       color: 'text-green-700',  bg: 'bg-green-50 border-green-200',   Icon: CheckCircle2 },
   REJECTED:  { label: 'Rejected',       color: 'text-red-700',    bg: 'bg-red-50 border-red-200',       Icon: XCircle },
   CANCELLED: { label: 'Cancelled',      color: 'text-gray-600',   bg: 'bg-gray-50 border-gray-200',     Icon: Ban },
-  COMPLETED: { label: 'Completed',      color: 'text-blue-700',   bg: 'bg-blue-50 border-blue-200',     Icon: CheckCheck },
+  COMPLETED: { label: 'Completed',      color: 'text-[#1a3a5c]',  bg: 'bg-[#e8f5f2] border-[#9de5d0]',  Icon: CheckCheck },
 };
 
 const REASON_LABELS: Record<string, string> = {
@@ -69,21 +71,21 @@ export default function TransfersPage() {
       <div className="min-h-screen bg-gray-50">
         <Header />
         <div className="flex items-center justify-center h-64">
-          <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600" />
+          <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-[#00D9A3]" />
         </div>
       </div>
     );
   }
 
   return (
-    <div className="min-h-screen bg-gray-50">
+    <Section variant="gray" className="min-h-screen py-0">
       <Header />
-      <div className="max-w-2xl mx-auto px-4 py-8">
+      <Container className="max-w-2xl px-4 py-8">
         <Link href="/bookings" className="inline-flex items-center gap-1 text-sm text-gray-500 hover:text-gray-800 mb-6">
           <ArrowLeft size={16} /> Back to Bookings
         </Link>
 
-        <h1 className="text-2xl font-bold text-gray-900 mb-6">My Transfer Requests</h1>
+        <Heading as="h4" className="text-gray-900 mb-6">My Transfer Requests</Heading>
 
         {transfers.length === 0 ? (
           <Card>
@@ -131,7 +133,7 @@ export default function TransfersPage() {
                           {transfer.targetTravelDate && (
                             <>
                               <span className="text-gray-300">→</span>
-                              <span className="text-blue-600 font-medium">
+                              <span className="text-[#00C28F] font-medium">
                                 {format(new Date(transfer.targetTravelDate), 'MMM dd, yyyy')}
                               </span>
                             </>
@@ -175,9 +177,9 @@ export default function TransfersPage() {
                         )}
 
                         {transfer.reviewNote && (
-                          <div className="bg-blue-50 border border-blue-100 rounded-lg p-3">
-                            <p className="text-xs text-blue-500 mb-1 font-medium">Review Note</p>
-                            <p className="text-sm text-blue-700">{transfer.reviewNote}</p>
+                          <div className="bg-[#e8f5f2] border border-[#b7eadb] rounded-lg p-3">
+                            <p className="text-xs text-[#1a3a5c] mb-1 font-medium">Review Note</p>
+                            <p className="text-sm text-[#1a3a5c]">{transfer.reviewNote}</p>
                           </div>
                         )}
 
@@ -200,7 +202,8 @@ export default function TransfersPage() {
             })}
           </div>
         )}
-      </div>
-    </div>
+      </Container>
+      <PortalFooter slim />
+    </Section>
   );
 }

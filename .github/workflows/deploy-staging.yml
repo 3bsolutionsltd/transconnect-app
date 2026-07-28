@@ -2,13 +2,13 @@ name: Deploy to Staging
 
 on:
   push:
-    branches: [main]
+    branches: [staging]
   workflow_dispatch:
     inputs:
       force_build:
         description: 'Force rebuild of Docker images (no cache)'
         required: false
-        default: 'false'
+        default: false
         type: boolean
 
 env:
@@ -24,11 +24,9 @@ jobs:
     name: Deploy staging
     runs-on: ubuntu-latest
     environment: staging
-    env:
-      SLACK_WEBHOOK_URL: ${{ secrets.SLACK_WEBHOOK_URL }}
 
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v5
 
       - name: Set short SHA
         id: sha
@@ -59,12 +57,14 @@ jobs:
 
       - name: Notify deployment status
         if: always() && env.SLACK_WEBHOOK_URL != ''
-        uses: slackapi/slack-github-action@v1.27.0
+        uses: slackapi/slack-github-action@v2.1.1
         continue-on-error: true
         with:
+          webhook: ${{ env.SLACK_WEBHOOK_URL }}
+          webhook-type: incoming-webhook
           payload: |
             {
               "text": "${{ job.status == 'success' && '✅' || '❌' }} Staging deploy *${{ job.status }}* — `${{ steps.sha.outputs.sha }}` by ${{ github.actor }}"
             }
         env:
-          SLACK_WEBHOOK_URL: ${{ env.SLACK_WEBHOOK_URL }}
+          SLACK_WEBHOOK_URL: ${{ secrets.SLACK_WEBHOOK_URL }}

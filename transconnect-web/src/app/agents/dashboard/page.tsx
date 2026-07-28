@@ -8,6 +8,7 @@ import BalanceCard from '../../../components/agents/BalanceCard.agent';
 import PendingCommissionsList from '../../../components/agents/PendingCommissionsList.agent';
 import ReferralShare from '../../../components/agents/ReferralShare.agent';
 import DownlineView from '../../../components/agents/DownlineView.agent';
+import TransConnectLogo from '@/components/branding/TransConnectLogo';
 
 export default function AgentDashboardPage() {
   const { token, agentId } = useAgentAuth();
@@ -21,7 +22,7 @@ export default function AgentDashboardPage() {
     async function load() {
       if (!agentId) {
         console.error('❌ No agent ID found. User must be properly authenticated.');
-        setNotifications(['Authentication error. Please log in again.']);
+        setNotifications(['Authentication error. Please sign in again.']);
         // Redirect to login instead of showing demo data
         if (typeof window !== 'undefined') {
           window.location.href = '/agents/login';
@@ -163,9 +164,13 @@ export default function AgentDashboardPage() {
               <p className="text-gray-600 mt-1">Welcome back, {data?.agent?.name || 'Agent'}</p>
             </div>
             <div className="flex items-center space-x-2">
-              <div className="w-10 h-10 bg-gradient-to-r from-blue-600 to-green-600 rounded-full flex items-center justify-center">
-                <span className="text-white font-bold text-sm">TC</span>
-              </div>
+              <TransConnectLogo
+                usage="light"
+                width={72}
+                height={20}
+                imageClassName="h-4"
+                wordmarkClassName="text-sm text-gray-900"
+              />
               <div className="text-sm">
                 <div className="font-medium text-gray-900">{data?.agent?.name || 'Agent'}</div>
                 <div className="text-gray-500">ID: {data?.agent?.referralCode}</div>
@@ -251,9 +256,9 @@ export default function AgentDashboardPage() {
               </div>
               <div className="ml-3">
                 <p className="text-sm text-red-800">
-                  <strong>Authentication Required:</strong> Please log in to access your dashboard.
+                  <strong>Authentication Required:</strong> Please sign in to access your dashboard.
                   <a href="/agents/login" className="font-medium underline hover:text-red-900 ml-1">
-                    Go to Login
+                    Go to Sign In
                   </a>
                 </p>
               </div>

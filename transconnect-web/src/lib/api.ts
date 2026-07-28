@@ -87,6 +87,20 @@ export const authApi = {
     return response.data;
   },
 
+  async requestPhoneOtp(phoneNumber: string) {
+    const response = await api.post('/auth/request-otp', { phoneNumber });
+    return response.data;
+  },
+
+  async verifyPhoneOtp(phoneNumber: string, otp: string) {
+    const response = await api.post('/auth/verify-otp', { phoneNumber, otp });
+    if (response.data.token && typeof window !== 'undefined') {
+      localStorage.setItem('token', response.data.token);
+      localStorage.setItem('user', JSON.stringify(response.data.user));
+    }
+    return response.data;
+  },
+
   logout() {
     if (typeof window !== 'undefined') {
       localStorage.removeItem('token');

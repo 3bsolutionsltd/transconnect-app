@@ -2,6 +2,7 @@
 import React from 'react';
 import Link from 'next/link';
 import OnboardingFlow from '../../../components/agents/OnboardingFlow.agent';
+import TransConnectLogo from '@/components/branding/TransConnectLogo';
 
 export default function AgentRegisterPage() {
   return (
@@ -16,12 +17,13 @@ export default function AgentRegisterPage() {
               </svg>
               Back to Agent Program
             </Link>
-            <div className="flex items-center space-x-2">
-              <div className="w-8 h-8 bg-gradient-to-r from-blue-600 to-green-600 rounded-lg flex items-center justify-center">
-                <span className="text-white font-bold text-sm">TC</span>
-              </div>
-              <span className="font-semibold text-gray-900">TransConnect</span>
-            </div>
+            <TransConnectLogo
+              usage="light"
+              width={102}
+              height={30}
+              imageClassName="h-5"
+              wordmarkClassName="text-base text-gray-900"
+            />
           </div>
         </div>
       </div>
@@ -52,12 +54,12 @@ export default function AgentRegisterPage() {
             </div>
           </div>
 
-          {/* Login Link */}
+          {/* Sign In Link */}
           <div className="mt-8 text-center">
             <p className="text-gray-600 text-sm mb-6">
               Already have an agent account?{' '}
               <Link href="/agents/login" className="text-blue-600 hover:text-blue-700 font-medium">
-                Login here
+                Sign in here
               </Link>
             </p>
           </div>

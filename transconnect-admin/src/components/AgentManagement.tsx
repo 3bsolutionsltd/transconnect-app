@@ -167,9 +167,14 @@ const AgentManagement = () => {
   };
 
   const filteredAgents = agents.filter(agent => {
-    const matchesSearch = agent.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
-                         agent.phone.includes(searchTerm) ||
-                         agent.email.toLowerCase().includes(searchTerm.toLowerCase());
+    const normalizedSearch = searchTerm.toLowerCase();
+    const name = (agent.name || '').toLowerCase();
+    const phone = agent.phone || '';
+    const email = (agent.email || '').toLowerCase();
+
+    const matchesSearch = name.includes(normalizedSearch) ||
+                         phone.includes(searchTerm) ||
+                         email.includes(normalizedSearch);
     const matchesStatus = statusFilter === 'all' || agent.status === statusFilter;
     return matchesSearch && matchesStatus;
   });

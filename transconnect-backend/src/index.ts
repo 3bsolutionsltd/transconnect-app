@@ -27,9 +27,11 @@ import qrRoutes from './routes/qr';
 import notificationRoutes from './routes/notifications';
 import operatorPaymentRoutes from './routes/operator-payments';
 import operatorManagementRoutes from './routes/operator-management';
+import operatorPortalRoutes from './routes/operator-portal';
 import adminOperatorUserRoutes from './routes/admin-operator-users';
 import databaseAdminRoutes from './routes/admin/database';
 import systemFixesRoutes from './routes/admin/system-fixes';
+import systemHealthRoutes from './routes/admin/system-health';
 import adminSeedRoutes from './routes/admin-seed';
 import agentRoutes from './routes/agents';
 import segmentRoutes from './routes/segments'; // NEW: Route segments management
@@ -160,6 +162,7 @@ app.use('/api/manager/transfers', managerTransferRoutes); // NEW: Week 4 - Manag
 app.use('/api/payments', paymentRoutes);
 app.use('/api/qr', qrRoutes);
 app.use('/api/operators', operatorRoutes);
+app.use('/api/operator-portal', operatorPortalRoutes); // NEW: Operator white-labeled portals (public)
 app.use('/api/buses', busRoutes);
 app.use('/api/rides', rideRoutes);
 app.use('/api/notifications', notificationRoutes);
@@ -168,6 +171,7 @@ app.use('/api/operator-management', operatorManagementRoutes);
 app.use('/api/admin/operator-users', adminOperatorUserRoutes);
 app.use('/api/admin/database', databaseAdminRoutes);
 app.use('/api/admin/system-fixes', systemFixesRoutes);
+app.use('/api/admin/system-health', systemHealthRoutes);
 app.use('/api/admin', adminSeedRoutes);
 app.use('/api/agents', agentRoutes);
 

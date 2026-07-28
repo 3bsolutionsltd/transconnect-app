@@ -5,8 +5,9 @@ import Link from 'next/link';
 import { useRouter, useSearchParams } from 'next/navigation';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
-import { Bus, Eye, EyeOff, Lock, CheckCircle } from 'lucide-react';
+import { Eye, EyeOff, Lock, CheckCircle } from 'lucide-react';
 import toast from 'react-hot-toast';
+import TransConnectLogo from '@/components/branding/TransConnectLogo';
 
 function ResetPasswordContent() {
   const [password, setPassword] = useState('');
@@ -92,10 +93,10 @@ function ResetPasswordContent() {
             <CheckCircle className="h-16 w-16 text-green-500 mx-auto mb-4" />
             <h2 className="text-2xl font-bold text-gray-900 mb-2">Password Reset Successful!</h2>
             <p className="text-gray-600 mb-4">
-              Your password has been reset successfully. Redirecting to login...
+              Your password has been reset successfully. Redirecting to sign in...
             </p>
             <Link href="/login">
-              <Button className="w-full">Go to Login</Button>
+              <Button className="w-full">Go to Sign In</Button>
             </Link>
           </CardContent>
         </Card>
@@ -109,8 +110,13 @@ function ResetPasswordContent() {
         {/* Header */}
         <div className="text-center mb-6 sm:mb-8">
           <div className="flex items-center justify-center mb-4">
-            <Bus className="h-10 w-10 sm:h-12 sm:w-12 text-blue-600" />
-            <h1 className="ml-3 text-2xl sm:text-3xl font-bold text-gray-900">TransConnect</h1>
+            <TransConnectLogo
+              usage="light"
+              width={120}
+              height={34}
+              imageClassName="h-7"
+              wordmarkClassName="text-2xl"
+            />
           </div>
           <p className="text-gray-600">Reset your password</p>
         </div>
@@ -190,13 +196,13 @@ function ResetPasswordContent() {
               </Button>
             </form>
 
-            {/* Back to Login */}
+            {/* Back to Sign In */}
             <div className="mt-6 text-center">
               <Link
                 href="/login"
                 className="text-sm text-blue-600 hover:text-blue-700 font-medium"
               >
-                Back to Login
+                Back to Sign In
               </Link>
             </div>
           </CardContent>

@@ -1,5 +1,7 @@
 import React from 'react';
 import Link from 'next/link';
+import TransConnectLogo from '@/components/branding/TransConnectLogo';
+import { COPYRIGHT_ATTRIBUTION } from '@/lib/links';
 
 /**
  * Marketing Landing Page for Agents
@@ -18,6 +20,15 @@ export default function AgentsLandingPage() {
           </div>
           
           <div className="relative z-10 text-center">
+            <div className="flex justify-center mb-6">
+              <TransConnectLogo
+                usage="light"
+                width={108}
+                height={32}
+                imageClassName="h-6"
+                wordmarkClassName="text-2xl"
+              />
+            </div>
             {/* Brand Badge */}
             <div className="inline-flex items-center px-4 py-2 bg-blue-100 text-blue-800 rounded-full text-sm font-medium mb-6">
               <svg className="w-4 h-4 mr-2" fill="currentColor" viewBox="0 0 20 20">
@@ -45,7 +56,7 @@ export default function AgentsLandingPage() {
                 <div className="absolute inset-0 bg-gradient-to-r from-blue-700 to-blue-800 rounded-xl opacity-0 group-hover:opacity-100 transition-opacity"></div>
               </Link>
               <Link href="/agents/login" className="px-8 py-4 border-2 border-blue-600 text-blue-600 rounded-xl hover:bg-blue-50 transition-all duration-300 font-semibold">
-                Agent Login
+                Agent Sign In
               </Link>
               <a href="#how-it-works" className="px-8 py-4 border-2 border-gray-300 text-gray-700 rounded-xl hover:border-blue-300 hover:text-blue-600 transition-all duration-300 font-semibold">
                 Learn How It Works
@@ -244,7 +255,7 @@ export default function AgentsLandingPage() {
               </span>
             </Link>
             <Link href="/agents/login" className="px-8 py-4 border-2 border-white text-white rounded-xl hover:bg-white hover:text-blue-600 transition-all duration-300 font-bold">
-              Agent Login
+              Agent Sign In
             </Link>
             <div className="text-blue-100 text-sm">
               <div className="flex items-center justify-center">
@@ -281,8 +292,17 @@ export default function AgentsLandingPage() {
       {/* Footer */}
       <footer className="py-8 px-4 bg-gray-900 text-center">
         <div className="max-w-4xl mx-auto">
+          <div className="flex justify-center mb-3">
+            <TransConnectLogo
+              usage="dark"
+              width={98}
+              height={30}
+              imageClassName="h-5"
+              wordmarkClassName="text-base"
+            />
+          </div>
           <p className="text-gray-400 text-sm">
-            © 2025 TransConnect. Building Uganda's transport future, one connection at a time.
+            {COPYRIGHT_ATTRIBUTION}
           </p>
         </div>
       </footer>

@@ -9,8 +9,10 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { useAuth } from '@/contexts/AuthContext';
 import { transferApi, getMyBookings } from '@/lib/api';
 import Header from '@/components/Header';
+import PortalFooter from '@/components/PortalFooter';
 import toast from 'react-hot-toast';
 import { format } from 'date-fns';
+import { Container, Heading, Section } from '@/components/styled';
 
 const REASON_OPTIONS = [
   { value: 'SCHEDULE_CONFLICT', label: 'Schedule Conflict' },
@@ -102,7 +104,7 @@ function TransferRequestContent() {
       <div className="min-h-screen bg-gray-50">
         <Header />
         <div className="flex items-center justify-center h-64">
-          <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600" />
+          <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-[#00D9A3]" />
         </div>
       </div>
     );
@@ -123,15 +125,15 @@ function TransferRequestContent() {
   }
 
   return (
-    <div className="min-h-screen bg-gray-50">
+    <Section variant="gray" className="min-h-screen py-0">
       <Header />
-      <div className="max-w-2xl mx-auto px-4 py-8">
+      <Container className="max-w-2xl px-4 py-8">
         {/* Back */}
         <Link href="/bookings" className="inline-flex items-center gap-1 text-sm text-gray-500 hover:text-gray-800 mb-6">
           <ArrowLeft size={16} /> Back to Bookings
         </Link>
 
-        <h1 className="text-2xl font-bold text-gray-900 mb-6">Request Booking Transfer</h1>
+        <Heading as="h4" className="text-gray-900 mb-6">Request Booking Transfer</Heading>
 
         {/* Current Booking Card */}
         <Card className="mb-6">
@@ -173,7 +175,7 @@ function TransferRequestContent() {
               value={targetDate}
               onChange={(e) => validateDate(e.target.value)}
               min={new Date().toISOString().split('T')[0]}
-              className="w-full border border-gray-300 rounded-lg px-4 py-3 text-sm focus:ring-2 focus:ring-blue-500 focus:border-transparent outline-none"
+              className="tc-input !px-4 !py-3 !text-sm"
             />
             {dateError && <p className="text-xs text-red-500 mt-1">{dateError}</p>}
             <p className="text-xs text-gray-400 mt-1">Leave blank to let the operator suggest an alternative.</p>
@@ -188,7 +190,7 @@ function TransferRequestContent() {
                   key={opt.value}
                   className={`flex items-center gap-3 p-3 rounded-lg border cursor-pointer transition-colors ${
                     reason === opt.value
-                      ? 'border-blue-500 bg-blue-50'
+                      ? 'border-[#00D9A3] bg-[#e8f5f2]'
                       : 'border-gray-200 hover:border-gray-300'
                   }`}
                 >
@@ -198,9 +200,9 @@ function TransferRequestContent() {
                     value={opt.value}
                     checked={reason === opt.value}
                     onChange={() => setReason(opt.value)}
-                    className="text-blue-600"
+                    className="text-[#00C28F]"
                   />
-                  <span className={`text-sm ${reason === opt.value ? 'text-blue-700 font-medium' : 'text-gray-700'}`}>
+                  <span className={`text-sm ${reason === opt.value ? 'text-[#1a3a5c] font-medium' : 'text-gray-700'}`}>
                     {opt.label}
                   </span>
                 </label>
@@ -218,14 +220,14 @@ function TransferRequestContent() {
               onChange={(e) => setReasonDetails(e.target.value)}
               rows={3}
               placeholder="Provide any extra information..."
-              className="w-full border border-gray-300 rounded-lg px-4 py-3 text-sm focus:ring-2 focus:ring-blue-500 focus:border-transparent outline-none resize-none"
+              className="tc-input !px-4 !py-3 !text-sm resize-none"
             />
           </div>
 
           {/* Info Banner */}
-          <div className="flex gap-3 bg-blue-50 border border-blue-100 rounded-lg p-4">
-            <Info size={18} className="text-blue-500 flex-shrink-0 mt-0.5" />
-            <p className="text-sm text-blue-700">
+          <div className="flex gap-3 bg-[#e8f5f2] border border-[#b7eadb] rounded-lg p-4">
+            <Info size={18} className="text-[#00C28F] flex-shrink-0 mt-0.5" />
+            <p className="text-sm text-[#1a3a5c]">
               Transfer requests are reviewed by our team. You&apos;ll be notified once your request is approved or rejected.
             </p>
           </div>
@@ -234,12 +236,13 @@ function TransferRequestContent() {
           <Button
             type="submit"
             disabled={submitting || !!dateError}
-            className="w-full py-3 text-base font-semibold"
+            className="w-full py-3 text-base font-semibold bg-[#00D9A3] hover:bg-[#00E5B0]"
           >
             {submitting ? 'Submitting...' : 'Submit Transfer Request'}
           </Button>
         </form>
-      </div>
-    </div>
+      </Container>
+      <PortalFooter slim />
+    </Section>
   );
 }
