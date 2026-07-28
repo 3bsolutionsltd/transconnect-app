@@ -49,7 +49,8 @@ router.get('/field-ops/all', authenticateToken, async (req: Request, res: Respon
         },
         status: {
           approved: operator.approved,
-          portalEnabled: operator.portalEnabled,
+          // Backward-compatible flag: the schema no longer has portalEnabled.
+          portalEnabled: operator.approved,
           managedByAgent: operator.managedByAgent,
         },
         createdAt: operator.createdAt,

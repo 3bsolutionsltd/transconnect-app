@@ -89,7 +89,7 @@ export class EmailOTPService {
 
   private getEmailTemplate(data: EmailOTPData): { subject: string; html: string } {
     const { otp, agentName, type } = data;
-    const displayName = agentName || 'Agent';
+    const displayName = agentName || 'User';
     
     const subject = type === 'registration' 
       ? 'TransConnect - Verify Your Registration'
@@ -118,13 +118,13 @@ export class EmailOTPService {
     <div class="container">
         <div class="header">
             <h1>🚌 TransConnect</h1>
-            <p>Agent ${type === 'registration' ? 'Registration' : 'Login'} Verification</p>
+          <p>${type === 'registration' ? 'Registration' : 'Login'} Verification</p>
         </div>
         
         <div class="content">
             <h2>Hello ${displayName}!</h2>
             
-            <p>Your verification code for TransConnect Agent ${type === 'registration' ? 'registration' : 'login'} is:</p>
+            <p>Your verification code for TransConnect ${type === 'registration' ? 'registration' : 'login'} is:</p>
             
             <div class="otp-box">
                 <div style="color: #6b7280; font-size: 14px; margin-bottom: 10px;">VERIFICATION CODE</div>

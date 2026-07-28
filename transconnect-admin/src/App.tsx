@@ -17,7 +17,6 @@ import {
   Building2,
   QrCode,
   UserCheck,
-  ShieldCheck,
   PanelLeftClose,
   PanelLeftOpen
 } from 'lucide-react';
@@ -30,7 +29,6 @@ import QRScannerPage from './components/QRScannerPage';
 import AgentManagement from './components/AgentManagement';
 import OperatorLayout from './components/operator/OperatorLayout';
 import MasterBookings from './components/MasterBookings';
-import AuthNotificationsHealth from './components/AuthNotificationsHealth';
 import FieldOperatorDirectory from './components/FieldOperatorDirectory';
 
 // Dashboard Component
@@ -529,7 +527,6 @@ const AdminLayout = () => {
         { name: 'QR Scanner', href: '/qr-scanner', icon: QrCode },
         { name: 'Analytics', href: '/analytics', icon: BarChart3 },
         { name: 'Users', href: '/users', icon: Users },
-        { name: 'System Health', href: '/system-health', icon: ShieldCheck },
         { name: 'Settings', href: '/settings', icon: Settings },
       ]
     : isMasterFieldOperator
@@ -676,7 +673,6 @@ const AdminLayout = () => {
               <Route path="/qr-scanner" element={isAdmin ? <QRScannerPage /> : <MasterBookings />} />
               <Route path="/analytics" element={isAdmin ? <Analytics /> : <MasterBookings />} />
               <Route path="/users" element={isAdmin ? <UserManagement /> : <MasterBookings />} />
-              <Route path="/system-health" element={isAdmin ? <AuthNotificationsHealth /> : <MasterBookings />} />
               <Route path="/operators-directory" element={isMasterFieldOperator ? <FieldOperatorDirectory /> : <MasterBookings />} />
               <Route path="/settings" element={isAdmin ? <div>Settings page coming soon...</div> : <MasterBookings />} />
             </Routes>

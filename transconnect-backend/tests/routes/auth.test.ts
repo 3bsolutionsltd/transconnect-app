@@ -7,30 +7,11 @@ import jwt from 'jsonwebtoken';
 jest.mock('../../src/lib/prisma', () => ({
   prisma: {
     user: {
-      findFirst: jest.fn(),
       findUnique: jest.fn(),
+      findFirst: jest.fn(),
       create: jest.fn(),
     },
   }
-}));
-
-jest.mock('../../src/tools/agents/otp.tool', () => ({
-  sendOtpForIdentifier: jest.fn().mockResolvedValue({
-    otp: '123456',
-    expiry: new Date(Date.now() + 10 * 60 * 1000),
-  }),
-  verifyOtpCodeForIdentifier: jest.fn(),
-  sendOtp: jest.fn(),
-  verifyOtpCode: jest.fn(),
-}));
-
-jest.mock('../../src/services/email-otp.service', () => ({
-  __esModule: true,
-  default: {
-    getInstance: () => ({
-      sendOTP: jest.fn().mockResolvedValue({ success: true }),
-    }),
-  },
 }));
 
 jest.mock('bcryptjs');
@@ -64,9 +45,6 @@ app.use('/auth', authRoutes);
 describe('Auth Routes', () => {
   beforeEach(() => {
     jest.clearAllMocks();
-    mockPrisma.user.findFirst.mockReset();
-    mockPrisma.user.findUnique.mockReset();
-    mockPrisma.user.create.mockReset();
   });
 
   describe('POST /auth/register', () => {
@@ -92,8 +70,8 @@ describe('Auth Routes', () => {
 
       expect(response.status).toBe(201);
       expect(response.body).toHaveProperty('user');
-      expect(response.body.verificationRequired).toBe(true);
-      expect(response.body.verificationChannel).toBe('email');
+      expect(response.body).toHaveProperty('verificationRequired', true);
+      expect(response.body).toHaveProperty('verificationChannel', 'email');
       expect(response.body.user.email).toBe(validUserData.email);
 
       expect(mockPrisma.user.findFirst).toHaveBeenCalledWith({
