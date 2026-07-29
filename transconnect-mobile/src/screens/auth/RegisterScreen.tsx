@@ -80,18 +80,12 @@ export default function RegisterScreen({ navigation }: any) {
         role: 'PASSENGER',
       });
       if (result?.verificationRequired) {
-        Alert.alert(
-          'Verify Your Email',
-          'We sent a 6-digit code to your email. Enter it to activate your account.',
-          [
-            {
-              text: 'Continue',
-              onPress: () => navigation.navigate('EmailVerification', {
-                email: result.email || formData.email,
-              }),
-            },
-          ]
-        );
+        setIsLoading(false);
+        // Navigate immediately to verification screen
+        navigation.navigate('EmailVerification', {
+          email: result.email || formData.email,
+        });
+        return; // Exit early to prevent finally block
       }
     } catch (error: any) {
       console.log('Registration error:', error.response?.data);
