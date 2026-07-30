@@ -234,6 +234,7 @@ router.get('/:id', async (req: Request, res: Response) => {
           }
         },
         buses: {
+          where: { active: true }, // Only show active buses
           select: {
             id: true,
             plateNumber: true,
@@ -242,6 +243,7 @@ router.get('/:id', async (req: Request, res: Response) => {
           }
         },
         routes: {
+          where: { active: true }, // Only show active routes
           select: {
             id: true,
             origin: true,
@@ -254,6 +256,11 @@ router.get('/:id', async (req: Request, res: Response) => {
     });
 
     if (!operator) {
+      return res.status(404).json({ error: 'Operator not found' });
+    }
+
+    // Only return approved operators to public
+    if (!operator.approved) {
       return res.status(404).json({ error: 'Operator not found' });
     }
 
