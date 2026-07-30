@@ -67,6 +67,9 @@ router.get('/field-ops/all', authenticateToken, async (req: Request, res: Respon
 router.get('/', async (req: Request, res: Response) => {
   try {
     const operators = await prisma.operator.findMany({
+      where: {
+        approved: true, // Only show approved operators to public
+      },
       include: {
         user: {
           select: {
@@ -88,6 +91,7 @@ router.get('/', async (req: Request, res: Response) => {
           }
         },
         buses: {
+          where: { active: true }, // Only show active buses
           select: {
             id: true,
             plateNumber: true,
@@ -96,6 +100,7 @@ router.get('/', async (req: Request, res: Response) => {
           }
         },
         routes: {
+          where: { active: true }, // Only show active routes
           select: {
             id: true,
             origin: true,

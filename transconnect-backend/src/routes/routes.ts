@@ -84,6 +84,7 @@ router.get('/', async (req: Request, res: Response) => {
       const directRoutes = await prisma.route.findMany({
         where: {
           active: true,
+          operator: { approved: true }, // Only show routes from approved operators
           OR: [
             // Exact or partial match
             {
@@ -109,7 +110,10 @@ router.get('/', async (req: Request, res: Response) => {
       if (directRoutes.length === 0) {
         console.log('No routes found for criteria, returning all active routes');
         const allActiveRoutes = await prisma.route.findMany({
-          where: { active: true },
+          where: { 
+            active: true,
+            operator: { approved: true } // Only show routes from approved operators
+          },
           include: {
             operator: { select: { id: true, companyName: true, approved: true } },
             bus: { select: { id: true, plateNumber: true, model: true, capacity: true, amenities: true } },
@@ -131,6 +135,7 @@ router.get('/', async (req: Request, res: Response) => {
     // Build where clause for filtering
     let whereClause: any = {
       active: true,
+      operator: { approved: true }, // Only show routes from approved operators
     };
 
     if (origin) {
@@ -193,11 +198,8 @@ router.get('/', async (req: Request, res: Response) => {
       ]
     });
 
-    // Only show routes from approved operators
-    const approvedRoutes = routes.filter(route => route.operator.approved);
-
     // Calculate availability if travelDate is provided
-    const routesWithAvailability = approvedRoutes.map(route => {
+    const routesWithAvailability = routes.map(route => {
       let routeData: any = {
         ...route,
         // Ensure all time fields are properly formatted as strings
