@@ -110,16 +110,15 @@ export default function PhoneLoginScreen({ navigation }: any) {
       
       await setAuthSession({ user, token, expiresAt, expiresIn });
       
-      // Show welcome message for new users
+      // Auth state will automatically switch to main app - no manual navigation needed
+      // Show welcome message for new users only
       if (isNewUser) {
         Alert.alert(
           'Welcome to TransConnect!',
-          'Your account has been created successfully. You can now book bus tickets and rides.',
-          [{ text: 'Get Started', onPress: () => navigation.navigate('Home') }]
+          'Your account has been created successfully. You can now book bus tickets and rides.'
         );
-      } else {
-        navigation.navigate('Home');
       }
+      // Navigation will happen automatically via AuthContext state change
     } catch (err: any) {
       const msg =
         err?.response?.data?.error ||
