@@ -38,7 +38,15 @@ export default function HomeScreen({ navigation }: any) {
   useEffect(() => {
     setRoutesLoading(true);
     routesApi.getAllRoutes()
-      .then(res => setAllRoutes(res.data || []))
+      .then(res => {
+        const payload = res?.data;
+        const normalizedRoutes = Array.isArray(payload)
+          ? payload
+          : Array.isArray(payload?.routes)
+            ? payload.routes
+            : [];
+        setAllRoutes(normalizedRoutes);
+      })
       .catch(() => {})
       .finally(() => setRoutesLoading(false));
   }, []);
