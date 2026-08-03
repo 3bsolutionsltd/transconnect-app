@@ -631,6 +631,14 @@ router.post('/request-otp', [
     const normalizedPhone = phoneValidation.normalizedNumber!;
     console.log(`📱 OTP request for: "${phoneNumber}" → "${normalizedPhone}"`);
 
+    const existingUser = await prisma.user.findFirst({
+      where: { phone: normalizedPhone },
+      select: {
+        email: true,
+        firstName: true,
+      },
+    });
+
     // Generate OTP
     const otpResult = await sendOtp(normalizedPhone);
     
@@ -640,8 +648,28 @@ router.post('/request-otp', [
     
     console.log(`📱 SMS Result: ${smsResult.success ? '✅' : '❌'} via ${smsResult.provider}`);
     if (smsResult.cost) console.log(`💰 Estimated cost: ${smsResult.cost}`);
+    if (smsResult.fallbackUsed) console.log('🔄 Fallback provider was used');
+
+    let emailBackupSent = false;
+    if (!smsResult.success && existingUser?.email) {
+      console.log('📧 SMS failed for passenger login, sending email backup...');
+      const emailOtpService = EmailOTPService.getInstance();
+      const emailResult = await emailOtpService.sendOTP({
+        email: existingUser.email,
+        otp: otpResult.otp,
+        agentName: existingUser.firstName,
+        type: 'login',
+      });
+
+      if (emailResult.success) {
+        console.log('✅ Passenger email OTP sent as backup');
+        emailBackupSent = true;
+      } else {
+        console.log('❌ Passenger SMS and email backup both failed:', emailResult.error);
+      }
+    }
     
-    if (!smsResult.success) {
+    if (!smsResult.success && !emailBackupSent) {
       return res.status(500).json({
         error: 'Failed to send OTP',
         details: smsResult.error,
@@ -650,13 +678,18 @@ router.post('/request-otp', [
     }
 
     res.status(200).json({ 
-      message: 'OTP sent successfully',
+      message: smsResult.success
+        ? 'OTP sent successfully'
+        : 'SMS delivery failed. OTP sent to your email instead.',
       phoneNumber: normalizedPhone,
       next_step: 'verify_otp',
       delivery: {
-        sms: true,
+        sms: smsResult.success,
+        email: emailBackupSent,
         provider: smsResult.provider,
-        instruction: 'Please enter the 6-digit code sent to your phone'
+        instruction: smsResult.success
+          ? 'Please enter the 6-digit code sent to your phone'
+          : 'SMS delivery failed. Please check your email for the 6-digit code.'
       }
     });
   } catch (error: any) {

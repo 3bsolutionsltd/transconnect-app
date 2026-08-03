@@ -45,11 +45,23 @@ export default function PhoneLoginScreen({ navigation }: any) {
     }
     setLoading(true);
     try {
-      await apiClient.post('/auth/request-otp', { phoneNumber: cleaned });
+      const response = await apiClient.post('/auth/request-otp', { phoneNumber: cleaned });
+      const normalizedPhone = response?.data?.phoneNumber;
+      const deliveryInstruction = response?.data?.delivery?.instruction;
+
+      if (normalizedPhone) {
+        setPhone(normalizedPhone);
+      }
+
       setStep('otp');
       startResendTimer();
+
+      if (deliveryInstruction) {
+        Alert.alert('Verification Code Sent', deliveryInstruction);
+      }
     } catch (err: any) {
       const msg =
+        err?.response?.data?.details ||
         err?.response?.data?.error ||
         err?.response?.data?.message ||
         'Failed to send OTP. Please try again.';
