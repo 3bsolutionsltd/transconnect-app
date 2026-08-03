@@ -98,7 +98,15 @@ router.get('/', async (req: Request, res: Response) => {
           ]
         },
         include: {
-          operator: { select: { id: true, companyName: true, approved: true } },
+          operator: {
+            select: {
+              id: true,
+              companyName: true,
+              approved: true,
+              slug: true,
+              portalEnabled: true,
+            }
+          },
           bus: { select: { id: true, plateNumber: true, model: true, capacity: true, amenities: true } },
           stops: { orderBy: { order: 'asc' } }
         },
@@ -115,7 +123,15 @@ router.get('/', async (req: Request, res: Response) => {
             operator: { approved: true } // Only show routes from approved operators
           },
           include: {
-            operator: { select: { id: true, companyName: true, approved: true } },
+            operator: {
+              select: {
+                id: true,
+                companyName: true,
+                approved: true,
+                slug: true,
+                portalEnabled: true,
+              }
+            },
             bus: { select: { id: true, plateNumber: true, model: true, capacity: true, amenities: true } },
             stops: { orderBy: { order: 'asc' } }
           },
@@ -160,6 +176,8 @@ router.get('/', async (req: Request, res: Response) => {
             id: true,
             companyName: true,
             approved: true,
+            slug: true,
+            portalEnabled: true,
             user: {
               select: {
                 phone: true,
@@ -215,6 +233,8 @@ router.get('/', async (req: Request, res: Response) => {
         operatorInfo: {
           id: route.operator.id,
           name: route.operator.companyName,
+          slug: route.operator.slug,
+          portalEnabled: route.operator.portalEnabled,
           phone: route.operator.user.phone,
           email: route.operator.user.email
         },

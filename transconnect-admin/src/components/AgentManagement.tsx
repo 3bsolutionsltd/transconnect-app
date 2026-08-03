@@ -13,7 +13,8 @@ import {
   Ban,
   User,
   Wallet,
-  Edit3
+  Edit3,
+  Link as LinkIcon
 } from 'lucide-react';
 
 interface Agent {
@@ -57,6 +58,11 @@ const AgentManagement = () => {
   const [newStatus, setNewStatus] = useState('');
   const [statusReason, setStatusReason] = useState('');
   const [updatingStatus, setUpdatingStatus] = useState(false);
+  const [showReferralModal, setShowReferralModal] = useState(false);
+  const [referralInput, setReferralInput] = useState('');
+  const [replaceExistingReferral, setReplaceExistingReferral] = useState(true);
+  const [updatingReferral, setUpdatingReferral] = useState(false);
+  const [notice, setNotice] = useState<{ type: 'success' | 'error'; message: string } | null>(null);
 
   const API_BASE_URL = (process.env.REACT_APP_API_URL || 'http://localhost:5000/api').replace(/\/api\/?$/, '') + '/api';
 
@@ -93,6 +99,13 @@ const AgentManagement = () => {
     loadAgents();
   }, [loadAgents]);
 
+  const showNotice = (type: 'success' | 'error', message: string) => {
+    setNotice({ type, message });
+    setTimeout(() => {
+      setNotice(null);
+    }, 4000);
+  };
+
   const handleStatusUpdate = async () => {
     if (!selectedAgent || !newStatus) return;
 
@@ -126,9 +139,47 @@ const AgentManagement = () => {
       setStatusReason('');
     } catch (error) {
       console.error('Error updating agent status:', error);
-      alert('Failed to update agent status');
+      showNotice('error', 'Failed to update agent status');
     } finally {
       setUpdatingStatus(false);
+    }
+  };
+
+  const handleReferralUpdate = async () => {
+    if (!selectedAgent || !referralInput.trim()) return;
+
+    try {
+      setUpdatingReferral(true);
+      const token = localStorage.getItem('admin_token');
+
+      const response = await fetch(`${API_BASE_URL}/agents/admin/${selectedAgent.id}/referral`, {
+        method: 'PUT',
+        headers: {
+          'Authorization': `Bearer ${token}`,
+          'Content-Type': 'application/json'
+        },
+        body: JSON.stringify({
+          referralCode: referralInput.trim().toUpperCase(),
+          replaceExisting: replaceExistingReferral
+        })
+      });
+
+      const data = await response.json().catch(() => ({}));
+      if (!response.ok) {
+        throw new Error(data?.error || 'Failed to update referral');
+      }
+
+      await loadAgents();
+      setShowReferralModal(false);
+      setSelectedAgent(null);
+      setReferralInput('');
+      setReplaceExistingReferral(true);
+      showNotice('success', 'Referrer updated successfully');
+    } catch (error: any) {
+      console.error('Error updating agent referral:', error);
+      showNotice('error', error?.message || 'Failed to update referrer');
+    } finally {
+      setUpdatingReferral(false);
     }
   };
 
@@ -200,6 +251,26 @@ const AgentManagement = () => {
 
   return (
     <div className="space-y-6">
+      {notice && (
+        <div
+          className={`rounded-lg border px-4 py-3 text-sm font-medium ${
+            notice.type === 'success'
+              ? 'border-green-200 bg-green-50 text-green-800'
+              : 'border-red-200 bg-red-50 text-red-800'
+          }`}
+        >
+          <div className="flex items-center justify-between">
+            <span>{notice.message}</span>
+            <button
+              onClick={() => setNotice(null)}
+              className="ml-4 text-xs underline hover:no-underline"
+            >
+              Dismiss
+            </button>
+          </div>
+        </div>
+      )}
+
       {/* Header */}
       <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between">
         <div>
@@ -428,17 +499,31 @@ const AgentManagement = () => {
                     </div>
                   </td>
                   <td className="px-6 py-4 whitespace-nowrap text-sm font-medium">
-                    <button
-                      onClick={() => {
-                        setSelectedAgent(agent);
-                        setNewStatus(agent.status);
-                        setShowStatusModal(true);
-                      }}
-                      className="text-blue-600 hover:text-blue-900 flex items-center"
-                    >
-                      <Edit3 className="h-4 w-4 mr-1" />
-                      Edit Status
-                    </button>
+                    <div className="flex flex-col space-y-2">
+                      <button
+                        onClick={() => {
+                          setSelectedAgent(agent);
+                          setNewStatus(agent.status);
+                          setShowStatusModal(true);
+                        }}
+                        className="text-blue-600 hover:text-blue-900 flex items-center"
+                      >
+                        <Edit3 className="h-4 w-4 mr-1" />
+                        Edit Status
+                      </button>
+                      <button
+                        onClick={() => {
+                          setSelectedAgent(agent);
+                          setReferralInput('');
+                          setReplaceExistingReferral(true);
+                          setShowReferralModal(true);
+                        }}
+                        className="text-emerald-600 hover:text-emerald-900 flex items-center"
+                      >
+                        <LinkIcon className="h-4 w-4 mr-1" />
+                        Set Referrer
+                      </button>
+                    </div>
                   </td>
                 </tr>
               ))}
@@ -520,6 +605,70 @@ const AgentManagement = () => {
                   className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed"
                 >
                   {updatingStatus ? 'Updating...' : 'Update Status'}
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {showReferralModal && selectedAgent && (
+        <div className="fixed inset-0 bg-gray-600 bg-opacity-50 overflow-y-auto h-full w-full z-50">
+          <div className="relative top-20 mx-auto p-5 border w-96 shadow-lg rounded-md bg-white">
+            <div className="mt-3">
+              <h3 className="text-lg font-medium text-gray-900 mb-4">
+                Set Agent Referrer
+              </h3>
+              <div className="space-y-4">
+                <div>
+                  <p className="text-sm text-gray-600 mb-1">Agent: {selectedAgent.name}</p>
+                  <p className="text-xs text-gray-500">Agent Code: {selectedAgent.referralCode}</p>
+                </div>
+
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-2">
+                    Referrer Code
+                  </label>
+                  <input
+                    value={referralInput}
+                    onChange={(e) => setReferralInput(e.target.value.toUpperCase())}
+                    placeholder="Enter existing agent referral code"
+                    className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-emerald-500 focus:border-transparent"
+                  />
+                  <p className="mt-1 text-xs text-gray-500">This should be the referral code of the agent who referred this person.</p>
+                </div>
+
+                <label className="flex items-start space-x-2">
+                  <input
+                    type="checkbox"
+                    checked={replaceExistingReferral}
+                    onChange={(e) => setReplaceExistingReferral(e.target.checked)}
+                    className="mt-1"
+                  />
+                  <span className="text-sm text-gray-700">
+                    Replace existing referrer if one already exists
+                  </span>
+                </label>
+              </div>
+
+              <div className="flex justify-end space-x-3 mt-6">
+                <button
+                  onClick={() => {
+                    setShowReferralModal(false);
+                    setSelectedAgent(null);
+                    setReferralInput('');
+                    setReplaceExistingReferral(true);
+                  }}
+                  className="px-4 py-2 text-gray-600 border border-gray-300 rounded-lg hover:bg-gray-50"
+                >
+                  Cancel
+                </button>
+                <button
+                  onClick={handleReferralUpdate}
+                  disabled={updatingReferral || !referralInput.trim()}
+                  className="px-4 py-2 bg-emerald-600 text-white rounded-lg hover:bg-emerald-700 disabled:opacity-50 disabled:cursor-not-allowed"
+                >
+                  {updatingReferral ? 'Saving...' : 'Save Referrer'}
                 </button>
               </div>
             </div>

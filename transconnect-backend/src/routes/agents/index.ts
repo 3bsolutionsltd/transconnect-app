@@ -1,5 +1,5 @@
 import { Router } from 'express';
-import { registerAgent, verifyOtp, getDashboard, requestWithdrawal, loginAgent, verifyLoginOtp, getAllAgents, updateAgentStatus, resendRegistrationOtp, resendLoginOtp, checkRegistrationStatus } from '../../services/agents/agent.service';
+import { registerAgent, verifyOtp, getDashboard, requestWithdrawal, loginAgent, verifyLoginOtp, getAllAgents, updateAgentStatus, resendRegistrationOtp, resendLoginOtp, checkRegistrationStatus, assignAgentReferral } from '../../services/agents/agent.service';
 import { uploadKyc, confirmKycUpload, listPendingKyc, reviewKyc, getPresignedUrl } from './kyc/kyc.controller';
 import { updateProfile, getProfile } from './profile/profile.controller';
 import operatorRoutes from './operators';
@@ -275,6 +275,7 @@ router.get('/profile/:agentId', getProfile);
 // Admin routes for agent management
 router.get('/admin/all', authenticateToken, getAllAgents);
 router.put('/admin/:agentId/status', authenticateToken, updateAgentStatus);
+router.put('/admin/:agentId/referral', authenticateToken, assignAgentReferral);
 
 // Online status tracking
 router.get('/online', authenticateToken, async (req, res) => {

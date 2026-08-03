@@ -14,6 +14,9 @@ const JWT_SECRET = process.env.JWT_SECRET || 'dev-secret';
 export async function registerAgent(req: Request, res: Response) {
   try {
     const { name, phone, email, referralCode } = req.body;
+    const normalizedReferralCode = typeof referralCode === 'string' && referralCode.trim()
+      ? ReferralService.normalizeReferralCode(referralCode)
+      : undefined;
 
     // Normalize phone number
     const phoneValidation = PhoneNormalizer.normalize(phone, 'UG'); // Default to Uganda
@@ -64,6 +67,10 @@ export async function registerAgent(req: Request, res: Response) {
             updatedAt: new Date()
           },
         });
+
+        if (normalizedReferralCode) {
+          await ReferralService.linkReferral(existingAgent.id, normalizedReferralCode);
+        }
 
         console.log(`✅ Updated existing pending agent registration`);
         
@@ -142,8 +149,8 @@ export async function registerAgent(req: Request, res: Response) {
     console.log(`✅ New agent created: ${agent.name} (${normalizedPhone})`);
 
     // Set up agent infrastructure
-    if (referralCode) {
-      await ReferralService.linkReferral(agent.id, referralCode);
+    if (normalizedReferralCode) {
+      await ReferralService.linkReferral(agent.id, normalizedReferralCode);
     }
 
     await WalletService.createWallet(agent.id);
@@ -919,4 +926,70 @@ function generateReferralCode(name: string) {
     name.replace(/\s+/g, '').substring(0, 4).toUpperCase() +
     Math.floor(1000 + Math.random() * 9000)
   );
+}
+
+export async function assignAgentReferral(req: Request, res: Response) {
+  try {
+    const requestUser = (req as any).user;
+    if (!requestUser || requestUser.role !== 'ADMIN') {
+      return res.status(403).json({ error: 'Only administrators can assign referral codes' });
+    }
+
+    const { agentId } = req.params;
+    const { referralCode, replaceExisting = true } = req.body;
+
+    if (!referralCode || typeof referralCode !== 'string') {
+      return res.status(400).json({ error: 'referralCode is required' });
+    }
+
+    const agent = await prisma.agent.findUnique({
+      where: { id: agentId },
+      select: { id: true, name: true, referralCode: true, referredById: true }
+    });
+
+    if (!agent) {
+      return res.status(404).json({ error: 'Agent not found' });
+    }
+
+    const linkResult = await ReferralService.linkReferral(agentId, referralCode, {
+      replaceExisting: Boolean(replaceExisting),
+    });
+
+    const updatedAgent = await prisma.agent.findUnique({
+      where: { id: agentId },
+      select: {
+        id: true,
+        name: true,
+        referralCode: true,
+        referredById: true,
+        referredBy: {
+          select: {
+            id: true,
+            name: true,
+            referralCode: true,
+          }
+        }
+      }
+    });
+
+    return res.json({
+      success: true,
+      message: 'Referral assigned successfully',
+      agent: updatedAgent,
+      referral: linkResult,
+    });
+  } catch (err: any) {
+    if (
+      err?.message === 'Invalid referral code' ||
+      err?.message === 'An agent cannot refer themselves' ||
+      err?.message === 'Agent already has a referrer'
+    ) {
+      return res.status(400).json({ error: err.message });
+    }
+    if (err?.message === 'Agent not found') {
+      return res.status(404).json({ error: err.message });
+    }
+    console.error('Assign agent referral error:', err);
+    return res.status(500).json({ error: err.message || 'Failed to assign referral' });
+  }
 }

@@ -5,6 +5,7 @@
 
 import { prisma } from '../../index';
 import bcrypt from 'bcryptjs';
+import { validateAndNormalizeContact } from '../../utils/contact-validation';
 
 export class AgentOperatorService {
   
@@ -39,12 +40,26 @@ export class AgentOperatorService {
         throw new Error('Agent account is pending verification');
       }
 
+      const contactValidation = validateAndNormalizeContact({
+        email: operatorData.email,
+        phone: operatorData.phone,
+        defaultCountry: 'UG',
+      });
+
+      if (!contactValidation.isValid || !contactValidation.normalizedEmail || !contactValidation.normalizedPhone) {
+        const contactError = contactValidation.errors[0]?.message || 'Invalid operator contact details';
+        throw new Error(contactError);
+      }
+
+      const normalizedEmail = contactValidation.normalizedEmail;
+      const normalizedPhone = contactValidation.normalizedPhone;
+
       // Check if email or phone already exists
       const existingUser = await prisma.user.findFirst({
         where: {
           OR: [
-            { email: operatorData.email },
-            { phone: operatorData.phone }
+            { email: normalizedEmail },
+            { phone: normalizedPhone }
           ]
         }
       });
@@ -65,68 +80,68 @@ export class AgentOperatorService {
       // Hash password
       const hashedPassword = await bcrypt.hash(operatorData.password || 'defaultpass123', 10);
 
-      // Create user
-      const user = await prisma.user.create({
-        data: {
-          firstName: operatorData.firstName,
-          lastName: operatorData.lastName,
-          email: operatorData.email,
-          phone: operatorData.phone,
-          password: hashedPassword,
-          role: 'OPERATOR',
-          verified: true
-        }
-      });
+      const operator = await prisma.$transaction(async (tx) => {
+        const user = await tx.user.create({
+          data: {
+            firstName: operatorData.firstName,
+            lastName: operatorData.lastName,
+            email: normalizedEmail,
+            phone: normalizedPhone,
+            password: hashedPassword,
+            role: 'OPERATOR',
+            verified: true
+          }
+        });
 
-      // Create operator linked to agent
-      const operator = await prisma.operator.create({
-        data: {
-          companyName: operatorData.companyName,
-          license: operatorData.license,
-          userId: user.id,
-          agentId: agentId,
-          managedByAgent: true,
-          approved: false // Requires admin approval
-        },
-        include: {
-          user: {
-            select: {
-              id: true,
-              firstName: true,
-              lastName: true,
-              email: true,
-              phone: true
-            }
+        const createdOperator = await tx.operator.create({
+          data: {
+            companyName: operatorData.companyName,
+            license: operatorData.license,
+            userId: user.id,
+            agentId: agentId,
+            managedByAgent: true,
+            approved: false // Requires admin approval
           },
-          managingAgent: {
-            select: {
-              id: true,
-              name: true,
-              referralCode: true
+          include: {
+            user: {
+              select: {
+                id: true,
+                firstName: true,
+                lastName: true,
+                email: true,
+                phone: true
+              }
+            },
+            managingAgent: {
+              select: {
+                id: true,
+                name: true,
+                referralCode: true
+              }
             }
           }
-        }
-      });
+        });
 
-      // Create OperatorUser relationship (CRITICAL - this was missing!)
-      await prisma.operatorUser.create({
-        data: {
-          userId: user.id,
-          operatorId: operator.id,
-          role: 'MANAGER',
-          permissions: ['manage_all'],
-          active: true
-        }
-      });
+        await tx.operatorUser.create({
+          data: {
+            userId: user.id,
+            operatorId: createdOperator.id,
+            role: 'MANAGER',
+            permissions: ['manage_all'],
+            active: true
+          }
+        });
 
-      // Create agent-operator relationship
-      await prisma.agentOperator.create({
-        data: {
-          agentId: agentId,
-          operatorId: operator.id,
-          role: 'MANAGER',
-          permissions: ['manage_routes', 'manage_buses', 'view_analytics']
-        }
+        await tx.agentOperator.create({
+          data: {
+            agentId: agentId,
+            operatorId: createdOperator.id,
+            role: 'MANAGER',
+            permissions: ['manage_routes', 'manage_buses', 'view_analytics']
+          }
+        });
+
+        return createdOperator;
       });
 
       return {

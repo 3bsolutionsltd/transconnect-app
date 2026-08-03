@@ -6,6 +6,7 @@ export type TrustedOperator = {
   maxPrice: number;
   avgPrice: number;
   sampleRoute: string;
+  portalSlug?: string;
 };
 
 function toNumber(value: unknown): number {
@@ -51,6 +52,7 @@ export function deriveTrustedOperators(routes: any[]): TrustedOperator[] {
     prices: number[];
     destinations: Set<string>;
     sampleRoute: string;
+    portalSlug?: string;
   }>();
 
   for (const route of routes || []) {
@@ -61,6 +63,15 @@ export function deriveTrustedOperators(routes: any[]): TrustedOperator[] {
     const destination = normalizeName(route?.destination || route?.to || 'Destination');
     const price = toNumber(route?.price);
     const routeLabel = `${origin} -> ${destination}`;
+    const routeOperator = route?.operator || route?.operatorInfo || {};
+    const operatorSlug =
+      (typeof routeOperator?.slug === 'string' && routeOperator.slug.trim()) ||
+      (typeof route?.operatorSlug === 'string' && route.operatorSlug.trim()) ||
+      undefined;
+    const portalEnabled =
+      typeof routeOperator?.portalEnabled === 'boolean'
+        ? routeOperator.portalEnabled
+        : undefined;
 
     if (!map.has(name)) {
       map.set(name, {
@@ -69,6 +80,7 @@ export function deriveTrustedOperators(routes: any[]): TrustedOperator[] {
         prices: [],
         destinations: new Set<string>(),
         sampleRoute: routeLabel,
+        portalSlug: portalEnabled === false ? undefined : operatorSlug,
       });
     }
 
@@ -76,6 +88,9 @@ export function deriveTrustedOperators(routes: any[]): TrustedOperator[] {
     entry.activeRoutes += 1;
     entry.destinations.add(destination);
     if (price > 0) entry.prices.push(price);
+    if (!entry.portalSlug && operatorSlug && portalEnabled !== false) {
+      entry.portalSlug = operatorSlug;
+    }
   }
 
   return Array.from(map.values())
@@ -94,6 +109,7 @@ export function deriveTrustedOperators(routes: any[]): TrustedOperator[] {
         maxPrice,
         avgPrice,
         sampleRoute: entry.sampleRoute,
+        portalSlug: entry.portalSlug,
       };
     })
     .sort((a, b) => b.activeRoutes - a.activeRoutes || a.name.localeCompare(b.name));

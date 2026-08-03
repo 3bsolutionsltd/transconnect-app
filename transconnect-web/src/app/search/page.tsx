@@ -20,10 +20,20 @@ function SearchContent() {
   const [routes, setRoutes] = useState<any[]>([]);
   const [loading, setLoading] = useState(false);
 
-  const [maxPrice, setMaxPrice] = useState(80000);
-  const [minPrice] = useState(35000);
+  const [maxPrice, setMaxPrice] = useState<number | null>(null);
+  const [minPrice, setMinPrice] = useState(0);
+  const [priceCeiling, setPriceCeiling] = useState(80000);
   const [sortBy, setSortBy] = useState<'price' | 'departure' | 'duration' | 'rating'>('price');
   const [selectedAmenities, setSelectedAmenities] = useState<string[]>([]);
+
+  const effectiveMaxPrice = maxPrice ?? priceCeiling;
+
+  function normalizeText(value: unknown): string {
+    return String(value || '')
+      .toLowerCase()
+      .replace(/\s+/g, ' ')
+      .trim();
+  }
 
   function parseAmenities(route: any): string[] {
     const rawAmenities = route?.bus?.amenities || route?.busInfo?.amenities || route?.amenities;
@@ -96,9 +106,29 @@ function SearchContent() {
       if (destination) params.destination = destination;
       if (date) params.travelDate = date;
       const result = await fetchRoutes(params);
-      setRoutes(result || []);
+      const normalizedRoutes = result || [];
+      setRoutes(normalizedRoutes);
+
+      const prices = normalizedRoutes
+        .map((route: any) => Number(route?.price || 0))
+        .filter((price: number) => Number.isFinite(price) && price > 0);
+
+      if (prices.length > 0) {
+        const nextMin = Math.floor(Math.min(...prices));
+        const nextMax = Math.ceil(Math.max(...prices));
+        setMinPrice(nextMin);
+        setPriceCeiling(nextMax);
+        setMaxPrice((current) => (current === null ? nextMax : Math.min(current, nextMax)));
+      } else {
+        setMinPrice(0);
+        setPriceCeiling(80000);
+        setMaxPrice(null);
+      }
     } catch {
       setRoutes([]);
+      setMinPrice(0);
+      setPriceCeiling(80000);
+      setMaxPrice(null);
     } finally {
       setLoading(false);
     }
@@ -130,7 +160,7 @@ function SearchContent() {
     }
 
     const filtered = routes.filter((route) => {
-      const withinPrice = Number(route.price || 0) <= maxPrice;
+      const withinPrice = Number(route.price || 0) <= effectiveMaxPrice;
       if (!withinPrice) return false;
 
       if (selectedAmenities.length > 0) {
@@ -141,15 +171,18 @@ function SearchContent() {
 
       if (!operatorFilter) return true;
 
-      const routeOperatorName = (
+      const routeOperatorName = normalizeText(
         route?.operator?.companyName ||
         route?.operator?.name ||
+        route?.operatorInfo?.name ||
         route?.operatorInfo?.companyName ||
         route?.operatorName ||
         ''
-      ).toString().toLowerCase();
+      );
 
-      return routeOperatorName.includes(operatorFilter.toLowerCase());
+      const normalizedFilter = normalizeText(operatorFilter);
+      if (!routeOperatorName) return false;
+      return routeOperatorName.includes(normalizedFilter) || normalizedFilter.includes(routeOperatorName);
     });
 
     const sorted = [...filtered].sort((a, b) => {
@@ -170,7 +203,7 @@ function SearchContent() {
     });
 
     return sorted;
-  }, [maxPrice, operatorFilter, routes, selectedAmenities, sortBy]);
+  }, [effectiveMaxPrice, operatorFilter, routes, selectedAmenities, sortBy]);
 
   return (
     <div className="min-h-screen bg-[#f5f8fe]">
@@ -214,7 +247,7 @@ function SearchContent() {
             <aside className="space-y-4">
               <div className="flex items-center justify-between">
                 <h2 className="text-2xl font-black text-[#14263f]">{filteredRoutes.length} routes found</h2>
-                <button className="text-sm font-semibold text-[#0f8c6b]" onClick={() => setMaxPrice(80000)}>Clear all</button>
+                <button className="text-sm font-semibold text-[#0f8c6b]" onClick={() => { setMaxPrice(priceCeiling); setSelectedAmenities([]); }}>Clear all</button>
               </div>
 
               {operatorFilter && (
@@ -277,14 +310,14 @@ function SearchContent() {
                 <input
                   type="range"
                   min={minPrice}
-                  max={80000}
-                  value={maxPrice}
+                  max={priceCeiling}
+                  value={effectiveMaxPrice}
                   onChange={(e) => setMaxPrice(Number(e.target.value))}
                   className="w-full"
                 />
                 <div className="flex justify-between text-xs font-semibold text-[#425d83] mt-2">
                   <span>{minPrice.toLocaleString()}</span>
-                  <span>{maxPrice.toLocaleString()}</span>
+                  <span>{effectiveMaxPrice.toLocaleString()}</span>
                 </div>
               </StyledCard>
             </aside>
@@ -320,7 +353,7 @@ function SearchContent() {
                           <OperatorLogoBadge operator={route?.operator || route?.operatorInfo} size="xl" />
                           <div className="min-w-0">
                             <div className="flex flex-wrap items-center gap-2">
-                              <h3 className="text-2xl font-black text-[#132742] leading-tight">{route.operator?.companyName || route.operatorInfo?.companyName || route.operatorName || 'Operator'}</h3>
+                              <h3 className="text-2xl font-black text-[#132742] leading-tight">{route.operator?.companyName || route.operatorInfo?.companyName || route.operatorInfo?.name || route.operatorName || 'Operator'}</h3>
                               <span className="inline-flex items-center rounded-full border border-[#cfeedd] bg-[#f2fbf7] px-2.5 py-1 text-[10px] font-bold uppercase tracking-[0.08em] text-[#0f8c6b]">
                                 Trusted
                               </span>

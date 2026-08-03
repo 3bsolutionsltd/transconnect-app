@@ -20,23 +20,43 @@ export default function OnboardingFlow({ onComplete }: { onComplete?: () => void
   const [step, setStep] = useState(1);
   const [draft, setDraft] = useState<any>({});
 
+  const getReferralCodeFromUrl = () => {
+    if (typeof window === 'undefined') return '';
+    const params = new URLSearchParams(window.location.search);
+    const raw = params.get('ref') || params.get('referralCode') || params.get('referral') || '';
+    return raw.trim().toUpperCase();
+  };
+
   useEffect(() => {
     try {
+      const referralFromUrl = getReferralCodeFromUrl();
       const saved = localStorage.getItem(DRAFT_KEY);
       if (saved) {
         const savedDraft = JSON.parse(saved);
-        setDraft(savedDraft);
+        const mergedDraft = referralFromUrl && !savedDraft.referralCode
+          ? { ...savedDraft, referralCode: referralFromUrl }
+          : savedDraft;
+
+        if (mergedDraft !== savedDraft) {
+          localStorage.setItem(DRAFT_KEY, JSON.stringify(mergedDraft));
+        }
+
+        setDraft(mergedDraft);
         
         // Resume from the correct step based on progress
-        if (savedDraft.profile) {
+        if (mergedDraft.profile) {
           setStep(5); // Completed all steps
-        } else if (savedDraft.kycUploaded) {
+        } else if (mergedDraft.kycUploaded) {
           setStep(4); // KYC uploaded, go to payout
-        } else if (savedDraft.token) {
+        } else if (mergedDraft.token) {
           setStep(3); // OTP verified, go to KYC
-        } else if (savedDraft.id) {
+        } else if (mergedDraft.id) {
           setStep(2); // Registered, go to OTP
         }
+      } else if (referralFromUrl) {
+        const initialDraft = { referralCode: referralFromUrl };
+        setDraft(initialDraft);
+        localStorage.setItem(DRAFT_KEY, JSON.stringify(initialDraft));
       }
     } catch {}
   }, []);
