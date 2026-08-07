@@ -175,6 +175,255 @@ router.get('/admin/all', authenticateToken, async (req: Request, res: Response) 
   }
 });
 
+// ── ADMIN: analytics summary for dashboard and reports ─────────────────────
+router.get('/admin/analytics', authenticateToken, async (req: Request, res: Response) => {
+  try {
+    const requestUser = (req as any).user;
+    const { windowDays = '30' } = req.query;
+
+    const access = await getOperationsAccess(requestUser);
+    if (!access.allowed) {
+      return res.status(403).json({ error: 'Operations access required for analytics' });
+    }
+
+    const parsedWindowDays = Number(windowDays);
+    const safeWindowDays = Number.isFinite(parsedWindowDays)
+      ? Math.max(7, Math.min(180, Math.floor(parsedWindowDays)))
+      : 30;
+
+    const now = new Date();
+    const startDate = new Date(now);
+    startDate.setDate(startDate.getDate() - safeWindowDays);
+
+    const monthStart = new Date(now.getFullYear(), now.getMonth(), 1);
+    const todayStart = new Date(now);
+    todayStart.setHours(0, 0, 0, 0);
+    const tomorrowStart = new Date(todayStart);
+    tomorrowStart.setDate(tomorrowStart.getDate() + 1);
+
+    const routeScope = access.scopedOperatorIds
+      ? { operatorId: { in: access.scopedOperatorIds } }
+      : undefined;
+
+    const bookingScope = routeScope ? { route: routeScope } : {};
+
+    const [
+      totalBookings,
+      totalPassengers,
+      activeRoutes,
+      todayBookings,
+      monthlyRevenueAgg,
+      totalRevenueAgg,
+      firstBookingRows,
+      repeatRows,
+      activePassengerRows,
+      recentBookings,
+      topRouteGroups,
+      routeMeta,
+      dailyBookingEvents,
+    ] = await Promise.all([
+      prisma.booking.count({ where: bookingScope }),
+      prisma.user.count({ where: { role: 'PASSENGER' } }),
+      prisma.route.count({ where: { active: true, ...(routeScope || {}) } }),
+      prisma.booking.count({
+        where: {
+          ...bookingScope,
+          createdAt: { gte: todayStart, lt: tomorrowStart },
+        },
+      }),
+      prisma.payment.aggregate({
+        where: {
+          status: 'COMPLETED',
+          createdAt: { gte: monthStart },
+          ...(routeScope ? { booking: { route: routeScope } } : {}),
+        },
+        _sum: { amount: true },
+      }),
+      prisma.payment.aggregate({
+        where: {
+          status: 'COMPLETED',
+          ...(routeScope ? { booking: { route: routeScope } } : {}),
+        },
+        _sum: { amount: true },
+      }),
+      prisma.$queryRaw<Array<{ total_new_passengers: number; with_first_booking: number }>>`
+        WITH new_passengers AS (
+          SELECT u.id
+          FROM users u
+          WHERE u.role = 'PASSENGER'
+            AND u."createdAt" >= ${startDate}
+        )
+        SELECT
+          COUNT(*)::int AS total_new_passengers,
+          COUNT(b.user_id)::int AS with_first_booking
+        FROM new_passengers np
+        LEFT JOIN LATERAL (
+          SELECT b."userId" AS user_id
+          FROM bookings b
+          WHERE b."userId" = np.id
+          LIMIT 1
+        ) b ON true
+      `,
+      prisma.$queryRaw<Array<{ passengers_with_first_booking: number; repeaters_within_30d: number }>>`
+        WITH passenger_first AS (
+          SELECT b."userId", MIN(b."createdAt") AS first_booking_at
+          FROM bookings b
+          INNER JOIN users u ON u.id = b."userId"
+          WHERE u.role = 'PASSENGER'
+          GROUP BY b."userId"
+        )
+        SELECT
+          COUNT(*)::int AS passengers_with_first_booking,
+          COUNT(*) FILTER (
+            WHERE EXISTS (
+              SELECT 1
+              FROM bookings b2
+              WHERE b2."userId" = pf."userId"
+                AND b2."createdAt" > pf.first_booking_at
+                AND b2."createdAt" <= pf.first_booking_at + INTERVAL '30 days'
+            )
+          )::int AS repeaters_within_30d
+        FROM passenger_first pf
+      `,
+      prisma.$queryRaw<Array<{ active_passengers: number; average_bookings_per_active_passenger: number }>>`
+        WITH active_passenger_bookings AS (
+          SELECT b."userId", COUNT(*)::int AS booking_count
+          FROM bookings b
+          INNER JOIN users u ON u.id = b."userId"
+          WHERE u.role = 'PASSENGER'
+            AND b."createdAt" >= ${startDate}
+          GROUP BY b."userId"
+        )
+        SELECT
+          COUNT(*)::int AS active_passengers,
+          COALESCE(AVG(booking_count)::float, 0)::float AS average_bookings_per_active_passenger
+        FROM active_passenger_bookings
+      `,
+      prisma.booking.findMany({
+        where: bookingScope,
+        include: {
+          user: {
+            select: { firstName: true, lastName: true, phone: true },
+          },
+          route: {
+            select: {
+              origin: true,
+              destination: true,
+              departureTime: true,
+              operator: { select: { companyName: true } },
+            },
+          },
+          payment: {
+            select: { status: true, amount: true, method: true },
+          },
+        },
+        orderBy: { createdAt: 'desc' },
+        take: 8,
+      }),
+      prisma.booking.groupBy({
+        by: ['routeId'],
+        where: {
+          ...bookingScope,
+          createdAt: { gte: startDate },
+        },
+        _count: { _all: true },
+        _sum: { totalAmount: true },
+        orderBy: { _count: { routeId: 'desc' } },
+        take: 5,
+      }),
+      prisma.route.findMany({
+        where: routeScope || {},
+        select: { id: true, origin: true, destination: true },
+      }),
+      prisma.booking.findMany({
+        where: {
+          ...bookingScope,
+          createdAt: { gte: startDate },
+        },
+        select: { createdAt: true },
+      }),
+    ]);
+
+    const firstBookingBase = firstBookingRows[0] || { total_new_passengers: 0, with_first_booking: 0 };
+    const repeatBase = repeatRows[0] || { passengers_with_first_booking: 0, repeaters_within_30d: 0 };
+    const activeBase = activePassengerRows[0] || {
+      active_passengers: 0,
+      average_bookings_per_active_passenger: 0,
+    };
+
+    const firstBookingRate = firstBookingBase.total_new_passengers > 0
+      ? (firstBookingBase.with_first_booking / firstBookingBase.total_new_passengers) * 100
+      : 0;
+
+    const repeat30DayRate = repeatBase.passengers_with_first_booking > 0
+      ? (repeatBase.repeaters_within_30d / repeatBase.passengers_with_first_booking) * 100
+      : 0;
+
+    const routeLookup = new Map(routeMeta.map(route => [route.id, route]));
+    const routePerformance = topRouteGroups.map(group => {
+      const route = routeLookup.get(group.routeId);
+      return {
+        routeId: group.routeId,
+        route: route ? `${route.origin} → ${route.destination}` : group.routeId,
+        bookings: group._count._all,
+        revenue: group._sum.totalAmount || 0,
+      };
+    });
+
+    const dailyBookingMap = new Map<string, number>();
+    for (const event of dailyBookingEvents) {
+      const day = event.createdAt.toISOString().split('T')[0];
+      dailyBookingMap.set(day, (dailyBookingMap.get(day) || 0) + 1);
+    }
+
+    const dailyBookings = Array.from(dailyBookingMap.entries())
+      .sort((a, b) => a[0].localeCompare(b[0]))
+      .map(([day, bookings]) => ({ day, bookings }));
+
+    const popularRoute = routePerformance.length > 0 ? routePerformance[0].route : '—';
+
+    res.json({
+      overview: {
+        totalBookings,
+        totalRevenue: totalRevenueAgg._sum.amount || 0,
+        activeRoutes,
+        totalPassengers,
+        todayBookings,
+        monthlyRevenue: monthlyRevenueAgg._sum.amount || 0,
+        popularRoute,
+      },
+      funnel: {
+        windowDays: safeWindowDays,
+        newPassengerSignups: firstBookingBase.total_new_passengers,
+        newPassengersWithFirstBooking: firstBookingBase.with_first_booking,
+        firstBookingRate,
+        repeat30DayRate,
+        activePassengerCount: activeBase.active_passengers,
+        averageBookingsPerActivePassenger: activeBase.average_bookings_per_active_passenger,
+      },
+      recentBookings: recentBookings.map(booking => ({
+        id: booking.id,
+        passenger: `${booking.user?.firstName || ''} ${booking.user?.lastName || ''}`.trim(),
+        passengerPhone: booking.user?.phone || '',
+        route: `${booking.route?.origin || ''} → ${booking.route?.destination || ''}`.trim(),
+        amount: booking.payment?.amount || booking.totalAmount || 0,
+        status: booking.status,
+        paymentStatus: booking.payment?.status || 'NO_PAYMENT',
+        createdAt: booking.createdAt,
+        travelDate: booking.travelDate,
+        seatNumber: booking.seatNumber,
+        operator: booking.route?.operator?.companyName || '',
+      })),
+      routePerformance,
+      dailyBookings,
+      generatedAt: new Date().toISOString(),
+    });
+  } catch (error) {
+    console.error('Error fetching admin analytics:', error);
+    res.status(500).json({ error: 'Failed to fetch admin analytics' });
+  }
+});
+
 // ── ADMIN: confirm a cash payment manually ────────────────────────────────
 router.post('/admin/confirm-payment/:bookingId', authenticateToken, async (req: Request, res: Response) => {
   try {

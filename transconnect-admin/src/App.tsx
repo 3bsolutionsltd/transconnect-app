@@ -41,139 +41,82 @@ const Dashboard = () => {
     totalPassengers: 0,
     todayBookings: 0,
     monthlyRevenue: 0,
-    averageOccupancy: 0,
     popularRoute: ''
+  });
+  const [funnelStats, setFunnelStats] = useState({
+    windowDays: 30,
+    newPassengerSignups: 0,
+    firstBookingRate: 0,
+    repeat30DayRate: 0,
+    averageBookingsPerActivePassenger: 0,
+    activePassengerCount: 0,
   });
   const [recentBookings, setRecentBookings] = useState<any[]>([]);
   const [routePerformance, setRoutePerformance] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
+  const [lastUpdated, setLastUpdated] = useState('');
 
   const API_BASE_URL = (process.env.REACT_APP_API_URL || 'http://localhost:5000/api').replace(/\/api\/?$/, '') + '/api';
 
   const loadDashboardData = useCallback(async () => {
     try {
       const token = localStorage.getItem('admin_token');
-      console.log('🔄 Loading dashboard data from API:', API_BASE_URL);
-      
-      // Fetch real data from API with cache busting
-      const timestamp = Date.now();
-      const [routesRes, usersRes, operatorsRes] = await Promise.all([
-        fetch(`${API_BASE_URL}/routes?_t=${timestamp}`, {
-          headers: { 'Authorization': `Bearer ${token}`, 'Cache-Control': 'no-cache' }
-        }),
-        fetch(`${API_BASE_URL}/users?_t=${timestamp}`, {
-          headers: { 'Authorization': `Bearer ${token}`, 'Cache-Control': 'no-cache' }
-        }),
-        fetch(`${API_BASE_URL}/operators?_t=${timestamp}`, {
-          headers: { 'Authorization': `Bearer ${token}`, 'Cache-Control': 'no-cache' }
-        })
-      ]);
-
-      const routesData = routesRes.ok ? await routesRes.json() : { routes: [] };
-      const usersData = usersRes.ok ? await usersRes.json() : { users: [] };
-      const operatorsData = operatorsRes.ok ? await operatorsRes.json() : [];
-
-      // Extract arrays from paginated responses
-      const routes = Array.isArray(routesData) ? routesData : (routesData.routes || []);
-      const users = Array.isArray(usersData) ? usersData : (usersData.users || []);
-      const operators = Array.isArray(operatorsData) ? operatorsData : [];
-
-      console.log('📊 API Data received:', {
-        users: users.length,
-        routes: routes.length,
-        operators: operators.length,
-        passengers: users.filter((u: any) => u.role === 'PASSENGER').length
+      const response = await fetch(`${API_BASE_URL}/bookings/admin/analytics?windowDays=30`, {
+        headers: { 'Authorization': `Bearer ${token}`, 'Cache-Control': 'no-cache' }
       });
 
-      // Calculate real stats from actual data
-      const passengers = users.filter((u: any) => u.role === 'PASSENGER');
-      const activeRoutes = routes.filter((r: any) => r.active);
-      
-      // Calculate estimated revenue based on routes and average bookings
-      const estimatedTotalBookings = passengers.length * 3; // Assume 3 bookings per passenger average
-      const avgRoutePrice = routes.length > 0 ? routes.reduce((sum: number, r: any) => sum + (r.price || 15000), 0) / routes.length : 15000;
-      const estimatedRevenue = estimatedTotalBookings * avgRoutePrice;
-      
-      console.log('💰 Calculated stats:', {
-        passengers: passengers.length,
-        activeRoutes: activeRoutes.length,
-        estimatedBookings: estimatedTotalBookings,
-        avgPrice: Math.round(avgRoutePrice),
-        estimatedRevenue: estimatedRevenue
-      });
-      
-      setStats({
-        totalBookings: estimatedTotalBookings,
-        totalRevenue: estimatedRevenue,
-        activeRoutes: activeRoutes.length,
-        totalPassengers: passengers.length,
-        todayBookings: Math.floor(passengers.length * 0.15), // 15% of passengers book today
-        monthlyRevenue: Math.floor(estimatedRevenue * 0.6), // 60% of total revenue this month
-        averageOccupancy: 75 + Math.floor(Math.random() * 15), // Realistic occupancy
-        popularRoute: routes.length > 0 ? `${routes[0].origin} → ${routes[0].destination}` : 'Kampala → Jinja'
-      });
-
-      // Create realistic recent bookings based on actual user data
-      const recentBookingsList = [];
-      const samplePassengers = passengers.slice(0, 4); // Take first 4 passengers
-      const sampleRoutes = routes.slice(0, 4); // Take first 4 routes
-      
-      for (let i = 0; i < Math.min(4, samplePassengers.length); i++) {
-        const passenger = samplePassengers[i];
-        const route = sampleRoutes[i % sampleRoutes.length] || { origin: 'Kampala', destination: 'Jinja', price: 15000 };
-        const statuses = ['CONFIRMED', 'PENDING', 'COMPLETED'];
-        
-        recentBookingsList.push({
-          id: (i + 1).toString(),
-          passenger: `${passenger.firstName} ${passenger.lastName}`,
-          route: `${route.origin} → ${route.destination}`,
-          amount: route.price || 15000,
-          status: statuses[i % statuses.length],
-          date: new Date(Date.now() - (i * 30 * 60 * 1000)).toISOString(),
-          seatNumber: `${String.fromCharCode(65 + i)}${Math.floor(Math.random() * 20) + 1}`
-        });
+      if (!response.ok) {
+        throw new Error(`Failed to load dashboard analytics: HTTP ${response.status}`);
       }
-      
-      setRecentBookings(recentBookingsList);
-      
-      // Set route performance data
-      const routePerformanceData = routes.slice(0, 4).map((routeData: any, index: number) => {
-        const estimatedBookings = Math.floor(passengers.length * (0.3 + Math.random() * 0.4)); // 30-70% of passengers per route
-        const revenue = estimatedBookings * (routeData.price || 15000);
-        const occupancy = 60 + Math.floor(Math.random() * 35); // 60-95% occupancy
-        const growthValues = ['+12%', '+8%', '+15%', '+6%', '+3%', '+9%'];
-        
-        return {
-          route: `${routeData.origin} → ${routeData.destination}`,
-          bookings: estimatedBookings,
-          revenue: revenue,
-          occupancy: occupancy,
-          growth: growthValues[index % growthValues.length]
-        };
+
+      const payload = await response.json();
+      const overview = payload.overview || {};
+      const funnel = payload.funnel || {};
+
+      setStats({
+        totalBookings: overview.totalBookings || 0,
+        totalRevenue: overview.totalRevenue || 0,
+        activeRoutes: overview.activeRoutes || 0,
+        totalPassengers: overview.totalPassengers || 0,
+        todayBookings: overview.todayBookings || 0,
+        monthlyRevenue: overview.monthlyRevenue || 0,
+        popularRoute: overview.popularRoute || '—'
       });
-      
-      setRoutePerformance(routePerformanceData);
+
+      setFunnelStats({
+        windowDays: funnel.windowDays || 30,
+        newPassengerSignups: funnel.newPassengerSignups || 0,
+        firstBookingRate: Number(funnel.firstBookingRate || 0),
+        repeat30DayRate: Number(funnel.repeat30DayRate || 0),
+        averageBookingsPerActivePassenger: Number(funnel.averageBookingsPerActivePassenger || 0),
+        activePassengerCount: funnel.activePassengerCount || 0,
+      });
+
+      setRecentBookings(payload.recentBookings || []);
+      setRoutePerformance(payload.routePerformance || []);
+      setLastUpdated(payload.generatedAt || new Date().toISOString());
     } catch (error) {
       console.error('Error loading dashboard data:', error);
-      // Fallback to realistic demo data based on actual system
       setStats({
-        totalBookings: 21, // 7 passengers × 3 average bookings
-        totalRevenue: 315000, // 21 bookings × 15000 UGX average
-        activeRoutes: 6,
-        totalPassengers: 7, // Actual passenger count
-        todayBookings: 1,
-        monthlyRevenue: 189000, // 60% of total revenue
-        averageOccupancy: 75,
-        popularRoute: 'Jinja → Kampala'
+        totalBookings: 0,
+        totalRevenue: 0,
+        activeRoutes: 0,
+        totalPassengers: 0,
+        todayBookings: 0,
+        monthlyRevenue: 0,
+        popularRoute: '—'
       });
-      
-      // Set fallback route performance data
-      setRoutePerformance([
-        { route: 'Jinja → Kampala', bookings: 3, revenue: 45000, occupancy: 75, growth: '+12%' },
-        { route: 'Kampala → Mbarara', bookings: 2, revenue: 50000, occupancy: 68, growth: '+8%' },
-        { route: 'Entebbe → Kampala', bookings: 2, revenue: 30000, occupancy: 82, growth: '+15%' },
-        { route: 'Kampala → Jinja', bookings: 1, revenue: 15000, occupancy: 60, growth: '+6%' }
-      ]);
+      setFunnelStats({
+        windowDays: 30,
+        newPassengerSignups: 0,
+        firstBookingRate: 0,
+        repeat30DayRate: 0,
+        averageBookingsPerActivePassenger: 0,
+        activePassengerCount: 0,
+      });
+      setRoutePerformance([]);
+      setRecentBookings([]);
+      setLastUpdated(new Date().toISOString());
     } finally {
       setLoading(false);
     }
@@ -194,7 +137,7 @@ const Dashboard = () => {
   };
 
   const formatCurrency = (amount: number) => {
-    return `UGX ${(amount / 1000000).toFixed(1)}M`;
+    return `UGX ${Math.round(amount).toLocaleString()}`;
   };
 
   const getTimeAgo = (dateString: string) => {
@@ -234,7 +177,7 @@ const Dashboard = () => {
           <p className="text-gray-600">Welcome back, {user?.firstName}! Here's your system overview.</p>
         </div>
         <div className="text-sm text-gray-500">
-          Last updated: {new Date().toLocaleString()} | v2.0 Real Data
+          Last updated: {new Date(lastUpdated || Date.now()).toLocaleString()}
         </div>
       </div>
       
@@ -263,9 +206,9 @@ const Dashboard = () => {
             <div>
               <p className="text-sm font-medium text-gray-600">Total Bookings</p>
               <p className="text-3xl font-bold text-gray-900">{stats.totalBookings.toLocaleString()}</p>
-              <p className="text-sm text-green-600 flex items-center mt-1">
-                <TrendingUp className="h-3 w-3 mr-1" />
-                +12% from last month
+              <p className="text-sm text-blue-600 flex items-center mt-1">
+                <Calendar className="h-3 w-3 mr-1" />
+                Platform total
               </p>
             </div>
             <div className="h-12 w-12 bg-blue-100 rounded-lg flex items-center justify-center">
@@ -280,8 +223,8 @@ const Dashboard = () => {
               <p className="text-sm font-medium text-gray-600">Total Revenue</p>
               <p className="text-3xl font-bold text-gray-900">{formatCurrency(stats.totalRevenue)}</p>
               <p className="text-sm text-green-600 flex items-center mt-1">
-                <TrendingUp className="h-3 w-3 mr-1" />
-                +8% from last month
+                <DollarSign className="h-3 w-3 mr-1" />
+                Completed payments
               </p>
             </div>
             <div className="h-12 w-12 bg-green-100 rounded-lg flex items-center justify-center">
@@ -295,9 +238,9 @@ const Dashboard = () => {
             <div>
               <p className="text-sm font-medium text-gray-600">Active Routes</p>
               <p className="text-3xl font-bold text-gray-900">{stats.activeRoutes}</p>
-              <p className="text-sm text-blue-600 flex items-center mt-1">
+              <p className="text-sm text-purple-600 flex items-center mt-1">
                 <MapPin className="h-3 w-3 mr-1" />
-                4 major cities
+                Active in system
               </p>
             </div>
             <div className="h-12 w-12 bg-purple-100 rounded-lg flex items-center justify-center">
@@ -311,9 +254,9 @@ const Dashboard = () => {
             <div>
               <p className="text-sm font-medium text-gray-600">Total Passengers</p>
               <p className="text-3xl font-bold text-gray-900">{stats.totalPassengers.toLocaleString()}</p>
-              <p className="text-sm text-green-600 flex items-center mt-1">
-                <TrendingUp className="h-3 w-3 mr-1" />
-                +15% from last month
+              <p className="text-sm text-orange-600 flex items-center mt-1">
+                <Users className="h-3 w-3 mr-1" />
+                Registered passengers
               </p>
             </div>
             <div className="h-12 w-12 bg-orange-100 rounded-lg flex items-center justify-center">
@@ -323,17 +266,17 @@ const Dashboard = () => {
         </div>
       </div>
 
-      {/* Secondary Stats */}
+      {/* Passenger Funnel KPIs */}
       <div className="grid grid-cols-1 sm:grid-cols-3 gap-6">
         <div className="bg-white p-6 rounded-lg shadow border">
           <div className="flex items-center justify-between">
             <div>
-              <p className="text-sm font-medium text-gray-600">Monthly Revenue</p>
-              <p className="text-2xl font-bold text-gray-900">{formatCurrency(stats.monthlyRevenue)}</p>
-              <p className="text-sm text-gray-500">Current month</p>
+              <p className="text-sm font-medium text-gray-600">New Passenger Sign-ups</p>
+              <p className="text-2xl font-bold text-gray-900">{funnelStats.newPassengerSignups}</p>
+              <p className="text-sm text-gray-500">Last {funnelStats.windowDays} days</p>
             </div>
             <div className="h-10 w-10 bg-green-100 rounded-lg flex items-center justify-center">
-              <BarChart3 className="h-5 w-5 text-green-600" />
+              <Users className="h-5 w-5 text-green-600" />
             </div>
           </div>
         </div>
@@ -341,12 +284,12 @@ const Dashboard = () => {
         <div className="bg-white p-6 rounded-lg shadow border">
           <div className="flex items-center justify-between">
             <div>
-              <p className="text-sm font-medium text-gray-600">Average Occupancy</p>
-              <p className="text-2xl font-bold text-gray-900">{stats.averageOccupancy}%</p>
-              <p className="text-sm text-gray-500">Across all routes</p>
+              <p className="text-sm font-medium text-gray-600">First Booking Rate</p>
+              <p className="text-2xl font-bold text-gray-900">{funnelStats.firstBookingRate.toFixed(1)}%</p>
+              <p className="text-sm text-gray-500">New passengers with at least one booking</p>
             </div>
             <div className="h-10 w-10 bg-blue-100 rounded-lg flex items-center justify-center">
-              <Users className="h-5 w-5 text-blue-600" />
+              <TrendingUp className="h-5 w-5 text-blue-600" />
             </div>
           </div>
         </div>
@@ -354,13 +297,26 @@ const Dashboard = () => {
         <div className="bg-white p-6 rounded-lg shadow border">
           <div className="flex items-center justify-between">
             <div>
-              <p className="text-sm font-medium text-gray-600">Popular Route</p>
-              <p className="text-lg font-bold text-gray-900">{stats.popularRoute}</p>
-              <p className="text-sm text-gray-500">Most booked this month</p>
+              <p className="text-sm font-medium text-gray-600">30-Day Repeat Rate</p>
+              <p className="text-2xl font-bold text-gray-900">{funnelStats.repeat30DayRate.toFixed(1)}%</p>
+              <p className="text-sm text-gray-500">Passengers who book again within 30 days</p>
             </div>
             <div className="h-10 w-10 bg-purple-100 rounded-lg flex items-center justify-center">
-              <MapPin className="h-5 w-5 text-purple-600" />
+              <BarChart3 className="h-5 w-5 text-purple-600" />
             </div>
+          </div>
+        </div>
+      </div>
+
+      <div className="bg-white p-6 rounded-lg shadow border">
+        <div className="flex items-center justify-between">
+          <div>
+            <p className="text-sm font-medium text-gray-600">Average Bookings per Active Passenger</p>
+            <p className="text-2xl font-bold text-gray-900">{funnelStats.averageBookingsPerActivePassenger.toFixed(2)}</p>
+            <p className="text-sm text-gray-500">Active passengers: {funnelStats.activePassengerCount.toLocaleString()} in last {funnelStats.windowDays} days</p>
+          </div>
+          <div className="h-10 w-10 bg-indigo-100 rounded-lg flex items-center justify-center">
+            <Calendar className="h-5 w-5 text-indigo-600" />
           </div>
         </div>
       </div>
@@ -384,7 +340,7 @@ const Dashboard = () => {
                     <div className="font-medium text-gray-900">{booking.passenger}</div>
                     <div className="text-sm text-gray-600">{booking.route}</div>
                     <div className="text-xs text-gray-500">
-                      Seat {booking.seatNumber} • {getTimeAgo(booking.date)}
+                      Seat {booking.seatNumber} • {getTimeAgo(booking.createdAt)}
                     </div>
                   </div>
                   <div className="text-right">
@@ -392,6 +348,7 @@ const Dashboard = () => {
                     <span className={`inline-block px-2 py-1 rounded-full text-xs font-medium border ${getStatusColor(booking.status)}`}>
                       {booking.status}
                     </span>
+                    <div className="text-[11px] text-gray-500 mt-1">Booked {new Date(booking.createdAt).toLocaleString()}</div>
                   </div>
                 </div>
               ))}
@@ -453,12 +410,12 @@ const Dashboard = () => {
                   <div className="text-sm text-gray-600">Revenue</div>
                 </div>
                 <div>
-                  <div className="font-semibold text-blue-600">{route.occupancy}%</div>
-                  <div className="text-sm text-gray-600">Occupancy</div>
+                  <div className="font-semibold text-blue-600">{stats.popularRoute === route.route ? 'Top route' : 'Active route'}</div>
+                  <div className="text-sm text-gray-600">Performance</div>
                 </div>
                 <div>
-                  <div className="font-semibold text-green-600">{route.growth}</div>
-                  <div className="text-sm text-gray-600">Growth</div>
+                  <div className="font-semibold text-gray-700">Booked in {funnelStats.windowDays}d window</div>
+                  <div className="text-sm text-gray-600">Window</div>
                 </div>
               </div>
             ))}
@@ -472,27 +429,150 @@ const Dashboard = () => {
 
 
 // Analytics Component
-const Analytics = () => (
-  <div className="space-y-6">
-    <h1 className="text-2xl sm:text-3xl font-bold text-gray-900">Analytics</h1>
-    
-    <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-      <div className="bg-white p-4 sm:p-6 rounded-lg shadow border">
-        <h3 className="text-lg font-semibold text-gray-900 mb-4">Revenue Trends</h3>
-        <div className="h-64 flex items-center justify-center bg-gray-50 rounded">
-          <p className="text-gray-500">Chart placeholder</p>
+const Analytics = () => {
+  const API_BASE_URL = (process.env.REACT_APP_API_URL || 'http://localhost:5000/api').replace(/\/api\/?$/, '') + '/api';
+  const [windowDays, setWindowDays] = useState(30);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState('');
+  const [overview, setOverview] = useState<any>({});
+  const [funnel, setFunnel] = useState<any>({});
+  const [routes, setRoutes] = useState<any[]>([]);
+  const [dailyBookings, setDailyBookings] = useState<any[]>([]);
+
+  const loadAnalytics = useCallback(async () => {
+    setLoading(true);
+    setError('');
+    try {
+      const token = localStorage.getItem('admin_token');
+      const response = await fetch(`${API_BASE_URL}/bookings/admin/analytics?windowDays=${windowDays}`, {
+        headers: { 'Authorization': `Bearer ${token}` },
+      });
+
+      if (!response.ok) {
+        throw new Error(`HTTP ${response.status}`);
+      }
+
+      const payload = await response.json();
+      setOverview(payload.overview || {});
+      setFunnel(payload.funnel || {});
+      setRoutes(payload.routePerformance || []);
+      setDailyBookings(payload.dailyBookings || []);
+    } catch (e: any) {
+      setError(e.message || 'Failed to load analytics');
+    } finally {
+      setLoading(false);
+    }
+  }, [API_BASE_URL, windowDays]);
+
+  useEffect(() => {
+    loadAnalytics();
+  }, [loadAnalytics]);
+
+  return (
+    <div className="space-y-6">
+      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
+        <h1 className="text-2xl sm:text-3xl font-bold text-gray-900">Analytics</h1>
+        <div className="flex items-center gap-2">
+          <label className="text-sm text-gray-600">Window</label>
+          <select
+            className="border rounded-lg px-3 py-2 text-sm"
+            value={windowDays}
+            onChange={(e) => setWindowDays(Number(e.target.value))}
+          >
+            {[30, 60, 90, 180].map((days) => (
+              <option key={days} value={days}>{days} days</option>
+            ))}
+          </select>
         </div>
       </div>
-      
-      <div className="bg-white p-4 sm:p-6 rounded-lg shadow border">
-        <h3 className="text-lg font-semibold text-gray-900 mb-4">Popular Routes</h3>
-        <div className="h-64 flex items-center justify-center bg-gray-50 rounded">
-          <p className="text-gray-500">Chart placeholder</p>
+
+      {error && (
+        <div className="bg-red-50 border border-red-200 text-red-700 rounded-lg px-4 py-3 text-sm">
+          {error}
         </div>
-      </div>
+      )}
+
+      {loading ? (
+        <div className="bg-white rounded-lg shadow border p-10 text-center text-gray-500">Loading analytics…</div>
+      ) : (
+        <>
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+            <div className="bg-white p-4 rounded-lg shadow border">
+              <p className="text-xs text-gray-500">New Passenger Sign-ups</p>
+              <p className="text-2xl font-bold text-gray-900">{(funnel.newPassengerSignups || 0).toLocaleString()}</p>
+            </div>
+            <div className="bg-white p-4 rounded-lg shadow border">
+              <p className="text-xs text-gray-500">First Booking Rate</p>
+              <p className="text-2xl font-bold text-gray-900">{Number(funnel.firstBookingRate || 0).toFixed(1)}%</p>
+            </div>
+            <div className="bg-white p-4 rounded-lg shadow border">
+              <p className="text-xs text-gray-500">30-Day Repeat Rate</p>
+              <p className="text-2xl font-bold text-gray-900">{Number(funnel.repeat30DayRate || 0).toFixed(1)}%</p>
+            </div>
+            <div className="bg-white p-4 rounded-lg shadow border">
+              <p className="text-xs text-gray-500">Avg Bookings / Active Passenger</p>
+              <p className="text-2xl font-bold text-gray-900">{Number(funnel.averageBookingsPerActivePassenger || 0).toFixed(2)}</p>
+            </div>
+          </div>
+
+          <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+            <div className="bg-white p-4 sm:p-6 rounded-lg shadow border">
+              <h3 className="text-lg font-semibold text-gray-900 mb-4">Revenue Snapshot</h3>
+              <div className="space-y-3 text-sm">
+                <div className="flex justify-between"><span className="text-gray-600">Total Revenue</span><span className="font-semibold">UGX {(overview.totalRevenue || 0).toLocaleString()}</span></div>
+                <div className="flex justify-between"><span className="text-gray-600">Monthly Revenue</span><span className="font-semibold">UGX {(overview.monthlyRevenue || 0).toLocaleString()}</span></div>
+                <div className="flex justify-between"><span className="text-gray-600">Total Bookings</span><span className="font-semibold">{(overview.totalBookings || 0).toLocaleString()}</span></div>
+                <div className="flex justify-between"><span className="text-gray-600">Today Bookings</span><span className="font-semibold">{(overview.todayBookings || 0).toLocaleString()}</span></div>
+              </div>
+            </div>
+
+            <div className="bg-white p-4 sm:p-6 rounded-lg shadow border">
+              <h3 className="text-lg font-semibold text-gray-900 mb-4">Daily Bookings</h3>
+              <div className="max-h-64 overflow-auto text-sm divide-y">
+                {dailyBookings.length === 0 ? (
+                  <p className="text-gray-500">No booking activity in this window.</p>
+                ) : dailyBookings.map((row: any) => (
+                  <div key={row.day} className="py-2 flex justify-between">
+                    <span className="text-gray-600">{row.day}</span>
+                    <span className="font-medium">{row.bookings}</span>
+                  </div>
+                ))}
+              </div>
+            </div>
+          </div>
+
+          <div className="bg-white p-4 sm:p-6 rounded-lg shadow border">
+            <h3 className="text-lg font-semibold text-gray-900 mb-4">Top Routes (by bookings)</h3>
+            <div className="overflow-x-auto">
+              <table className="w-full text-sm">
+                <thead className="text-left text-xs text-gray-500 uppercase">
+                  <tr>
+                    <th className="py-2">Route</th>
+                    <th className="py-2">Bookings</th>
+                    <th className="py-2">Revenue</th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y">
+                  {routes.length === 0 ? (
+                    <tr>
+                      <td className="py-4 text-gray-500" colSpan={3}>No route performance data yet.</td>
+                    </tr>
+                  ) : routes.map((route: any) => (
+                    <tr key={route.routeId}>
+                      <td className="py-3 font-medium text-gray-900">{route.route}</td>
+                      <td className="py-3">{route.bookings}</td>
+                      <td className="py-3">UGX {(route.revenue || 0).toLocaleString()}</td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          </div>
+        </>
+      )}
     </div>
-  </div>
-);
+  );
+};
 
 // Main App Component with Authentication
 const AuthenticatedApp = () => {

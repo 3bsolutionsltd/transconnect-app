@@ -201,13 +201,14 @@ export default function MasterBookings() {
 
   const exportCSV = () => {
     const rows = [
-      ['ID', 'Passenger', 'Phone', 'Route', 'Date', 'Seat', 'Status', 'Payment', 'Amount', 'Operator'],
+      ['ID', 'Passenger', 'Phone', 'Route', 'Travel Date', 'Booked At', 'Seat', 'Status', 'Payment', 'Amount', 'Operator'],
       ...bookings.map(b => [
         b.id,
         `${b.user?.firstName} ${b.user?.lastName}`,
         b.user?.phone || '',
         `${b.route?.origin} → ${b.route?.destination}`,
         new Date(b.travelDate).toLocaleDateString(),
+        b.createdAt ? new Date(b.createdAt).toLocaleString() : '',
         b.seatNumber,
         b.status,
         b.payment?.status || 'NO PAYMENT',
@@ -371,7 +372,7 @@ export default function MasterBookings() {
               <table className="w-full text-sm">
                 <thead className="bg-gray-50 border-b">
                   <tr>
-                    {['Booking','Passenger','Route','Travel Date','Seat','Status','Payment Method/Status','Amount','Operator','Assignment / Actions'].map(h => (
+                    {['Booking','Passenger','Route','Travel Date','Booked At','Seat','Status','Payment Method/Status','Amount','Operator','Assignment / Actions'].map(h => (
                       <th key={h} className="px-4 py-3 text-left text-xs font-semibold text-gray-500 uppercase tracking-wide whitespace-nowrap">
                         {h}
                       </th>
@@ -414,6 +415,11 @@ export default function MasterBookings() {
                           {new Date(booking.travelDate).toLocaleDateString('en-GB', {
                             day: '2-digit', month: 'short', year: 'numeric'
                           })}
+                        </td>
+
+                        {/* Booked At */}
+                        <td className="px-4 py-3 whitespace-nowrap text-gray-700">
+                          {booking.createdAt ? new Date(booking.createdAt).toLocaleString() : '—'}
                         </td>
 
                         {/* Seat */}
@@ -479,7 +485,7 @@ export default function MasterBookings() {
                       {/* Expanded row */}
                       {expandedId === booking.id && (
                         <tr className="bg-blue-50">
-                          <td colSpan={10} className="px-6 py-4">
+                          <td colSpan={11} className="px-6 py-4">
                             <div className="grid grid-cols-2 md:grid-cols-4 gap-4 text-sm">
                               <div>
                                 <span className="text-gray-500 block text-xs mb-1">Full Booking ID</span>
