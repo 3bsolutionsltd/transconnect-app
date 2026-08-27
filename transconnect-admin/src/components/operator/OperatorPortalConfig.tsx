@@ -33,6 +33,7 @@ const OperatorPortalConfig = () => {
   const [saving, setSaving] = useState(false);
   const [message, setMessage] = useState<{ type: 'success' | 'error' | 'info'; text: string } | null>(null);
   const [isConfigured, setIsConfigured] = useState(false);
+  const [savedPortalUrl, setSavedPortalUrl] = useState('');
 
   const API_BASE_URL = (process.env.REACT_APP_API_URL || 'http://localhost:5000/api').replace(/\/api\/?$/, '') + '/api';
   const WEB_BASE_URL = (process.env.REACT_APP_WEB_URL || 'https://transconnect.app').replace(/\/+$/, '');
@@ -69,11 +70,12 @@ const OperatorPortalConfig = () => {
 
         setConfig(loadedConfig);
         setIsConfigured(configData.isConfigured || false);
+        setSavedPortalUrl(configData.portalUrl || '');
 
         if (configData.isConfigured && configData.slug) {
           setMessage({
             type: 'info',
-            text: `Your portal is live at: ${WEB_BASE_URL}/operator/${configData.slug}`
+            text: `Your portal is live at: ${configData.portalUrl || `${WEB_BASE_URL}/operator/${configData.slug}`}`
           });
         }
       } else {
@@ -150,6 +152,7 @@ const OperatorPortalConfig = () => {
         const savedConfig = normalizeConfig(configData);
         setConfig(savedConfig);
         setIsConfigured(true);
+        setSavedPortalUrl(configData.portalUrl || `${WEB_BASE_URL}/operator/${savedConfig.slug}`);
         setMessage({ 
           type: 'success', 
           text: `Portal configuration saved successfully! ${configData.portalUrl ? `Your portal URL: ${configData.portalUrl}` : ''}` 
@@ -181,9 +184,7 @@ const OperatorPortalConfig = () => {
     setConfig((previous) => ({ ...previous, slug: formatted }));
   }
 
-  const portalUrl = config.slug 
-    ? `${WEB_BASE_URL}/operator/${config.slug}`
-    : '';
+  const portalUrl = savedPortalUrl || (config.slug ? `${WEB_BASE_URL}/operator/${config.slug}` : '');
 
   if (loading) {
     return (
