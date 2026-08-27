@@ -35,7 +35,17 @@ const OperatorPortalConfig = () => {
   const [isConfigured, setIsConfigured] = useState(false);
 
   const API_BASE_URL = (process.env.REACT_APP_API_URL || 'http://localhost:5000/api').replace(/\/api\/?$/, '') + '/api';
-  const WEB_BASE_URL = process.env.REACT_APP_WEB_URL || 'http://localhost:3000';
+  const WEB_BASE_URL = (process.env.REACT_APP_WEB_URL || 'https://transconnect.app').replace(/\/+$/, '');
+
+  const normalizeConfig = (configData: Partial<PortalConfig>): PortalConfig => ({
+    slug: configData.slug || '',
+    brandLogoUrl: configData.brandLogoUrl || '',
+    heroImageUrl: configData.heroImageUrl || '',
+    brandColor: configData.brandColor || '#16a34a',
+    tagline: configData.tagline || '',
+    description: configData.description || '',
+    portalEnabled: configData.portalEnabled === true
+  });
 
   const loadConfig = useCallback(async () => {
     try {
@@ -55,15 +65,7 @@ const OperatorPortalConfig = () => {
         // Backend returns data nested under 'config' property
         const configData = data.config || data;
         
-        const loadedConfig = {
-          slug: configData.slug || '',
-          brandLogoUrl: configData.brandLogoUrl || '',
-          heroImageUrl: configData.heroImageUrl || '',
-          brandColor: configData.brandColor || '#16a34a',
-          tagline: configData.tagline || '',
-          description: configData.description || '',
-          portalEnabled: configData.portalEnabled || false
-        };
+        const loadedConfig = normalizeConfig(configData);
 
         setConfig(loadedConfig);
         setIsConfigured(configData.isConfigured || false);
@@ -145,7 +147,8 @@ const OperatorPortalConfig = () => {
       if (response.ok) {
         // Backend returns data nested under 'config' property
         const configData = data.config || data;
-        
+        const savedConfig = normalizeConfig(configData);
+        setConfig(savedConfig);
         setIsConfigured(true);
         setMessage({ 
           type: 'success', 
@@ -175,7 +178,7 @@ const OperatorPortalConfig = () => {
       .replace(/\s+/g, '-')
       .replace(/[^a-z0-9-]/g, '')
       .substring(0, 50);
-    setConfig({ ...config, slug: formatted });
+    setConfig((previous) => ({ ...previous, slug: formatted }));
   }
 
   const portalUrl = config.slug 
@@ -239,7 +242,7 @@ const OperatorPortalConfig = () => {
             </p>
           </div>
           <button
-            onClick={() => setConfig({ ...config, portalEnabled: !config.portalEnabled })}
+            onClick={() => setConfig((previous) => ({ ...previous, portalEnabled: !previous.portalEnabled }))}
             className={`relative inline-flex h-8 w-14 items-center rounded-full transition-colors focus:outline-none focus:ring-2 focus:ring-green-500 focus:ring-offset-2 ${
               config.portalEnabled ? 'bg-green-600' : 'bg-gray-300'
             }`}
@@ -287,7 +290,7 @@ const OperatorPortalConfig = () => {
               <input
                 type="url"
                 value={config.brandLogoUrl}
-                onChange={(e) => setConfig({ ...config, brandLogoUrl: e.target.value })}
+                onChange={(e) => setConfig((previous) => ({ ...previous, brandLogoUrl: e.target.value }))}
                 placeholder="https://example.com/logo.png"
                 className="flex-1 px-3 py-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-green-500 focus:border-transparent"
               />
@@ -320,7 +323,7 @@ const OperatorPortalConfig = () => {
               <input
                 type="url"
                 value={config.heroImageUrl}
-                onChange={(e) => setConfig({ ...config, heroImageUrl: e.target.value })}
+                onChange={(e) => setConfig((previous) => ({ ...previous, heroImageUrl: e.target.value }))}
                 placeholder="https://example.com/hero-banner.jpg"
                 className="flex-1 px-3 py-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-green-500 focus:border-transparent"
               />
@@ -353,7 +356,7 @@ const OperatorPortalConfig = () => {
               <input
                 type="text"
                 value={config.brandColor}
-                onChange={(e) => setConfig({ ...config, brandColor: e.target.value })}
+                onChange={(e) => setConfig((previous) => ({ ...previous, brandColor: e.target.value }))}
                 placeholder="#16a34a"
                 pattern="^#[0-9A-Fa-f]{6}$"
                 className="flex-1 px-3 py-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-green-500 focus:border-transparent font-mono"
@@ -361,7 +364,7 @@ const OperatorPortalConfig = () => {
               <input
                 type="color"
                 value={config.brandColor}
-                onChange={(e) => setConfig({ ...config, brandColor: e.target.value })}
+                onChange={(e) => setConfig((previous) => ({ ...previous, brandColor: e.target.value }))}
                 className="w-12 h-10 border border-gray-300 rounded cursor-pointer"
               />
             </div>
@@ -384,7 +387,7 @@ const OperatorPortalConfig = () => {
           <input
             type="text"
             value={config.tagline}
-            onChange={(e) => setConfig({ ...config, tagline: e.target.value })}
+            onChange={(e) => setConfig((previous) => ({ ...previous, tagline: e.target.value }))}
             placeholder="Your Swift and Reliable Travel Partner"
             maxLength={100}
             className="w-full px-3 py-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-green-500 focus:border-transparent"
@@ -404,7 +407,7 @@ const OperatorPortalConfig = () => {
           </label>
           <textarea
             value={config.description}
-            onChange={(e) => setConfig({ ...config, description: e.target.value })}
+            onChange={(e) => setConfig((previous) => ({ ...previous, description: e.target.value }))}
             placeholder="Tell passengers about your company, service quality, experience, and what makes you unique..."
             rows={4}
             maxLength={500}
