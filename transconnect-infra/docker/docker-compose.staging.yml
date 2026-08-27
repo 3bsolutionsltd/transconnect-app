@@ -115,6 +115,7 @@ services:
       args:
         REACT_APP_API_URL: ${REACT_APP_API_URL}
         REACT_APP_APP_NAME: "TransConnect Admin (Staging)"
+        REACT_APP_WEB_URL: ${REACT_APP_WEB_URL}
     container_name: tc_admin_staging
     restart: unless-stopped
     ports:

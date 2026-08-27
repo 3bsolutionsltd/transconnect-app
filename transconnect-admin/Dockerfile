@@ -6,8 +6,10 @@ WORKDIR /app
 # Build-time env vars (React bakes these at compile time)
 ARG REACT_APP_API_URL
 ARG REACT_APP_APP_NAME
+ARG REACT_APP_WEB_URL
 ENV REACT_APP_API_URL=$REACT_APP_API_URL
 ENV REACT_APP_APP_NAME=$REACT_APP_APP_NAME
+ENV REACT_APP_WEB_URL=$REACT_APP_WEB_URL
 
 # Copy package files
 COPY package*.json ./
