@@ -67,11 +67,14 @@ model User {
   lastName  String
   phone     String   @unique
   role      UserRole @default(PASSENGER)
+  // Dynamic role assignment. `role` above stays authoritative until every client reads roleId.
+  roleId    String?
   verified  Boolean  @default(false)
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
   // Relations
+  roleDefinition          Role?                       @relation(fields: [roleId], references: [id], onDelete: SetNull)
   bookings                Booking[]
   rides                   Ride[]
   payments                Payment[]
@@ -87,7 +90,52 @@ model User {
   bookingAssignmentsMade  BookingAssignment[]         @relation("BookingAssignmentsMade")
   bookingLedgerEntries    BookingLedgerEntry[]        @relation("BookingLedgerActor")
 
+  @@index([roleId])
   @@map("users")
+}
+
+model Role {
+  id          String   @id @default(cuid())
+  slug        String   @unique
+  name        String
+  description String?
+  // System roles are referenced by the UserRole enum and cannot be deleted or renamed.
+  isSystem    Boolean  @default(false)
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  users       User[]
+  permissions RolePermission[]
+
+  @@map("roles")
+}
+
+model Permission {
+  id          String   @id @default(cuid())
+  slug        String   @unique
+  resource    String
+  action      String
+  description String?
+  createdAt   DateTime @default(now())
+
+  roles RolePermission[]
+
+  @@unique([resource, action])
+  @@index([resource])
+  @@map("permissions")
+}
+
+model RolePermission {
+  roleId       String
+  permissionId String
+  createdAt    DateTime @default(now())
+
+  role       Role       @relation(fields: [roleId], references: [id], onDelete: Cascade)
+  permission Permission @relation(fields: [permissionId], references: [id], onDelete: Cascade)
+
+  @@id([roleId, permissionId])
+  @@index([permissionId])
+  @@map("role_permissions")
 }
 
 model Operator {

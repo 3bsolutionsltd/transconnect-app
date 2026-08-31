@@ -1,6 +1,7 @@
 import { Request, Response, NextFunction } from 'express';
 import jwt from 'jsonwebtoken';
 import { prisma } from '../lib/prisma';
+import { resolvePermissions } from '../services/permissions';
 
 interface AuthRequest extends Request {
   user?: {
@@ -8,6 +9,8 @@ interface AuthRequest extends Request {
     email: string;
     role: string;
     roles?: string[];
+    roleId?: string | null;
+    permissions?: string[];
   };
 }
 
@@ -29,6 +32,7 @@ export const authenticateToken = async (req: AuthRequest, res: Response, next: N
         id: true,
         email: true,
         role: true,
+        roleId: true,
         verified: true,
         operatorUser: {
           select: {
@@ -64,6 +68,11 @@ export const authenticateToken = async (req: AuthRequest, res: Response, next: N
       email: user.email,
       role: user.role,
       roles: Array.from(roles),
+      roleId: (user as any).roleId ?? null,
+      permissions: await resolvePermissions({
+        roleId: (user as any).roleId,
+        legacyRole: user.role,
+      }),
     };
 
     next();
@@ -103,6 +112,26 @@ export const requireRole = (roles: string[]) => {
 
     if (!hasRequiredRole) {
       return res.status(403).json({ error: 'Insufficient permissions' });
+    }
+
+    next();
+  };
+};
+
+/** Passes when the user holds any one of the listed permission slugs. */
+export const requirePermission = (...permissions: string[]) => {
+  return (req: AuthRequest, res: Response, next: NextFunction) => {
+    if (!req.user) {
+      return res.status(401).json({ error: 'Authentication required' });
+    }
+
+    const granted = req.user.permissions ?? [];
+    if (!permissions.some(permission => granted.includes(permission))) {
+      return res.status(403).json({
+        error: 'Insufficient permissions',
+        code: 'PERMISSION_DENIED',
+        required: permissions,
+      });
     }
 
     next();

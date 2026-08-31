@@ -6,6 +6,7 @@ import { body, validationResult } from 'express-validator';
 import { EmailService } from '../services/email.service';
 import EmailOTPService from '../services/email-otp.service';
 import { authenticateToken } from '../middleware/auth';
+import { resolvePermissions } from '../services/permissions';
 import { sendOtp, sendOtpForIdentifier, verifyOtpCode, verifyOtpCodeForIdentifier } from '../tools/agents/otp.tool';
 import MultiProviderSMSService from '../services/multi-provider-sms.service';
 import { PhoneNormalizer } from '../utils/phone-normalizer';
@@ -268,7 +269,8 @@ router.post('/login', [
       firstName: user.firstName,
       lastName: user.lastName,
       phone: user.phone,
-      role: user.role
+      role: user.role,
+      permissions: await resolvePermissions({ roleId: (user as any).roleId, legacyRole: user.role }),
     };
 
     res.json({ 
@@ -389,6 +391,7 @@ router.get('/me', async (req: Request, res: Response) => {
         lastName: true,
         phone: true,
         role: true,
+        roleId: true,
         verified: true
       }
     });
@@ -397,7 +400,10 @@ router.get('/me', async (req: Request, res: Response) => {
       return res.status(404).json({ error: 'User not found' });
     }
 
-    res.json(user);
+    res.json({
+      ...user,
+      permissions: await resolvePermissions({ roleId: user.roleId, legacyRole: user.role }),
+    });
   } catch (error) {
     console.error('Get profile error:', error);
     res.status(401).json({ error: 'Invalid token' });

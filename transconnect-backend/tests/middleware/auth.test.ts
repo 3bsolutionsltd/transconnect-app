@@ -1,12 +1,18 @@
 import { Request, Response, NextFunction } from 'express';
 import jwt from 'jsonwebtoken';
-import { authenticateToken, requireRole } from '../../src/middleware/auth';
+import { authenticateToken, requireRole, requirePermission } from '../../src/middleware/auth';
 import { prisma } from '../../src/lib/prisma';
 
 jest.mock('../../src/lib/prisma', () => ({
   prisma: {
     user: {
       findUnique: jest.fn(),
+    },
+    role: {
+      findUnique: jest.fn(),
+    },
+    rolePermission: {
+      findMany: jest.fn(),
     },
   },
 }));
@@ -25,6 +31,7 @@ const createTestUser = () => ({
   lastName: 'User',
   phone: '+256700000000',
   role: 'PASSENGER',
+  roleId: null,
   verified: true,
   password: '$2a$12$LQv3c1yqBWVHxkd0LHAkCOYz6TtxMQJqhN8/LewKTEW1HV4.7.QYK', // "password123"
   operatorUser: null,
@@ -77,6 +84,7 @@ describe('Auth Middleware', () => {
           id: true,
           email: true,
           role: true,
+          roleId: true,
           verified: true,
           operatorUser: {
             select: {
@@ -94,7 +102,9 @@ describe('Auth Middleware', () => {
         id: testUser.id,
         email: testUser.email,
         role: testUser.role,
-        roles: ['PASSENGER']
+        roles: ['PASSENGER'],
+        roleId: null,
+        permissions: []
       });
       expect(nextFunction).toHaveBeenCalled();
     });
@@ -132,6 +142,8 @@ describe('Auth Middleware', () => {
         email: testUser.email,
         role: 'PASSENGER',
         roles: ['PASSENGER', 'OPERATOR', 'OPERATOR_FIELD_OPERATOR'],
+        roleId: null,
+        permissions: [],
       });
       expect(nextFunction).toHaveBeenCalled();
     });
@@ -360,6 +372,82 @@ describe('Auth Middleware', () => {
 
       expect(nextFunction).toHaveBeenCalled();
       expect(mockResponse.status).not.toHaveBeenCalled();
+    });
+  });
+
+  describe('requirePermission', () => {
+    beforeEach(() => {
+      (mockRequest as any).user = {
+        id: 'test-user-id',
+        email: 'test@example.com',
+        role: 'MASTER_FIELD_OPERATOR',
+        roles: ['MASTER_FIELD_OPERATOR'],
+        roleId: 'role_master_field_operator',
+        permissions: ['dashboard.view', 'bookings.read'],
+      };
+    });
+
+    it('should allow access when the user holds the permission', () => {
+      requirePermission('bookings.read')(
+        mockRequest as Request,
+        mockResponse as Response,
+        nextFunction
+      );
+
+      expect(nextFunction).toHaveBeenCalled();
+      expect(mockResponse.status).not.toHaveBeenCalled();
+    });
+
+    it('should allow access when the user holds any one of several permissions', () => {
+      requirePermission('users.write', 'dashboard.view')(
+        mockRequest as Request,
+        mockResponse as Response,
+        nextFunction
+      );
+
+      expect(nextFunction).toHaveBeenCalled();
+    });
+
+    it('should deny access when the permission is missing', () => {
+      requirePermission('users.write')(
+        mockRequest as Request,
+        mockResponse as Response,
+        nextFunction
+      );
+
+      expect(mockResponse.status).toHaveBeenCalledWith(403);
+      expect(mockResponse.json).toHaveBeenCalledWith({
+        error: 'Insufficient permissions',
+        code: 'PERMISSION_DENIED',
+        required: ['users.write'],
+      });
+      expect(nextFunction).not.toHaveBeenCalled();
+    });
+
+    it('should deny access when the user has no permissions resolved', () => {
+      (mockRequest as any).user.permissions = undefined;
+
+      requirePermission('dashboard.view')(
+        mockRequest as Request,
+        mockResponse as Response,
+        nextFunction
+      );
+
+      expect(mockResponse.status).toHaveBeenCalledWith(403);
+      expect(nextFunction).not.toHaveBeenCalled();
+    });
+
+    it('should return 401 when the request is unauthenticated', () => {
+      (mockRequest as any).user = undefined;
+
+      requirePermission('dashboard.view')(
+        mockRequest as Request,
+        mockResponse as Response,
+        nextFunction
+      );
+
+      expect(mockResponse.status).toHaveBeenCalledWith(401);
+      expect(nextFunction).not.toHaveBeenCalled();
     });
   });
 });
