@@ -1,0 +1,9 @@
+[Unit]
+Description=Check TransConnect SSL certificate expiry
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=oneshot
+EnvironmentFile=-/etc/default/transconnect-ssl-monitor
+ExecStart=/usr/local/sbin/transconnect-ssl-monitor

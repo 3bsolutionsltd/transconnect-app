@@ -88,6 +88,54 @@ else
     warn "Certbot already installed"
 fi
 
+# Certbot updates the certificate files in place, but Nginx keeps serving the
+# certificate loaded in memory until it is reloaded. Install an explicit
+# deploy hook so successful renewals take effect immediately.
+RENEWAL_HOOK_DIR="/etc/letsencrypt/renewal-hooks/deploy"
+mkdir -p "$RENEWAL_HOOK_DIR"
+cat > "$RENEWAL_HOOK_DIR/transconnect-nginx-reload.sh" <<'EOF'
+#!/usr/bin/env bash
+set -euo pipefail
+if nginx -t; then
+    systemctl reload nginx
+fi
+EOF
+chmod 755 "$RENEWAL_HOOK_DIR/transconnect-nginx-reload.sh"
+if systemctl list-unit-files certbot.timer --no-legend 2>/dev/null | grep -q certbot.timer; then
+    systemctl enable --now certbot.timer
+    info "Certbot renewal timer enabled"
+else
+    warn "certbot.timer is unavailable; configure a scheduled 'certbot renew' job"
+fi
+
+# Daily expiry monitoring is independent of Certbot so failed renewals alert us.
+# The repository may not exist yet during the initial bootstrap; install this
+# block after cloning and rerun setup-vps.sh when the files become available.
+SSL_MONITOR_CONFIG="/etc/default/transconnect-ssl-monitor"
+SSL_MONITOR_SOURCE="$APP_DIR/app/transconnect-infra"
+if [[ -f "$SSL_MONITOR_SOURCE/scripts/ssl-expiry-monitor.sh" ]]; then
+    install -m 0755 "$SSL_MONITOR_SOURCE/scripts/ssl-expiry-monitor.sh" \
+        /usr/local/sbin/transconnect-ssl-monitor
+    install -m 0644 "$SSL_MONITOR_SOURCE/systemd/transconnect-ssl-monitor.service" \
+        /etc/systemd/system/transconnect-ssl-monitor.service
+    install -m 0644 "$SSL_MONITOR_SOURCE/systemd/transconnect-ssl-monitor.timer" \
+        /etc/systemd/system/transconnect-ssl-monitor.timer
+    if [[ ! -f "$SSL_MONITOR_CONFIG" ]]; then
+        cat > "$SSL_MONITOR_CONFIG" <<EOF
+DOMAINS="$DOMAIN www.$DOMAIN api.$DOMAIN admin.$DOMAIN"
+WARN_DAYS=30
+# Set to a webhook URL (for example, an ntfy.sh topic) to receive alerts.
+ALERT_URL=
+EOF
+        chmod 600 "$SSL_MONITOR_CONFIG"
+    fi
+    systemctl daemon-reload
+    systemctl enable --now transconnect-ssl-monitor.timer
+    info "SSL expiry monitor enabled (daily; warning threshold: 30 days)"
+else
+    warn "SSL monitor files not found; rerun setup-vps.sh after cloning the repository"
+fi
+
 # ── 6. Firewall (UFW) ─────────────────────────────────────────
 # Only ADD TransConnect-required rules — never reset or change
 # defaults, as other services may depend on existing rules.
@@ -204,7 +252,9 @@ info "  certbot --nginx -d $STAGING_DOMAIN \\"
 info "    -d api-staging.$DOMAIN -d admin-staging.$DOMAIN \\"
 info "    --non-interactive --agree-tos -m $ALERT_EMAIL"
 info ""
-info "  Certbot auto-renewal is enabled by default."
+info "  Verify renewal with: certbot renew --dry-run"
+info "  Check timer with: systemctl status certbot.timer"
+info "  Nginx reload hook: $RENEWAL_HOOK_DIR/transconnect-nginx-reload.sh"
 info "========================================================"
 
 # ── 12. Swap (if < 2 GB RAM) ──────────────────────────────────
