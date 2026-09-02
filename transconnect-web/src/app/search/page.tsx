@@ -10,6 +10,36 @@ import { useSearchParams } from 'next/navigation';
 import { Section, Container, StyledCard, StyledButton } from '@/components/styled';
 import OperatorLogoBadge from '@/components/branding/OperatorLogoBadge';
 
+function formatArrivalTime(departureTime: unknown, durationMinutes: unknown): string {
+  if (typeof departureTime !== 'string' || !departureTime.trim()) return 'Not available';
+
+  const match = departureTime.trim().match(/^(\d{1,2}):(\d{2})$/);
+  const duration = Number(durationMinutes);
+  if (!match || !Number.isFinite(duration) || duration < 0) return 'Not available';
+
+  const departureMinutes = (Number(match[1]) * 60) + Number(match[2]);
+  if (departureMinutes >= 1440 || Number(match[2]) >= 60) return 'Not available';
+
+  const arrivalMinutes = (departureMinutes + duration) % 1440;
+  const hours = Math.floor(arrivalMinutes / 60).toString().padStart(2, '0');
+  const minutes = (arrivalMinutes % 60).toString().padStart(2, '0');
+  return `${hours}:${minutes}`;
+}
+
+function formatDuration(durationMinutes: unknown): string {
+  const duration = Number(durationMinutes);
+  if (!Number.isFinite(duration) || duration < 0) return 'Duration unavailable';
+
+  return `${Math.floor(duration / 60)}h ${duration % 60}m`;
+}
+
+function formatPrice(price: unknown): string {
+  const numericPrice = Number(price);
+  return Number.isFinite(numericPrice) && numericPrice >= 0
+    ? numericPrice.toLocaleString()
+    : 'Price unavailable';
+}
+
 function SearchContent() {
   const searchParams = useSearchParams();
   const operatorFilter = (searchParams.get('operator') || '').trim();
@@ -342,6 +372,10 @@ function SearchContent() {
                   const busLabel = getBusLabel(route);
                   const amenities = parseAmenities(route);
                   const visibleAmenities = amenities.slice(0, 3);
+                  const arrivalTime = formatArrivalTime(route.departureTime, route.duration);
+                  const availableSeats = route.availability?.availableSeats;
+                  const rating = route?.operator?.rating ?? route?.operatorInfo?.rating;
+                  const reviewCount = route?.operator?.reviewCount ?? route?.operatorInfo?.reviewCount;
 
                   return (
                 <StyledCard key={route.id} hover={false} className="!p-0 overflow-hidden">
@@ -353,12 +387,14 @@ function SearchContent() {
                           <OperatorLogoBadge operator={route?.operator || route?.operatorInfo} size="xl" />
                           <div className="min-w-0">
                             <div className="flex flex-wrap items-center gap-2">
-                              <h3 className="text-2xl font-black text-[#132742] leading-tight">{route.operator?.companyName || route.operatorInfo?.companyName || route.operatorInfo?.name || route.operatorName || 'Operator'}</h3>
-                              <span className="inline-flex items-center rounded-full border border-[#cfeedd] bg-[#f2fbf7] px-2.5 py-1 text-[10px] font-bold uppercase tracking-[0.08em] text-[#0f8c6b]">
-                                Trusted
-                              </span>
+                              <h3 className="text-2xl font-black text-[#132742] leading-tight">{route.operator?.companyName || route.operatorInfo?.companyName || route.operatorInfo?.name || route.operatorName || 'Operator unavailable'}</h3>
                             </div>
-                            <p className="text-xs text-[#8ca4c4] flex items-center gap-1 mt-1"><Star className="h-3 w-3 text-[#f59e0b]" />4.7 • 203 reviews</p>
+                            <p className="text-xs text-[#8ca4c4] flex items-center gap-1 mt-1">
+                              <Star className="h-3 w-3 text-[#f59e0b]" />
+                              {Number.isFinite(Number(rating)) && reviewCount !== undefined
+                                ? `${Number(rating).toFixed(1)} • ${reviewCount} reviews`
+                                : 'Not rated'}
+                            </p>
                             <div className="flex flex-wrap gap-2 mt-2">
                               <span className="px-2 py-0.5 rounded-full bg-[#edf3ff] text-[#214c86] text-xs font-semibold">{busLabel}</span>
                               {visibleAmenities.length > 0 ? (
@@ -372,7 +408,7 @@ function SearchContent() {
                                 ))
                               ) : (
                                 <span className="px-2 py-0.5 rounded-full bg-[#f5f7fb] text-[#6f86a7] text-xs font-semibold">
-                                  Standard amenities
+                                  Amenities unavailable
                                 </span>
                               )}
                             </div>
@@ -382,17 +418,17 @@ function SearchContent() {
 
                       <div>
                         <div className="flex items-baseline gap-2.5">
-                          <p className="text-4xl sm:text-5xl font-black text-[#132742] leading-none">{route.departureTime || '08:00'}</p>
-                          <p className="text-4xl sm:text-5xl font-black text-[#132742] leading-none">{route.arrivalTime || '14:30'}</p>
+                          <p className="text-4xl sm:text-5xl font-black text-[#132742] leading-none">{route.departureTime || 'Not available'}</p>
+                          <p className="text-4xl sm:text-5xl font-black text-[#132742] leading-none">{arrivalTime}</p>
                         </div>
                         <p className="text-xs text-[#8ca4c4] mt-1">{route.origin} • {route.destination}</p>
-                        <p className="text-xs text-[#0f8c6b] font-semibold mt-1">{Math.floor((route.duration || 360) / 60)}h {(route.duration || 360) % 60}m • Direct</p>
+                        <p className="text-xs text-[#0f8c6b] font-semibold mt-1">{formatDuration(route.duration)} • Direct</p>
                       </div>
 
                       <div className="text-left xl:text-right">
-                        <p className="text-5xl sm:text-6xl font-black text-[#0f8c6b] leading-none">{Number(route.price || 0).toLocaleString()}</p>
+                        <p className="text-5xl sm:text-6xl font-black text-[#0f8c6b] leading-none">{formatPrice(route.price)}</p>
                         <p className="text-xs uppercase text-[#8ca4c4] mt-1">UGX per seat</p>
-                        <p className="text-xs text-[#8ca4c4] mt-2">{route.availability?.availableSeats || 15} seats available</p>
+                        <p className="text-xs text-[#8ca4c4] mt-2">{availableSeats !== undefined ? `${availableSeats} seats available` : 'Availability unavailable'}</p>
                       </div>
 
                       <Link href={`/route/${route.id}`} className="self-start xl:self-center">
