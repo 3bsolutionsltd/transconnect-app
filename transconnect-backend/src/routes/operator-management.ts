@@ -1,5 +1,6 @@
 import { Router, Request, Response } from 'express';
 import { prisma } from '../lib/prisma';
+import { materializeLegacyViaRoutes } from '../services/routeSegmentService';
 import { authenticateToken } from '../middleware/auth';
 import { body, validationResult } from 'express-validator';
 import { requireFeature } from '../utils/feature-flags';
@@ -726,6 +727,10 @@ router.post('/routes', [
         }
       }
     });
+
+    if (viaString) {
+      await materializeLegacyViaRoutes();
+    }
 
     // Add stops if provided
     if (stops && Array.isArray(stops) && stops.length > 0) {

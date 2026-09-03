@@ -1,7 +1,7 @@
 import { Router, Request, Response } from 'express';
 import { prisma } from '../lib/prisma';
 import { authenticateToken } from '../middleware/auth';
-import { searchRoutesWithSegments } from '../services/routeSegmentService';
+import { searchRoutesWithSegments, materializeLegacyViaRoutes, syncStopsFromSegments } from '../services/routeSegmentService';
 import { osrmService } from '../services/osrm.service';
 
 const router = Router();
@@ -440,6 +440,10 @@ router.post('/', authenticateToken, async (req: Request, res: Response) => {
       }
     });
 
+    if (viaString) {
+      await materializeLegacyViaRoutes();
+    }
+
     res.status(201).json({
       route,
       operatorInfo: {
@@ -529,6 +533,8 @@ router.get('/:id/stops', async (req: Request, res: Response) => {
   try {
     const { id } = req.params;
 
+    await materializeLegacyViaRoutes();
+
     const route = await prisma.route.findUnique({
       where: { id },
       include: {
@@ -554,6 +560,8 @@ router.get('/:id/stops/calculate-price', async (req: Request, res: Response) => 
   try {
     const { id } = req.params;
     const { boardingStop, alightingStop } = req.query;
+
+    await materializeLegacyViaRoutes();
 
     if (!boardingStop || !alightingStop) {
       return res.status(400).json({ 
@@ -605,6 +613,8 @@ router.get('/:id/boarding-stops', async (req: Request, res: Response) => {
   try {
     const { id } = req.params;
 
+    await materializeLegacyViaRoutes();
+
     const route = await prisma.route.findUnique({
       where: { id },
       include: {
@@ -632,6 +642,8 @@ router.get('/:id/boarding-stops', async (req: Request, res: Response) => {
 router.get('/:id/alighting-stops/:boardingStop', async (req: Request, res: Response) => {
   try {
     const { id, boardingStop } = req.params;
+
+    await materializeLegacyViaRoutes();
 
     const route = await prisma.route.findUnique({
       where: { id },
@@ -669,6 +681,105 @@ router.get('/:id/alighting-stops/:boardingStop', async (req: Request, res: Respo
 // ============================================================================
 // ROUTE SEGMENT MANAGEMENT ENDPOINTS
 // ============================================================================
+
+// Save the complete ordered route journey, including stop metadata and fares.
+router.put('/:routeId/journey-config', authenticateToken, async (req: Request, res: Response) => {
+  try {
+    const { routeId } = req.params;
+    const { locations } = req.body;
+
+    if (!Array.isArray(locations) || locations.length < 2) {
+      return res.status(400).json({ error: 'At least an origin and destination are required' });
+    }
+
+    const normalizedLocations = locations.map((location: any) => ({
+      name: String(location.name || '').trim(),
+      distanceKm: Number(location.distanceKm),
+      durationMinutes: Number(location.durationMinutes),
+      price: Number(location.price),
+    }));
+
+    if (normalizedLocations.some((location: any) =>
+      !location.name || !Number.isFinite(location.distanceKm) || location.distanceKm < 0 ||
+      !Number.isFinite(location.durationMinutes) || location.durationMinutes < 0 ||
+      !Number.isFinite(location.price) || location.price < 0
+    )) {
+      return res.status(400).json({
+        error: 'Every location requires a name, distance, duration, and non-negative price'
+      });
+    }
+
+    const route = await prisma.route.findUnique({
+      where: { id: routeId },
+      include: { operator: true },
+    });
+
+    if (!route) return res.status(404).json({ error: 'Route not found' });
+
+    const requestUser = (req as any).user;
+    if (requestUser?.role !== 'ADMIN') {
+      const operator = await prisma.operator.findFirst({
+        where: { id: route.operatorId, userId: requestUser?.id || requestUser?.userId },
+      });
+      if (!operator) return res.status(403).json({ error: 'Not authorized for this route' });
+    }
+
+    const segmentCount = normalizedLocations.length - 1;
+    const segments = normalizedLocations.slice(0, -1).map((location: any, index: number) => ({
+      routeId,
+      segmentOrder: index + 1,
+      fromLocation: location.name,
+      toLocation: normalizedLocations[index + 1].name,
+      distanceKm: normalizedLocations[index + 1].distanceKm - location.distanceKm,
+      durationMinutes: normalizedLocations[index + 1].durationMinutes - location.durationMinutes,
+      basePrice: normalizedLocations[index + 1].price - location.price,
+    }));
+
+    if (segments.some((segment: any) =>
+      segment.distanceKm < 0 || segment.durationMinutes < 0 || segment.basePrice <= 0
+    )) {
+      return res.status(400).json({
+        error: 'Location distance, duration, and price must increase along the route'
+      });
+    }
+
+    const stops = normalizedLocations.map((location: any, index: number) => ({
+      routeId,
+      stopName: location.name,
+      distanceFromOrigin: location.distanceKm,
+      priceFromOrigin: location.price,
+      order: index + 1,
+      estimatedTime: route.departureTime,
+    }));
+
+    const totalDistance = normalizedLocations[normalizedLocations.length - 1].distanceKm;
+    const totalDuration = normalizedLocations[normalizedLocations.length - 1].durationMinutes;
+    const totalPrice = normalizedLocations[normalizedLocations.length - 1].price;
+
+    const result = await prisma.$transaction(async (transaction) => {
+      await transaction.routeSegment.deleteMany({ where: { routeId } });
+      await transaction.routeStop.deleteMany({ where: { routeId } });
+      await transaction.routeStop.createMany({ data: stops });
+      await transaction.routeSegment.createMany({ data: segments });
+      const updatedRoute = await transaction.route.update({
+        where: { id: routeId },
+        data: {
+          distance: totalDistance,
+          duration: totalDuration,
+          price: totalPrice,
+          via: normalizedLocations.slice(1, -1).map((location: any) => location.name).join(', ') || null,
+          segmentEnabled: true,
+        },
+      });
+      return updatedRoute;
+    });
+
+    return res.json({ success: true, route: result, stops, segments });
+  } catch (error: any) {
+    console.error('Error saving journey configuration:', error);
+    return res.status(500).json({ error: 'Failed to save journey configuration', message: error.message });
+  }
+});
 
 // Get segments for a specific route
 router.get('/:routeId/segments', async (req: Request, res: Response) => {
@@ -830,6 +941,8 @@ router.put('/segments/:segmentId', authenticateToken, async (req: Request, res: 
         ...(basePrice && { basePrice })
       }
     });
+
+    await syncStopsFromSegments(segment.routeId);
 
     res.json({
       success: true,

@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import axios from 'axios';
+import { api } from '../../lib/api';
 
 interface RouteStop {
   id: string;
@@ -36,9 +37,7 @@ const StopSelector: React.FC<StopSelectorProps> = ({ routeId, onStopsSelected })
   useEffect(() => {
     const fetchRouteDetails = async () => {
       try {
-        const response = await axios.get(
-          `${process.env.NEXT_PUBLIC_API_URL}/api/routes/${routeId}`
-        );
+        const response = await api.get(`/routes/${routeId}`);
         setRouteDetails(response.data);
       } catch (error) {
         console.error('Error fetching route details:', error);
@@ -101,9 +100,7 @@ const StopSelector: React.FC<StopSelectorProps> = ({ routeId, onStopsSelected })
       }
 
       try {
-        const response = await axios.get(
-          `${process.env.NEXT_PUBLIC_API_URL}/api/routes/${routeId}/boarding-stops`
-        );
+        const response = await api.get(`/routes/${routeId}/boarding-stops`);
         
         // Check if API returned empty results and use fallback
         if (!response.data || response.data.length === 0) {
@@ -138,9 +135,7 @@ const StopSelector: React.FC<StopSelectorProps> = ({ routeId, onStopsSelected })
 
       try {
         setLoading(true);
-        const response = await axios.get(
-          `${process.env.NEXT_PUBLIC_API_URL}/api/routes/${routeId}/alighting-stops/${encodeURIComponent(selectedBoarding)}`
-        );
+        const response = await api.get(`/routes/${routeId}/alighting-stops/${encodeURIComponent(selectedBoarding)}`);
         
         // Check if API returned empty results and use fallback
         if (!response.data || response.data.length === 0) {
@@ -189,15 +184,12 @@ const StopSelector: React.FC<StopSelectorProps> = ({ routeId, onStopsSelected })
       }
 
       try {
-        const response = await axios.get(
-          `${process.env.NEXT_PUBLIC_API_URL}/api/routes/${routeId}/stops/calculate-price`,
-          {
-            params: {
-              boardingStop: selectedBoarding,
-              alightingStop: selectedAlighting
-            }
+        const response = await api.get(`/routes/${routeId}/stops/calculate-price`, {
+          params: {
+            boardingStop: selectedBoarding,
+            alightingStop: selectedAlighting
           }
-        );
+        });
         
         const price = response.data.price;
         setCalculatedPrice(price);
