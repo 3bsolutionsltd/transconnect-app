@@ -19,11 +19,15 @@ type Props = {
 };
 
 export default function SeatMap({ capacity, bookedSeats = [], selectedSeats = [], maxSeats = 4, onSelect }: Props) {
+  const normalizedCapacity = Number.isFinite(Number(capacity)) && Number(capacity) > 0
+    ? Math.floor(Number(capacity))
+    : 0;
+
   // Generate seats with types
   const generateSeats = (): Seat[] => {
     const seats: Seat[] = [];
     
-    for (let i = 1; i <= capacity; i++) {
+    for (let i = 1; i <= normalizedCapacity; i++) {
       const seatNumber = i.toString();
       let seatType: SeatType = 'regular';
       
@@ -55,7 +59,7 @@ export default function SeatMap({ capacity, bookedSeats = [], selectedSeats = []
   };
 
   const seats = generateSeats();
-  const rows = Math.ceil(capacity / 4);
+  const rows = Math.ceil(normalizedCapacity / 4);
   const seatsPerRow = 4;
 
   const handleSeatClick = (seatNumber: string) => {
@@ -131,6 +135,7 @@ export default function SeatMap({ capacity, bookedSeats = [], selectedSeats = []
                       const isSelected = selectedSeats.includes(seat.number);
                       return (
                     <button
+                      type="button"
                       disabled={seat.isBooked}
                       onClick={() => handleSeatClick(seat.number)}
                       aria-label={`Seat ${seat.number}`}
@@ -169,6 +174,7 @@ export default function SeatMap({ capacity, bookedSeats = [], selectedSeats = []
                       const isSelected = selectedSeats.includes(seat.number);
                       return (
                     <button
+                      type="button"
                       disabled={seat.isBooked}
                       onClick={() => handleSeatClick(seat.number)}
                       aria-label={`Seat ${seat.number}`}
@@ -242,9 +248,9 @@ export default function SeatMap({ capacity, bookedSeats = [], selectedSeats = []
         <div className="mt-3 pt-3 border-t border-gray-200">
           <p className="text-xs text-gray-600 mb-2">All seats are charged at the same route fare.</p>
           <div className="flex items-center justify-between text-xs text-gray-600 mb-2">
-            <span>Total Seats: {capacity}</span>
+            <span>Total Seats: {normalizedCapacity}</span>
             <span>Booked: {bookedSeats.length}</span>
-            <span>Available: {capacity - bookedSeats.length}</span>
+            <span>Available: {Math.max(0, normalizedCapacity - bookedSeats.length)}</span>
           </div>
           <div className="flex items-center justify-between text-xs gap-2">
             <span className="text-blue-600 font-medium">Selected: {selectedSeats.length}/{maxSeats}</span>
