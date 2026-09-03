@@ -17,6 +17,7 @@ import { MonitoringService } from './services/monitoring.service';
 // Import routes
 import authRoutes from './routes/auth';
 import userRoutes from './routes/users';
+import roleRoutes from './routes/roles';
 import routeRoutes from './routes/routes';
 import bookingRoutes from './routes/bookings';
 import paymentRoutes from './routes/payments';
@@ -153,6 +154,7 @@ app.use(express.urlencoded({ extended: true }));
 // Routes
 app.use('/api/auth', authRoutes);
 app.use('/api/users', userRoutes);
+app.use('/api/roles', roleRoutes);
 app.use('/api/routes', routeRoutes);
 app.use('/api/segments', segmentRoutes); // NEW: Route segments management
 app.use('/api/distance', distanceRoutes); // NEW: Google Maps distance calculation

@@ -24,8 +24,21 @@ const OperatorRoutes = () => {
     duration: '',
     price: '',
     departureTime: '',
-    busId: ''
+    busId: '',
+    segmentPrices: [] as string[]
   });
+
+  const journeyLocations = () => [
+    routeForm.origin.trim(),
+    ...routeForm.via.split(',').map(location => location.trim()).filter(Boolean),
+    routeForm.destination.trim()
+  ].filter((location, index, locations) => location && locations.indexOf(location) === index);
+
+  const updateSegmentPrice = (index: number, value: string) => {
+    const segmentPrices = [...routeForm.segmentPrices];
+    segmentPrices[index] = value;
+    setRouteForm({ ...routeForm, segmentPrices });
+  };
 
   const API_BASE_URL = (process.env.REACT_APP_API_URL || 'http://localhost:5000/api').replace(/\/api\/?$/, '') + '/api';
 
@@ -161,7 +174,42 @@ const OperatorRoutes = () => {
       });
 
       if (response.ok) {
-        alert('Route created successfully!');
+        const data = await response.json();
+        const routeId = data.route?.id;
+        const locations = journeyLocations();
+        const segmentPrices = routeForm.segmentPrices.map(value => Number(value));
+
+        if (routeId && locations.length > 1) {
+          const totalDistance = Number(routeForm.distance);
+          const totalDuration = Number(routeForm.duration);
+          const cumulativePrice = segmentPrices.reduce((sum, value) => sum + value, 0);
+          const journeyResponse = await fetch(`${API_BASE_URL}/routes/${routeId}/journey-config`, {
+            method: 'PUT',
+            headers: {
+              'Authorization': `Bearer ${token}`,
+              'Content-Type': 'application/json'
+            },
+            body: JSON.stringify({
+              locations: locations.map((name, index) => ({
+                name,
+                distanceKm: totalDistance * index / (locations.length - 1),
+                durationMinutes: Math.round(totalDuration * index / (locations.length - 1)),
+                price: segmentPrices.slice(0, index).reduce((sum, value) => sum + value, 0)
+              }))
+            })
+          });
+
+          if (!journeyResponse.ok) {
+            const journeyError = await journeyResponse.json();
+            throw new Error(journeyError.error || 'Failed to save journey pricing');
+          }
+
+          if (Math.round(cumulativePrice) !== Number(routeForm.price)) {
+            alert(`Route created. Segment fares total UGX ${cumulativePrice.toLocaleString()}, while the route price is UGX ${Number(routeForm.price).toLocaleString()}.`);
+          } else {
+            alert('Route and segment pricing saved successfully!');
+          }
+        }
         setShowAddForm(false);
         setRouteForm({
           origin: '',
@@ -171,7 +219,8 @@ const OperatorRoutes = () => {
           duration: '',
           price: '',
           departureTime: '',
-          busId: ''
+          busId: '',
+          segmentPrices: []
         });
         loadRoutes();
       } else {
@@ -302,6 +351,40 @@ const OperatorRoutes = () => {
                 />
                 <p className="text-xs text-gray-500 mt-1">Enter intermediate stops separated by commas</p>
               </div>
+
+              {journeyLocations().length > 1 && (
+                <div className="border border-blue-100 rounded-lg p-4 bg-blue-50">
+                  <div className="flex items-center justify-between mb-3">
+                    <div>
+                      <h4 className="font-medium text-gray-900">Segment fares</h4>
+                      <p className="text-xs text-gray-600">Set the fare for each boarding-to-destination leg.</p>
+                    </div>
+                    <span className="text-xs text-gray-600">
+                      Total: UGX {routeForm.segmentPrices.reduce((sum, value) => sum + (Number(value) || 0), 0).toLocaleString()}
+                    </span>
+                  </div>
+                  <div className="space-y-2">
+                    {journeyLocations().slice(0, -1).map((location, index) => (
+                      <div key={`${location}-${journeyLocations()[index + 1]}`} className="grid grid-cols-[1fr_auto_1fr] items-center gap-2">
+                        <span className="text-sm text-gray-800">{location}</span>
+                        <span className="text-gray-400">→</span>
+                        <div className="flex items-center gap-2">
+                          <span className="text-sm text-gray-800">{journeyLocations()[index + 1]}</span>
+                          <input
+                            type="number"
+                            min="1"
+                            required
+                            value={routeForm.segmentPrices[index] || ''}
+                            onChange={(event) => updateSegmentPrice(index, event.target.value)}
+                            className="w-28 px-2 py-1 border border-gray-300 rounded-md"
+                            placeholder="Fare UGX"
+                          />
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              )}
 
               <div className="grid grid-cols-3 gap-4">
                 <div>
