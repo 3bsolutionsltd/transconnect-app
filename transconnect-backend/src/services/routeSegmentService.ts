@@ -189,7 +189,10 @@ export async function materializeLegacyViaRoutes(): Promise<void> {
     where: {
       active: true,
       via: { not: null },
-      segments: { none: {} },
+      OR: [
+        { stops: { none: {} } },
+        { segments: { none: {} } },
+      ],
     },
     select: {
       id: true,
