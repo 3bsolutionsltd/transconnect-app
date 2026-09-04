@@ -1,5 +1,5 @@
 'use client';
-import React, { useState } from 'react';
+import React, { useCallback, useState } from 'react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { createBooking } from '../../lib/api';
@@ -56,12 +56,12 @@ export default function BookingForm({ routeId, price, selectedSeats = [], defaul
     return selectedSeats.length * effectivePrice;
   };
 
-  const handleStopsSelected = (boarding: string, alighting: string, calculatedPrice: number) => {
+  const handleStopsSelected = useCallback((boarding: string, alighting: string, calculatedPrice: number) => {
     setBoardingStop(boarding);
     setAlightingStop(alighting);
     setDynamicPrice(calculatedPrice);
     setShowConfirmation(false);
-  };
+  }, []);
 
   const buildPassengers = () => selectedSeats.map((seatNumber, index) => ({
     firstName: passengerDetails[index].name.split(' ')[0] || passengerDetails[index].name,
