@@ -22,6 +22,7 @@ function PaymentCallbackContent() {
   const router = useRouter();
   const paymentId = searchParams.get('paymentId');
   const ref = searchParams.get('ref'); // fallback
+  const returnTo = searchParams.get('returnTo');
   const lookupId = paymentId || ref;
   const [status, setStatus] = useState<Status>('loading');
   const [data, setData] = useState<PaymentStatusResponse | null>(null);
@@ -72,6 +73,13 @@ function PaymentCallbackContent() {
     poll();
   }, [ref]);
 
+  useEffect(() => {
+    if (status !== 'completed' || !returnTo) return;
+
+    const timeout = window.setTimeout(() => router.replace(returnTo), 8000);
+    return () => window.clearTimeout(timeout);
+  }, [returnTo, router, status]);
+
   // ── Completed ───────────────────────────────────────────────────────────
   if (status === 'completed' && data) {
     return (
@@ -120,6 +128,11 @@ function PaymentCallbackContent() {
             <Link href="/bookings" className="text-blue-600 hover:underline text-sm">
               My Bookings
             </Link>
+            {returnTo && (
+              <Link href={returnTo} className="text-gray-500 hover:underline text-sm">
+                Return to operator portal
+              </Link>
+            )}
           </div>
         </div>
       </main>

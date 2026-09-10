@@ -193,6 +193,7 @@ export const paymentApi = {
     method: string;
     phoneNumber?: string;
     totalAmount?: number;
+    returnTo?: string;
   }) {
     const response = await api.post('/payments/initiate', paymentData);
     return response.data;

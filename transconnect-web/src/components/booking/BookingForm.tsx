@@ -13,12 +13,13 @@ type Props = {
   selectedSeats?: string[];
   defaultTravelDate?: string;
   onSuccess?: (booking: any) => void;
+  returnTo?: string;
   routeOrigin?: string;
   routeDestination?: string;
   routeDepartureTime?: string;
 };
 
-export default function BookingForm({ routeId, price, selectedSeats = [], defaultTravelDate, onSuccess, routeOrigin, routeDestination, routeDepartureTime }: Props) {
+export default function BookingForm({ routeId, price, selectedSeats = [], defaultTravelDate, onSuccess, returnTo, routeOrigin, routeDestination, routeDepartureTime }: Props) {
   const [travelDate, setTravelDate] = useState(defaultTravelDate || '');
   const [passengerDetails, setPassengerDetails] = useState<Array<{name: string, phone: string}>>([]);
   const [loading, setLoading] = useState(false);
@@ -161,7 +162,9 @@ export default function BookingForm({ routeId, price, selectedSeats = [], defaul
         };
 
       const bookingData = encodeURIComponent(JSON.stringify(bookingForPayment));
-      router.push(`/payment?booking=${bookingData}`);
+      const paymentParams = new URLSearchParams({ booking: bookingData });
+      if (returnTo) paymentParams.set('returnTo', returnTo);
+      router.push(`/payment?${paymentParams.toString()}`);
     } catch (err: any) {
       setError(err?.response?.data?.error || err.message || 'Booking failed. Please try again.');
     } finally {
