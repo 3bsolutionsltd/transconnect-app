@@ -3,7 +3,7 @@ import React, { useEffect, useState } from 'react';
 import { fetchRouteById } from '../../../lib/api';
 import SeatMap from '../../../components/booking/SeatMap';
 import BookingForm from '../../../components/booking/BookingForm';
-import { useRouter } from 'next/navigation';
+import { useRouter, useSearchParams } from 'next/navigation';
 import { ArrowLeft, MapPin, Clock, Route, Bus, Calendar, CheckCircle } from 'lucide-react';
 import Link from 'next/link';
 import { Section, Container, Heading, StyledCard, StyledButton, Badge } from '@/components/styled';
@@ -17,6 +17,9 @@ export default function RoutePage({ params }: { params: { id: string } }) {
   const [travelDate, setTravelDate] = useState(new Date().toISOString().split('T')[0]);
   const [loading, setLoading] = useState(false);
   const router = useRouter();
+  const searchParams = useSearchParams();
+  const operatorSlug = searchParams.get('operatorSlug');
+  const returnTo = operatorSlug ? `/operator/${encodeURIComponent(operatorSlug)}` : undefined;
 
   useEffect(() => {
     async function load() {
@@ -243,6 +246,7 @@ export default function RoutePage({ params }: { params: { id: string } }) {
                 selectedSeats={selectedSeats}
                 defaultTravelDate={travelDate}
                 onSuccess={() => router.push('/profile')}
+                returnTo={returnTo}
                 routeOrigin={route.origin}
                 routeDestination={route.destination}
                 routeDepartureTime={route.departureTime}

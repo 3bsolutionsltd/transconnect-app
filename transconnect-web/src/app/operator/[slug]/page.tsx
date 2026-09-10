@@ -27,6 +27,7 @@ interface OperatorRoute {
   destination: string;
   duration: number;
   price: number;
+  serviceClass?: string;
   departureTime: string;
   active: boolean;
   bus: {
@@ -262,8 +263,11 @@ export default function OperatorPortalPage() {
                       <div className="flex items-center gap-2"><Bus className="h-4 w-4" /> {route.bus.model} • {route.bus.capacity} seats</div>
                     </div>
                     <div className="flex items-center justify-between border-t pt-4">
-                      <p className="text-2xl font-extrabold" style={{ color: primaryColor }}>UGX {route.price.toLocaleString()}</p>
-                      <Link href={`/route/${route.id}`} className="btn-primary !py-2 !px-4 text-sm">Book Now</Link>
+                      <div>
+                        <p className="text-xs font-semibold uppercase tracking-wide text-gray-500">{route.serviceClass || "Standard"}</p>
+                        <p className="text-2xl font-extrabold" style={{ color: primaryColor }}>UGX {route.price.toLocaleString()}</p>
+                      </div>
+                      <Link href={`/route/${route.id}?operatorSlug=${encodeURIComponent(slug)}`} className="btn-primary !py-2 !px-4 text-sm">Book Now</Link>
                     </div>
                   </div>
                 </StyledCard>

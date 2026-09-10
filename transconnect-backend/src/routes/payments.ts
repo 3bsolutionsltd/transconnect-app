@@ -24,7 +24,8 @@ router.post('/initiate', [
   body('bookingId').notEmpty().withMessage('Booking ID is required'),
   body('method').isIn(['PESAPAL', 'CASH']).withMessage('Valid payment method is required (PESAPAL or CASH)'),
   body('phoneNumber').optional({ checkFalsy: true }).isMobilePhone('any').withMessage('Valid phone number is required for mobile money payments'),
-  body('totalAmount').optional().isNumeric().withMessage('totalAmount must be a number')
+  body('totalAmount').optional().isNumeric().withMessage('totalAmount must be a number'),
+  body('returnTo').optional().matches(/^\/operator\/[A-Za-z0-9-]+$/).withMessage('returnTo must be an operator portal path')
 ], async (req: Request, res: Response) => {
   try {
     const errors = validationResult(req);
@@ -32,7 +33,7 @@ router.post('/initiate', [
       return res.status(400).json({ errors: errors.array() });
     }
 
-    const { bookingId, method, phoneNumber, totalAmount: requestedTotal } = req.body;
+    const { bookingId, method, phoneNumber, totalAmount: requestedTotal, returnTo } = req.body;
     const userId = (req as any).user.id;
 
     // Verify booking exists and belongs to user
@@ -209,7 +210,7 @@ router.post('/initiate', [
           userEmail:     (booking.user as any).email || '',
           userFirstName: booking.user.firstName,
           userLastName:  booking.user.lastName,
-          callbackUrl:   `${process.env.FRONTEND_URL || 'https://transconnect.app'}/payment/callback?paymentId=${payment.id}&bookingId=${payment.bookingId}&ref=${paymentReference}`,
+          callbackUrl:   `${process.env.FRONTEND_URL || 'https://transconnect.app'}/payment/callback?paymentId=${payment.id}&bookingId=${payment.bookingId}&ref=${paymentReference}${returnTo ? `&returnTo=${encodeURIComponent(returnTo)}` : ''}`,
           cancellationUrl: `${process.env.FRONTEND_URL || 'https://transconnect.app'}/payment/cancelled?paymentId=${payment.id}&bookingId=${payment.bookingId}&ref=${paymentReference}`,
         };
 

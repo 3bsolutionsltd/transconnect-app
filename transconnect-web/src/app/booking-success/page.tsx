@@ -13,6 +13,7 @@ function BookingSuccessContent() {
   const searchParams = useSearchParams();
   const router = useRouter();
   const { user } = useAuth();
+  const returnTo = searchParams.get('returnTo');
   const [booking, setBooking] = useState<any>(null);
   const [loading, setLoading] = useState(true);
 
@@ -31,6 +32,13 @@ function BookingSuccessContent() {
     }
     setLoading(false);
   }, [searchParams, router]);
+
+  useEffect(() => {
+    if (!returnTo || !booking) return;
+
+    const timeout = window.setTimeout(() => router.replace(returnTo), 8000);
+    return () => window.clearTimeout(timeout);
+  }, [booking, returnTo, router]);
 
   const handleDownloadQR = async () => {
     if (!booking?.qrCode) return;
@@ -203,8 +211,8 @@ function BookingSuccessContent() {
 
         {/* Action Buttons */}
         <div className="flex justify-center space-x-4">
-          <Link href="/search" className="btn-outline">
-            Book Another Trip
+          <Link href={returnTo || '/search'} className="btn-outline">
+            {returnTo ? 'Return to Operator Portal' : 'Book Another Trip'}
           </Link>
           <Link href="/bookings" className="btn-primary">
             View My Bookings

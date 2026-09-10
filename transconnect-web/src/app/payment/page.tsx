@@ -12,6 +12,7 @@ import { paymentApi } from '@/lib/api';
 function PaymentContent() {
   const router = useRouter();
   const searchParams = useSearchParams();
+  const returnTo = searchParams.get('returnTo');
   const { user, loading } = useAuth();
   const notificationService = useNotificationService();
   
@@ -47,7 +48,9 @@ function PaymentContent() {
                 const successData = encodeURIComponent(
                   JSON.stringify({ ...parsed, ...live })
                 );
-                router.replace(`/booking-success?booking=${successData}`);
+                const successParams = new URLSearchParams({ booking: successData });
+                if (returnTo) successParams.set('returnTo', returnTo);
+                router.replace(`/booking-success?${successParams.toString()}`);
               } else {
                 setBookingData(parsed);
               }
@@ -89,7 +92,8 @@ function PaymentContent() {
         method: selectedMethod,
         ...(phoneNumber ? { phoneNumber } : {}),
         // Pass total for multi-seat bookings (backend uses it instead of single-booking amount)
-        ...(bookingData.totalAmount ? { totalAmount: bookingData.totalAmount } : {})
+        ...(bookingData.totalAmount ? { totalAmount: bookingData.totalAmount } : {}),
+        ...(returnTo ? { returnTo } : {})
       };
 
       const response = await paymentApi.initiate(paymentRequest);
@@ -118,7 +122,9 @@ function PaymentContent() {
               isCashPayment: true,
               qrCode: response.qrCode || bookingData.qrCode
             }));
-            router.push(`/booking-success?booking=${successData}`);
+            const successParams = new URLSearchParams({ booking: successData });
+            if (returnTo) successParams.set('returnTo', returnTo);
+            router.push(`/booking-success?${successParams.toString()}`);
           }, 1200);
         } else if (response.status === 'COMPLETED') {
           setPaymentStatus('success');
@@ -136,7 +142,9 @@ function PaymentContent() {
               paymentId: response.paymentId,
               qrCode: response.qrCode // Include QR code from payment response
             }));
-            router.push(`/booking-success?booking=${successData}`);
+            const successParams = new URLSearchParams({ booking: successData });
+            if (returnTo) successParams.set('returnTo', returnTo);
+            router.push(`/booking-success?${successParams.toString()}`);
           }, 2000);
         } else {
           // Payment is still pending, could implement polling here
