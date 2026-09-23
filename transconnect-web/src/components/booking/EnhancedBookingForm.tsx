@@ -83,7 +83,7 @@ const EnhancedBookingForm: React.FC<EnhancedBookingFormProps> = ({
     const fetchSeatAvailability = async () => {
       try {
         const response = await axios.get(
-          `${process.env.NEXT_PUBLIC_API_URL}/api/bookings/route/${route.id}/seats?travelDate=${travelDate}`
+          `${process.env.NEXT_PUBLIC_API_URL}/bookings/route/${route.id}/seats?travelDate=${travelDate}`
         );
         setAvailableSeats(response.data.availableSeats);
         setBookedSeats(response.data.bookedSeats || []);
@@ -159,7 +159,7 @@ const EnhancedBookingForm: React.FC<EnhancedBookingFormProps> = ({
       };
 
       const response = await axios.post(
-        `${process.env.NEXT_PUBLIC_API_URL}/api/bookings`,
+        `${process.env.NEXT_PUBLIC_API_URL}/bookings`,
         bookingData,
         {
           headers: {
