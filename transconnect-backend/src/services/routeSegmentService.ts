@@ -175,6 +175,70 @@ export async function searchRoutesWithSegments(
     }
   }
 
+  // Keep legacy routes searchable when their segment rows are missing or incomplete.
+  const legacyRoutes = await prisma.route.findMany({
+    where: {
+      active: true,
+      via: { not: null },
+      operator: { approved: true },
+    },
+    include: {
+      bus: true,
+      operator: true,
+    },
+  });
+
+  const matchesLocation = (location: string, search: string) =>
+    location.toLowerCase().includes(search.trim().toLowerCase());
+
+  for (const route of legacyRoutes) {
+    if (results.some((result) => result.routeId === route.id)) continue;
+
+    const locations = [route.origin, ...(route.via || '').split(','), route.destination]
+      .map((location) => location.trim())
+      .filter(Boolean);
+    const pickupIndex = locations.findIndex((location) => matchesLocation(location, origin));
+    const dropoffIndex = locations.findIndex(
+      (location, index) => index > pickupIndex && matchesLocation(location, destination)
+    );
+
+    if (pickupIndex < 0 || dropoffIndex < 0) continue;
+
+    const totalLegs = Math.max(locations.length - 1, 1);
+    const selectedLegs = dropoffIndex - pickupIndex;
+    const basePrice = Number(route.price) / totalLegs;
+    const distance = Number(route.distance) / totalLegs;
+    const duration = Math.round(Number(route.duration) / totalLegs);
+    const fallbackSegments = Array.from({ length: selectedLegs }, (_, index) => ({
+      segmentId: `${route.id}-legacy-${pickupIndex + index + 1}`,
+      basePrice,
+      adjustments: [],
+      finalPrice: basePrice,
+    }));
+
+    results.push({
+      routeId: route.id,
+      origin: route.origin,
+      destination: route.destination,
+      pickupLocation: locations[pickupIndex],
+      dropoffLocation: locations[dropoffIndex],
+      totalDistance: distance * selectedLegs,
+      totalDuration: duration * selectedLegs,
+      basePrice: basePrice * selectedLegs,
+      finalPrice: Math.round(basePrice * selectedLegs),
+      segments: fallbackSegments,
+      departureTime: route.departureTime,
+      busInfo: {
+        plateNumber: route.bus.plateNumber,
+        model: route.bus.model,
+        capacity: route.bus.capacity,
+      },
+      operatorInfo: {
+        companyName: route.operator.companyName,
+      },
+    });
+  }
+
   // Sort by final price
   return results.sort((a, b) => a.finalPrice - b.finalPrice);
 }
