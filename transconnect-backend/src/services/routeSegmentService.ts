@@ -75,10 +75,12 @@ export async function searchRoutesWithSegments(
         rs1.segment_order as start_order,
         rs2.segment_order as end_order
       FROM routes r
+      JOIN operators o ON o.id = r."operatorId"
       JOIN route_segments rs1 ON rs1.route_id = r.id
       JOIN route_segments rs2 ON rs2.route_id = r.id
       WHERE r.active = true
         AND r.segment_enabled = true
+        AND o.approved = true
         AND rs1.from_location ILIKE ${`%${origin}%`}
         AND rs2.to_location ILIKE ${`%${destination}%`}
         AND rs1.segment_order <= rs2.segment_order
@@ -188,7 +190,6 @@ export async function materializeLegacyViaRoutes(): Promise<void> {
   const routes = await prisma.route.findMany({
     where: {
       active: true,
-      via: { not: null },
       OR: [
         { stops: { none: {} } },
         { segments: { none: {} } },
