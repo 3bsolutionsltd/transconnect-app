@@ -18,6 +18,12 @@ jest.mock('../../src/lib/prisma', () => ({
     user: {
       findUnique: jest.fn(),
     },
+    role: {
+      findUnique: jest.fn(),
+    },
+    rolePermission: {
+      findMany: jest.fn(),
+    },
   },
 }));
 

@@ -44,7 +44,13 @@ export const mockPrisma = {
   operator: {
     findMany: jest.fn(),
     create: jest.fn(),
-  }
+  },
+  role: {
+    findUnique: jest.fn(),
+  },
+  rolePermission: {
+    findMany: jest.fn(),
+  },
 };
 
 // Test utilities
