@@ -1,6 +1,6 @@
 'use client';
 
-import React, { Suspense, useMemo, useState } from 'react';
+import React, { Suspense, useMemo, useRef, useState } from 'react';
 import { fetchRoutes } from '../../lib/api';
 import Link from 'next/link';
 import Header from '@/components/Header';
@@ -49,6 +49,7 @@ function SearchContent() {
   const [passengers, setPassengers] = useState(Number(searchParams.get('passengers') || 1));
   const [routes, setRoutes] = useState<any[]>([]);
   const [loading, setLoading] = useState(false);
+  const searchRequestRef = useRef(0);
 
   const [maxPrice, setMaxPrice] = useState<number | null>(null);
   const [minPrice, setMinPrice] = useState(0);
@@ -129,6 +130,7 @@ function SearchContent() {
 
   async function handleSearch(e?: React.FormEvent) {
     if (e) e.preventDefault();
+    const requestId = ++searchRequestRef.current;
     setLoading(true);
     try {
       const params: any = {};
@@ -136,6 +138,8 @@ function SearchContent() {
       if (destination) params.destination = destination;
       if (date) params.travelDate = date;
       const result = await fetchRoutes(params);
+      if (requestId !== searchRequestRef.current) return;
+
       const normalizedRoutes = result || [];
       setRoutes(normalizedRoutes);
 
@@ -155,12 +159,14 @@ function SearchContent() {
         setMaxPrice(null);
       }
     } catch {
+      if (requestId !== searchRequestRef.current) return;
+
       setRoutes([]);
       setMinPrice(0);
       setPriceCeiling(80000);
       setMaxPrice(null);
     } finally {
-      setLoading(false);
+      if (requestId === searchRequestRef.current) setLoading(false);
     }
   }
 
