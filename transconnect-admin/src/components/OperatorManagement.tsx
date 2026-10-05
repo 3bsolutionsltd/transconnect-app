@@ -92,7 +92,7 @@ const OperatorManagement: React.FC = () => {
   const fetchOperators = useCallback(async () => {
     try {
       const token = localStorage.getItem('admin_token');
-      const response = await fetch(`${API_BASE_URL}/operators`, {
+      const response = await fetch(`${API_BASE_URL}/operators/admin/all`, {
         headers: {
           'Authorization': `Bearer ${token}`,
           'Content-Type': 'application/json'

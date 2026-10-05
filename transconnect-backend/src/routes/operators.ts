@@ -8,6 +8,70 @@ const router = Router();
 
 const FIELD_OPERATOR_VIEW_ROLES = ['MASTER_FIELD_OPERATOR', 'ADMIN', 'MANAGER'];
 
+// Admin operator management: include pending operators and inactive fleet records.
+router.get('/admin/all', authenticateToken, async (req: Request, res: Response) => {
+  try {
+    const userRole = (req as any).user.role;
+    if (userRole !== 'ADMIN') {
+      return res.status(403).json({ error: 'Only administrators can view all operators' });
+    }
+
+    const operators = await prisma.operator.findMany({
+      include: {
+        user: {
+          select: {
+            id: true,
+            firstName: true,
+            lastName: true,
+            email: true,
+            phone: true,
+          },
+        },
+        managingAgent: {
+          select: {
+            id: true,
+            name: true,
+            phone: true,
+            email: true,
+            referralCode: true,
+            status: true,
+          },
+        },
+        buses: {
+          select: {
+            id: true,
+            plateNumber: true,
+            model: true,
+            capacity: true,
+            active: true,
+          },
+        },
+        routes: {
+          select: {
+            id: true,
+            origin: true,
+            destination: true,
+            price: true,
+            active: true,
+          },
+        },
+      },
+      orderBy: {
+        createdAt: 'desc',
+      },
+    });
+
+    return res.json({
+      success: true,
+      count: operators.length,
+      operators,
+    });
+  } catch (error) {
+    console.error('Error fetching all operators for admin:', error);
+    return res.status(500).json({ error: 'Failed to fetch operators' });
+  }
+});
+
 // Master field operator view: all operators with company, contact, and status summary
 router.get('/field-ops/all', authenticateToken, async (req: Request, res: Response) => {
   try {
