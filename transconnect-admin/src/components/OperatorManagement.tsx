@@ -165,9 +165,18 @@ const OperatorManagement: React.FC = () => {
         resetOperatorForm();
         setShowAddOperatorModal(false);
       } else {
-        const error = await response.json();
+        const error: {
+          error?: string;
+          details?: Array<{ field?: string; message?: string }>;
+        } = await response.json();
         console.error('Error saving operator:', error);
-        alert(error.error || 'Failed to save operator');
+        const details = Array.isArray(error.details)
+          ? error.details
+              .map(({ field, message }) => [field, message].filter(Boolean).join(': '))
+              .filter(Boolean)
+              .join('\n')
+          : '';
+        alert([error.error || 'Failed to save operator', details].filter(Boolean).join('\n'));
       }
     } catch (error) {
       console.error('Error saving operator:', error);
@@ -992,9 +1001,14 @@ const OperatorManagement: React.FC = () => {
                     type="tel"
                     value={operatorFormData.phone}
                     onChange={(e) => setOperatorFormData({...operatorFormData, phone: e.target.value})}
+                    placeholder="+256 712 345 678 or 0712 345 678"
+                    autoComplete="tel"
                     className="w-full px-3 py-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-blue-500 focus:border-transparent"
                     required
                   />
+                  <p className="mt-1 text-xs text-gray-500">
+                    Enter one valid phone number, with or without Uganda's country code.
+                  </p>
                 </div>
               </div>
 
