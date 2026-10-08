@@ -144,10 +144,6 @@ export async function searchRoutesWithSegments(
         (sum, seg) => sum + Number(seg.basePrice),
         0
       );
-      const finalPrice = segmentPrices.reduce(
-        (sum, calc) => sum + calc.finalPrice,
-        0
-      );
 
       results.push({
         routeId: route.id,
@@ -158,7 +154,7 @@ export async function searchRoutesWithSegments(
         totalDistance,
         totalDuration,
         basePrice,
-        finalPrice: Math.round(finalPrice), // Round to nearest UGX
+        finalPrice: Number(route.price),
         segments: segmentPrices,
         departureTime: route.departureTime,
         busInfo: {
@@ -225,7 +221,7 @@ export async function searchRoutesWithSegments(
       totalDistance: distance * selectedLegs,
       totalDuration: duration * selectedLegs,
       basePrice: basePrice * selectedLegs,
-      finalPrice: Math.round(basePrice * selectedLegs),
+      finalPrice: Number(route.price),
       segments: fallbackSegments,
       departureTime: route.departureTime,
       busInfo: {
