@@ -774,26 +774,33 @@ router.post('/', [
     let finalPrice = route.price;
     let boarding: any = null;
     let alighting: any = null;
+    let bookingBoardingStop: string | null = null;
+    let bookingAlightingStop: string | null = null;
 
     if (boardingStop || alightingStop) {
-      if (!boardingStop || !alightingStop || route.stops.length === 0) {
+      if (!boardingStop || !alightingStop) {
         return res.status(400).json({
-          error: 'Boarding and alighting stops are not configured for this route'
+          error: 'Both boarding and alighting stops are required'
         });
       }
 
-      boarding = route.stops.find(stop => stop.stopName === boardingStop);
-      alighting = route.stops.find(stop => stop.stopName === alightingStop);
+      const normalizeStopName = (name: string) => name.trim().toLocaleLowerCase();
+      boarding = route.stops.find(stop => normalizeStopName(stop.stopName) === normalizeStopName(boardingStop));
+      alighting = route.stops.find(stop => normalizeStopName(stop.stopName) === normalizeStopName(alightingStop));
 
       if (!boarding || !alighting) {
-        return res.status(400).json({ error: 'Invalid boarding or alighting stop' });
-      }
+        // Older mobile clients submit search labels, not configured route-stop names.
+        // Never guess a segment fare; unmatched labels use the full route fare.
+        console.warn('Booking stop labels did not match route stops; using full-route fare', { routeId });
+      } else {
+        if (boarding.order >= alighting.order) {
+          return res.status(400).json({ error: 'Boarding stop must be before alighting stop' });
+        }
 
-      if (boarding.order >= alighting.order) {
-        return res.status(400).json({ error: 'Boarding stop must be before alighting stop' });
+        finalPrice = alighting.priceFromOrigin - boarding.priceFromOrigin;
+        bookingBoardingStop = boarding.stopName;
+        bookingAlightingStop = alighting.stopName;
       }
-
-      finalPrice = alighting.priceFromOrigin - boarding.priceFromOrigin;
     }
 
     // Check seat availability
@@ -838,8 +845,8 @@ router.post('/', [
           travelDate: new Date(travelDate),
           qrCode: '',  // updated below once we have the booking ID
           totalAmount: finalPrice,
-          boardingStop: boardingStop || null,
-          alightingStop: alightingStop || null,
+          boardingStop: bookingBoardingStop,
+          alightingStop: bookingAlightingStop,
           actualPrice: finalPrice,
           status: 'PENDING'
         }
@@ -876,8 +883,8 @@ router.post('/', [
         userId: primaryBooking.userId,
         bookingId: primaryBooking.id,
         passengerName: `${primaryBooking.user.firstName} ${primaryBooking.user.lastName}`,
-        route: boardingStop && alightingStop 
-          ? `${boardingStop} to ${alightingStop}` 
+        route: bookingBoardingStop && bookingAlightingStop
+          ? `${bookingBoardingStop} to ${bookingAlightingStop}`
           : `${primaryBooking.route.origin} to ${primaryBooking.route.destination}`,
         date: primaryBooking.travelDate.toLocaleDateString(),
         time: primaryBooking.route.departureTime,
@@ -896,8 +903,8 @@ router.post('/', [
         totalSeats: seatNumbers.length,
         pricePerSeat: finalPrice,
         totalAmount: finalPrice * seatNumbers.length,
-        route: boardingStop && alightingStop 
-          ? `${boardingStop} → ${alightingStop}` 
+        route: bookingBoardingStop && bookingAlightingStop
+          ? `${bookingBoardingStop} → ${bookingAlightingStop}`
           : `${route.origin} → ${route.destination}`
       }
     });

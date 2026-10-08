@@ -200,6 +200,47 @@ describe('Booking Routes', () => {
       expect(mockPrisma.booking.create).toHaveBeenCalled();
     });
 
+    it('uses the full route fare when legacy stop labels do not match configured stops', async () => {
+      const mockRoute = {
+        ...testRoute,
+        stops: [
+          { stopName: 'Kampala Central', order: 1, priceFromOrigin: 0 },
+          { stopName: 'Entebbe Airport', order: 2, priceFromOrigin: 5000 },
+        ],
+        bookings: [],
+      };
+      const createdBooking = {
+        ...testBooking,
+        route: { ...mockRoute, bus: testRoute.bus, operator: testRoute.operator },
+        user: { id: 'test-user-id', firstName: 'Test', lastName: 'User' },
+      };
+
+      mockPrisma.route.findUnique.mockResolvedValue(mockRoute);
+      mockPrisma.booking.findFirst.mockResolvedValue(null);
+      mockPrisma.booking.create.mockResolvedValue(createdBooking);
+      mockPrisma.booking.findMany.mockResolvedValue([createdBooking]);
+
+      const response = await request(app)
+        .post('/bookings')
+        .set('Authorization', `Bearer ${testToken}`)
+        .send({
+          ...validBookingData,
+          boardingStop: 'Kampala',
+          alightingStop: 'Entebbe',
+        });
+
+      expect(response.status).toBe(201);
+      expect(response.body.summary.pricePerSeat).toBe(testRoute.price);
+      expect(mockPrisma.booking.create).toHaveBeenCalledWith(expect.objectContaining({
+        data: expect.objectContaining({
+          totalAmount: testRoute.price,
+          actualPrice: testRoute.price,
+          boardingStop: null,
+          alightingStop: null,
+        }),
+      }));
+    });
+
     it('should return 400 for missing required fields', async () => {
       const invalidData = { routeId: 'test-route-id' }; // missing seatNumbers and travelDate
 
