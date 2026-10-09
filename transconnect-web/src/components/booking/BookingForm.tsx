@@ -135,7 +135,6 @@ export default function BookingForm({ routeId, price, selectedSeats = [], defaul
       const bookingId = primaryBooking?.id || 'Unknown';
       
       notificationService.onBookingCreated(bookingId, routeDetails);
-      notificationService.onQrTicketReady(bookingId);
       
       if (onSuccess) onSuccess(result);
       

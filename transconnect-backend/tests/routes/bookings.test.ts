@@ -2,6 +2,7 @@ import request from 'supertest';
 import express from 'express';
 import bookingRoutes from '../../src/routes/bookings';
 import { prisma } from '../../src/lib/prisma';
+import { NotificationService } from '../../src/services/notification.service';
 
 jest.mock('../../src/lib/prisma', () => ({
   prisma: {
@@ -24,10 +25,29 @@ jest.mock('../../src/lib/prisma', () => ({
     rolePermission: {
       findMany: jest.fn(),
     },
+    payment: {
+      create: jest.fn(),
+      update: jest.fn(),
+    },
+    bookingLedgerEntry: {
+      create: jest.fn(),
+    },
+    $transaction: jest.fn(),
+  },
+}));
+
+jest.mock('../../src/services/notification.service', () => ({
+  NotificationService: {
+    getInstance: jest.fn(() => ({
+      sendBookingReceived: jest.fn(),
+      sendPaymentConfirmation: jest.fn(),
+      sendPaymentFailed: jest.fn(),
+    })),
   },
 }));
 
 const mockPrisma = prisma as any;
+const mockNotificationService = (NotificationService.getInstance as jest.Mock).mock.results[0].value;
 
 // Mock QRCode
 jest.mock('qrcode', () => ({
@@ -198,6 +218,11 @@ describe('Booking Routes', () => {
       expect(response.status).toBe(201);
       expect(response.body).toHaveProperty('bookings');
       expect(response.body.bookings[0]).toHaveProperty('id');
+      expect(mockNotificationService.sendBookingReceived).toHaveBeenCalledWith(expect.objectContaining({
+        userId: testUser.id,
+        bookingId: testBooking.id,
+        amount: testRoute.price,
+      }));
 
       expect(mockPrisma.route.findUnique).toHaveBeenCalledWith({
         where: { id: validBookingData.routeId },
@@ -244,6 +269,34 @@ describe('Booking Routes', () => {
           boardingStop: null,
           alightingStop: null,
         }),
+      }));
+    });
+
+    it('sends payment confirmation only after an operator confirms cash payment', async () => {
+      mockPrisma.user.findUnique.mockResolvedValueOnce({
+        id: 'test-user-id',
+        email: 'test@example.com',
+        role: 'ADMIN',
+        verified: true,
+      });
+      mockPrisma.booking.findUnique.mockResolvedValue({
+        ...testBooking,
+        user: { firstName: 'Test', lastName: 'User' },
+        payment: { id: 'cash-payment-id', method: 'CASH', reference: 'CASH-123' },
+        route: { operatorId: 'test-operator-id' },
+      });
+      mockPrisma.$transaction.mockResolvedValue([]);
+
+      const response = await request(app)
+        .post('/bookings/admin/confirm-payment/test-booking-id')
+        .set('Authorization', `Bearer ${testToken}`);
+
+      expect(response.status).toBe(200);
+      expect(mockNotificationService.sendPaymentConfirmation).toHaveBeenCalledWith(expect.objectContaining({
+        userId: testBooking.userId,
+        bookingId: testBooking.id,
+        method: 'Cash Payment',
+        transactionId: 'CASH-123',
       }));
     });
 

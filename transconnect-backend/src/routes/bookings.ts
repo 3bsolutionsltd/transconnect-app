@@ -437,7 +437,11 @@ router.post('/admin/confirm-payment/:bookingId', authenticateToken, async (req: 
 
     const booking = await prisma.booking.findUnique({
       where: { id: bookingId },
-      include: { payment: true, route: { select: { operatorId: true } } },
+      include: {
+        payment: true,
+        route: { select: { operatorId: true } },
+        user: { select: { firstName: true, lastName: true } },
+      },
     });
     if (!booking) return res.status(404).json({ error: 'Booking not found' });
 
@@ -453,6 +457,9 @@ router.post('/admin/confirm-payment/:bookingId', authenticateToken, async (req: 
       return res.status(400).json({ error: 'Only cash bookings can be confirmed with this action' });
     }
 
+    const paymentReference = booking.payment?.reference ||
+      `CASH-${booking.id.slice(-6).toUpperCase()}-${Date.now().toString().slice(-6)}`;
+
     await prisma.$transaction([
       prisma.booking.update({ where: { id: bookingId }, data: { status: 'CONFIRMED' } }),
       ...(booking.payment
@@ -465,7 +472,7 @@ router.post('/admin/confirm-payment/:bookingId', authenticateToken, async (req: 
                 amount: booking.totalAmount,
                 method: 'CASH',
                 status: 'COMPLETED',
-                reference: `CASH-${booking.id.slice(-6).toUpperCase()}-${Date.now().toString().slice(-6)}`,
+                reference: paymentReference,
               },
             }),
           ]),
@@ -480,6 +487,19 @@ router.post('/admin/confirm-payment/:bookingId', authenticateToken, async (req: 
         },
       }),
     ]);
+
+    try {
+      await notificationService.sendPaymentConfirmation({
+        userId: booking.userId,
+        bookingId: booking.id,
+        passengerName: `${booking.user.firstName} ${booking.user.lastName}`,
+        amount: booking.totalAmount,
+        method: 'Cash Payment',
+        transactionId: paymentReference,
+      });
+    } catch (notificationError) {
+      console.error('Error sending cash payment confirmation:', notificationError);
+    }
 
     res.json({ success: true, message: 'Booking confirmed and payment marked complete' });
   } catch (error) {
@@ -879,7 +899,7 @@ router.post('/', [
     // Send booking confirmation notification for the primary passenger
     try {
       const primaryBooking = completeBookings[0];
-      await notificationService.sendBookingConfirmation({
+      await notificationService.sendBookingReceived({
         userId: primaryBooking.userId,
         bookingId: primaryBooking.id,
         passengerName: `${primaryBooking.user.firstName} ${primaryBooking.user.lastName}`,
@@ -890,7 +910,6 @@ router.post('/', [
         time: primaryBooking.route.departureTime,
         seatNumber: seatNumbers.join(', '),
         amount: finalPrice * seatNumbers.length,
-        qrCode: primaryBooking.id,
       });
     } catch (notificationError) {
       console.error('Error sending booking confirmation notification:', notificationError);

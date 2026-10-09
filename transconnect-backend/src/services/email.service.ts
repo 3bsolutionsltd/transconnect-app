@@ -99,6 +99,38 @@ export class EmailService {
     return this.sendEmail(to, template.subject, template.html, template.text);
   }
 
+  async sendBookingReceived(
+    to: string,
+    bookingData: {
+      bookingId: string;
+      passengerName: string;
+      route: string;
+      date: string;
+      time: string;
+      seatNumber: string;
+      amount: number;
+    }
+  ): Promise<{ success: boolean; messageId?: string; error?: string }> {
+    const subject = `Booking Received - Payment Pending - ${bookingData.bookingId}`;
+    const html = `
+      <h2>Booking received - payment pending</h2>
+      <p>Dear ${bookingData.passengerName},</p>
+      <p>Your booking request has been received. Payment is still pending, so your ticket is not yet confirmed.</p>
+      <ul>
+        <li><strong>Booking ID:</strong> ${bookingData.bookingId}</li>
+        <li><strong>Route:</strong> ${bookingData.route}</li>
+        <li><strong>Date:</strong> ${bookingData.date}</li>
+        <li><strong>Departure time:</strong> ${bookingData.time}</li>
+        <li><strong>Seat:</strong> ${bookingData.seatNumber}</li>
+        <li><strong>Amount due:</strong> UGX ${bookingData.amount.toLocaleString()}</li>
+      </ul>
+      <p>Complete payment to confirm your booking. If you selected cash, your booking will be confirmed after the operator records your payment.</p>
+    `;
+    const text = `Booking received - payment pending\n\nDear ${bookingData.passengerName},\n\nYour booking request has been received, but your ticket is not yet confirmed because payment is pending.\n\nBooking ID: ${bookingData.bookingId}\nRoute: ${bookingData.route}\nDate: ${bookingData.date}\nDeparture time: ${bookingData.time}\nSeat: ${bookingData.seatNumber}\nAmount due: UGX ${bookingData.amount.toLocaleString()}\n\nComplete payment to confirm your booking. If you selected cash, confirmation will follow after the operator records your payment.`;
+
+    return this.sendEmail(to, subject, html, text);
+  }
+
   /**
    * Send payment confirmation email
    */
