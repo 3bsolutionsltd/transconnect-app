@@ -73,14 +73,7 @@ router.get('/', async (req: Request, res: Response) => {
         segmentEnabled: true
       }));
 
-      // If segment search found results, return them
-      if (transformedRoutes.length > 0) {
-        console.log('Segment search found:', transformedRoutes.length, 'routes');
-        return res.json(transformedRoutes);
-      }
-
-      // Fall back to direct route search for routes without segments configured
-      console.log('Segment search empty, falling back to direct route search');
+      console.log('Checking direct routes for incomplete segment data');
       const directRoutes = await prisma.route.findMany({
         where: {
           active: true,
@@ -106,8 +99,15 @@ router.get('/', async (req: Request, res: Response) => {
         take: 50 // Limit to prevent overwhelming results
       });
       console.log('Direct route search found:', directRoutes.length, 'routes');
-      
-      return res.json(directRoutes);
+
+      const directRouteIds = new Set(directRoutes.map((route) => route.id));
+      const mergedRoutes = [
+        ...directRoutes,
+        ...transformedRoutes.filter((route) => !directRouteIds.has(route.id)),
+      ];
+
+      console.log('Returning combined route results:', mergedRoutes.length, 'routes');
+      return res.json(mergedRoutes);
     }
 
     // Otherwise, use legacy query for listing all routes

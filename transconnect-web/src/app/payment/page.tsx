@@ -20,7 +20,7 @@ function PaymentContent() {
   const [selectedMethod, setSelectedMethod] = useState('CASH');
   const [phoneNumber, setPhoneNumber] = useState('');
   const [processing, setProcessing] = useState(false);
-  const [paymentStatus, setPaymentStatus] = useState<'pending' | 'processing' | 'success' | 'failed'>('pending');
+  const [paymentStatus, setPaymentStatus] = useState<'pending' | 'processing' | 'registered' | 'success' | 'failed'>('pending');
   const [paymentId, setPaymentId] = useState<string | null>(null);
   const [errorMessage, setErrorMessage] = useState<string>('');
 
@@ -109,7 +109,7 @@ function PaymentContent() {
         
         // Cash flow remains pending until operator marks it paid.
         if (selectedMethod === 'CASH' && response.status === 'PENDING') {
-          setPaymentStatus('success');
+          setPaymentStatus('registered');
           notificationService.showSuccess('Cash Payment Registered', 'Please pay at the operator office or boarding point.');
 
           setTimeout(() => {
@@ -132,6 +132,7 @@ function PaymentContent() {
           // Show payment success notification
           const paymentMethodName = paymentMethods.find(m => m.id === selectedMethod)?.name || selectedMethod;
           notificationService.onPaymentSuccess(bookingData.totalAmount, paymentMethodName);
+          notificationService.onQrTicketReady(bookingData.id);
           
           // Wait a moment to show success, then redirect
           setTimeout(() => {
@@ -148,10 +149,7 @@ function PaymentContent() {
           }, 2000);
         } else {
           // Payment is still pending, could implement polling here
-          const errorMsg = 'Payment is still processing. Please check back later.';
-          setErrorMessage(errorMsg);
-          setPaymentStatus('failed');
-          notificationService.onPaymentFailed(errorMsg);
+          setPaymentStatus('processing');
         }
       } else {
         const errorMsg = 'Payment failed. Please try again.';
@@ -189,6 +187,8 @@ function PaymentContent() {
     switch (paymentStatus) {
       case 'processing':
         return <Clock className="h-8 w-8 text-blue-500 animate-pulse" />;
+      case 'registered':
+        return <Clock className="h-8 w-8 text-amber-500" />;
       case 'success':
         return <CheckCircle className="h-8 w-8 text-green-500" />;
       case 'failed':
@@ -202,6 +202,8 @@ function PaymentContent() {
     switch (paymentStatus) {
       case 'processing':
         return 'Processing your payment...';
+      case 'registered':
+        return 'Cash payment registered. Your booking will be confirmed after the operator verifies payment.';
       case 'success':
         return 'Payment successful! Redirecting...';
       case 'failed':

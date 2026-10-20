@@ -161,7 +161,13 @@ export default function BookingDetailsPage() {
   }
 
   const statusVariant =
-    booking.status === 'CONFIRMED' ? 'success' : booking.status === 'PENDING' ? 'warning' : 'error';
+    booking.status === 'CONFIRMED' || booking.status === 'COMPLETED'
+      ? 'success'
+      : booking.status === 'PENDING'
+        ? 'warning'
+        : 'error';
+  const isBookingConfirmed = booking.status === 'CONFIRMED' || booking.status === 'COMPLETED';
+  const isPaymentConfirmed = booking.payment?.status === 'COMPLETED';
   const busModel = booking.route?.bus?.model || 'Standard Bus';
   const routeAmenities = parseAmenities(booking.route?.bus?.amenities).slice(0, 4);
 
@@ -175,11 +181,27 @@ export default function BookingDetailsPage() {
 
         <div className="grid grid-cols-1 lg:grid-cols-[1fr_340px] gap-4">
           <main className="space-y-4">
-            <StyledCard hover={false} className="!p-5 bg-[#0f9f6f] text-white">
+            <StyledCard
+              hover={false}
+              className={`!p-5 ${isBookingConfirmed ? 'bg-[#0f9f6f]' : 'bg-amber-600'} text-white`}
+            >
               <div className="flex items-center justify-between">
                 <div>
-                  <h1 className="text-3xl font-black">Booking Confirmed</h1>
-                  <p className="text-white/85 text-sm mt-1">Your ticket is ready • Booking ID: #{booking.id.slice(-8).toUpperCase()}</p>
+                  <h1 className="text-3xl font-black">
+                    {isBookingConfirmed
+                      ? 'Booking Confirmed'
+                      : isPaymentConfirmed
+                        ? 'Confirmation Pending'
+                        : 'Payment Pending'}
+                  </h1>
+                  <p className="text-white/85 text-sm mt-1">
+                    {isBookingConfirmed
+                      ? 'Your ticket is ready'
+                      : isPaymentConfirmed
+                        ? 'Payment was received; booking confirmation is being finalized'
+                        : 'Your booking will be confirmed after payment'}
+                    {' • Booking ID: #'}{booking.id.slice(-8).toUpperCase()}
+                  </p>
                 </div>
                 <div className="text-right text-xs">
                   <p className="uppercase">Booked On</p>
@@ -191,7 +213,15 @@ export default function BookingDetailsPage() {
             <StyledCard hover={false} className="!p-0 overflow-hidden">
               <div className="px-5 py-4 border-b border-[#ebf1f8] flex items-center justify-between">
                 <h2 className="text-2xl font-black text-[#14263f]">Trip Details</h2>
-                <Badge variant={statusVariant}>Confirmed</Badge>
+                <Badge variant={statusVariant}>
+                  {isBookingConfirmed
+                    ? 'Confirmed'
+                    : isPaymentConfirmed
+                      ? 'Confirmation Pending'
+                      : booking.status === 'PENDING'
+                        ? 'Payment Pending'
+                        : booking.status}
+                </Badge>
               </div>
 
               <div className="p-5">
@@ -241,8 +271,15 @@ export default function BookingDetailsPage() {
               <div className="p-5 divide-y divide-[#edf2f9]">
                 <div className="py-2 flex justify-between text-sm"><span className="text-[#8ca4c4]">Ticket Price</span><span className="font-semibold">UGX {booking.totalAmount.toLocaleString()}</span></div>
                 <div className="py-2 flex justify-between text-sm"><span className="text-[#8ca4c4]">Service Fee</span><span className="font-semibold">UGX 2,000</span></div>
-                <div className="py-2 flex justify-between text-2xl font-black text-[#0f8c6b]"><span>Total Paid</span><span>UGX {booking.totalAmount.toLocaleString()}</span></div>
-                {booking.payment && <div className="py-2 text-xs text-[#0f8c6b]">Paid via {booking.payment.method} • Ref: {booking.payment.reference}</div>}
+                <div className="py-2 flex justify-between text-2xl font-black text-[#0f8c6b]">
+                  <span>{isPaymentConfirmed ? 'Total Paid' : 'Amount Due'}</span>
+                  <span>UGX {booking.totalAmount.toLocaleString()}</span>
+                </div>
+                {booking.payment && (
+                  <div className="py-2 text-xs text-[#0f8c6b]">
+                    {isPaymentConfirmed ? 'Paid' : 'Payment pending'} via {booking.payment.method} • Ref: {booking.payment.reference}
+                  </div>
+                )}
               </div>
             </StyledCard>
           </main>
@@ -263,12 +300,15 @@ export default function BookingDetailsPage() {
                 <p className="text-4xl font-black">#{booking.id.slice(-8).toUpperCase()}</p>
               </div>
               <div className="p-4 text-center">
-                {booking.qrCode ? (
+                {isBookingConfirmed && booking.qrCode ? (
                   <img src={booking.qrCode} alt="ticket qr code" className="w-44 h-44 mx-auto" />
                 ) : (
-                  <QrCode className="h-40 w-40 text-[#c8d5e8] mx-auto" />
+                  <div className="h-40 flex flex-col items-center justify-center gap-2 text-center">
+                    <QrCode className="h-16 w-16 text-[#c8d5e8] mx-auto" />
+                    <p className="text-sm text-[#6f86a7]">Ticket QR code will be available after payment is confirmed.</p>
+                  </div>
                 )}
-                <p className="text-xs text-[#8ca4c4] mt-3">Show this at boarding gate</p>
+                {isBookingConfirmed && <p className="text-xs text-[#8ca4c4] mt-3">Show this at boarding gate</p>}
               </div>
 
               <div className="grid grid-cols-3 border-t border-[#edf2f9] text-center py-3">

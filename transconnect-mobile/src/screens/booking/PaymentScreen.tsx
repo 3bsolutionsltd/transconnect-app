@@ -14,7 +14,7 @@ import {
 import { WebView } from 'react-native-webview';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
-import { bookingsApi } from '../../services/api';
+import { bookingsApi, paymentsApi } from '../../services/api';
 import { useAuth } from '../../contexts/AuthContext';
 import { offlineStorage } from '../../services/offlineStorage';
 import { notificationService } from '../../services/notificationService';
@@ -30,7 +30,9 @@ export default function PaymentScreen({ route, navigation }: any) {
   const [phoneNumber, setPhoneNumber] = useState('');
   const [loading, setLoading] = useState(false);
   const [showPaymentModal, setShowPaymentModal] = useState(false);
-  const [paymentStatus, setPaymentStatus] = useState<'pending' | 'success' | 'failed'>('pending');
+  const [paymentStatus, setPaymentStatus] = useState<'pending' | 'registered' | 'success' | 'failed'>('pending');
+  const [paymentId, setPaymentId] = useState<string | null>(null);
+  const [activeBooking, setActiveBooking] = useState<any>(existingBooking || null);
   const [showWebView, setShowWebView] = useState(false);
   const [pesapalUrl, setPesapalUrl] = useState('');
 
@@ -141,26 +143,18 @@ export default function PaymentScreen({ route, navigation }: any) {
         // Save booking to offline storage immediately
         await offlineStorage.saveBooking(createdBooking);
       }
+      setActiveBooking(createdBooking);
       
       // Handle cash payments differently - no payment API call needed
       if (selectedMethod === 'cash') {
-        setPaymentStatus('success');
+        setPaymentStatus('registered');
         setLoading(false);
 
-        // Send booking confirmation notification
-        await notificationService.sendBookingConfirmation(
+        await notificationService.sendBookingReceived(
           searchParams.from,
           searchParams.to,
           format(new Date(travelDate), 'MMM dd, yyyy'),
           createdBooking.id.slice(0, 8)
-        );
-
-        // Schedule trip reminder
-        await notificationService.scheduleTripReminder(
-          travelDate,
-          searchParams.from,
-          searchParams.to,
-          routeData.departureTime
         );
 
         setTimeout(() => {
@@ -185,6 +179,7 @@ export default function PaymentScreen({ route, navigation }: any) {
 
       // Call payment API
       const paymentResponse = await bookingsApi.initiatePayment(paymentData);
+      setPaymentId(paymentResponse.data.paymentId || null);
       
       // Check if we have a checkout URL (PesaPal redirect flow)
       if (paymentResponse.data.checkoutUrl) {
@@ -237,7 +232,7 @@ export default function PaymentScreen({ route, navigation }: any) {
       } else {
         // Payment is pending - this shouldn't normally happen without checkoutUrl
         console.warn('⚠️ Payment initiated but no checkout URL provided');
-        setPaymentStatus('success');
+        setPaymentStatus('registered');
         setLoading(false);
 
         setTimeout(() => {
@@ -247,6 +242,7 @@ export default function PaymentScreen({ route, navigation }: any) {
             route: routeData,
             searchParams,
             paymentRef: paymentResponse.data.paymentReference,
+            isPaymentPending: true,
           });
         }, 1500);
       }
@@ -487,6 +483,17 @@ export default function PaymentScreen({ route, navigation }: any) {
                 <Text style={styles.modalText}>Your booking has been confirmed</Text>
               </>
             )}
+            {paymentStatus === 'registered' && (
+              <>
+                <Ionicons name="time-outline" size={64} color="#F59E0B" />
+                <Text style={styles.modalTitle}>Booking Received</Text>
+                <Text style={styles.modalText}>
+                  {selectedMethod === 'cash'
+                    ? 'Payment is pending. Your booking will be confirmed after the operator records your cash payment.'
+                    : 'Payment is still pending. Your booking will be confirmed when payment is verified.'}
+                </Text>
+              </>
+            )}
             {paymentStatus === 'failed' && (
               <>
                 <View style={styles.errorIcon}>
@@ -555,7 +562,7 @@ export default function PaymentScreen({ route, navigation }: any) {
           {pesapalUrl ? (
             <WebView
               source={{ uri: pesapalUrl }}
-              onNavigationStateChange={(navState) => {
+              onNavigationStateChange={async (navState) => {
                 console.log('📱 WebView navigation:', navState.url);
                 
                 // Check if payment was completed or cancelled based on callback URL
@@ -563,26 +570,41 @@ export default function PaymentScreen({ route, navigation }: any) {
                     navState.url.includes('/payment/success') ||
                     navState.url.includes('transconnect.app/callback')) {
                   
-                  // Extract payment reference or status from URL
-                  const urlParams = new URLSearchParams(navState.url.split('?')[1]);
-                  const status = urlParams.get('status') || urlParams.get('OrderTrackingId');
-                  
-                  console.log('✅ Payment callback detected:', status);
-                  
                   setShowWebView(false);
                   setPesapalUrl('');
-                  
-                  // Show success modal briefly then navigate
                   setShowPaymentModal(true);
-                  setPaymentStatus('success');
+
+                  let paymentConfirmed = false;
+                  let paymentFailed = false;
+                  let paymentReference = paymentId || 'PESAPAL-PENDING';
+                  if (paymentId) {
+                    try {
+                      const paymentStatusResponse = await paymentsApi.getPaymentStatus(paymentId);
+                      paymentConfirmed = paymentStatusResponse.data.status === 'COMPLETED';
+                      paymentFailed = paymentStatusResponse.data.status === 'FAILED';
+                      paymentReference = paymentStatusResponse.data.reference || paymentReference;
+                    } catch (error) {
+                      console.error('Unable to verify PesaPal payment status:', error);
+                    }
+                  } else {
+                    console.error('Cannot verify PesaPal payment: payment ID is unavailable.');
+                  }
+
+                  setPaymentStatus(paymentConfirmed ? 'success' : paymentFailed ? 'failed' : 'registered');
                   
                   setTimeout(() => {
                     setShowPaymentModal(false);
+                    if (paymentFailed) {
+                      Alert.alert('Payment Failed', 'Your payment was not completed. Please try again.');
+                      return;
+                    }
+
                     navigation.navigate('BookingConfirmation', {
-                      booking: route.params.booking || { id: 'PENDING' },
+                      booking: activeBooking || existingBooking || { id: 'PENDING' },
                       route: routeData,
                       searchParams,
-                      paymentRef: status || 'PESAPAL-PENDING',
+                      paymentRef: paymentReference,
+                      isPaymentPending: !paymentConfirmed,
                     });
                   }, 1500);
                 } else if (navState.url.includes('/payment/cancel') || 

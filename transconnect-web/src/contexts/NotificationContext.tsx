@@ -120,9 +120,9 @@ export function useNotifications() {
 // Predefined notification templates for common actions
 export const NotificationTemplates = {
   bookingCreated: (bookingId: string, routeDetails: string) => ({
-    type: 'success' as const,
-    title: 'Booking Confirmed! 🎉',
-    message: `Your booking for ${routeDetails} has been created successfully. Booking ID: ${bookingId}`,
+    type: 'info' as const,
+    title: 'Booking Received - Payment Pending',
+    message: `Your booking for ${routeDetails} has been received. Complete payment to confirm it. Booking ID: ${bookingId}`,
     persistent: true,
     action: {
       label: 'View Booking',

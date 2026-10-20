@@ -152,6 +152,40 @@ export class NotificationService {
   }
 
   /**
+   * Send a booking received notification while payment is still pending
+   */
+  async sendBookingReceived(bookingData: {
+    userId: string;
+    bookingId: string;
+    passengerName: string;
+    route: string;
+    date: string;
+    time: string;
+    seatNumber: string;
+    amount: number;
+  }): Promise<void> {
+    await this.sendNotification({
+      userId: bookingData.userId,
+      type: 'BOOKING_CONFIRMATION',
+      channels: ['EMAIL', 'SMS', 'PUSH', 'IN_APP'],
+      title: 'Booking Received - Payment Pending',
+      body: `Your booking for ${bookingData.route} on ${bookingData.date} has been received. Payment is pending; your ticket will be confirmed after payment.`,
+      subject: `Booking Received - Payment Pending - ${bookingData.bookingId}`,
+      data: {
+        bookingId: bookingData.bookingId,
+        passengerName: bookingData.passengerName,
+        route: bookingData.route,
+        date: bookingData.date,
+        time: bookingData.time,
+        seatNumber: bookingData.seatNumber,
+        amount: bookingData.amount.toString(),
+        paymentStatus: 'PENDING',
+        bookingStatus: 'PENDING',
+      },
+    });
+  }
+
+  /**
    * Send booking confirmation notification
    */
   async sendBookingConfirmation(bookingData: {
@@ -309,6 +343,18 @@ export class NotificationService {
   ): Promise<{ success: boolean; messageId?: string; error?: string }> {
     // Use specific email methods for better templates
     if (data.type === 'BOOKING_CONFIRMATION' && data.data) {
+      if (data.data.paymentStatus === 'PENDING') {
+        return await this.emailService.sendBookingReceived(email, {
+          bookingId: data.data.bookingId,
+          passengerName: data.data.passengerName || 'Passenger',
+          route: data.data.route,
+          date: data.data.date,
+          time: data.data.time,
+          seatNumber: data.data.seatNumber,
+          amount: parseInt(data.data.amount),
+        });
+      }
+
       return await this.emailService.sendBookingConfirmation(email, {
         bookingId: data.data.bookingId,
         passengerName: data.data.passengerName || 'Passenger',
@@ -360,6 +406,13 @@ export class NotificationService {
       switch (data.type) {
         case 'BOOKING_CONFIRMATION':
           if (data.data) {
+            if (data.data.paymentStatus === 'PENDING') {
+              return await this.smsService.sendSMS({
+                phoneNumber,
+                message: `TransConnect booking received - payment pending.\nBooking ID: ${data.data.bookingId}\nRoute: ${data.data.route}\nDate: ${data.data.date}\nSeat: ${data.data.seatNumber}\nAmount due: UGX ${parseInt(data.data.amount).toLocaleString()}\nYour ticket will be confirmed after payment.`,
+              });
+            }
+
             return await this.smsService.sendBookingConfirmation(phoneNumber, data.data);
           }
           break;

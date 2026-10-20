@@ -11,6 +11,12 @@ jest.mock('../../src/lib/prisma', () => ({
       findFirst: jest.fn(),
       create: jest.fn(),
     },
+    role: {
+      findUnique: jest.fn(),
+    },
+    rolePermission: {
+      findMany: jest.fn(),
+    },
   }
 }));
 

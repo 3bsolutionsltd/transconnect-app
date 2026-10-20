@@ -59,6 +59,7 @@ describe('Complete Booking Flow Integration', () => {
     mockPrisma.booking.findMany.mockReset();
     mockPrisma.booking.create.mockReset();
     mockPrisma.booking.update.mockReset();
+    mockPrisma.route.findMany.mockReset();
   });
 
   describe('End-to-End Booking Process', () => {
@@ -97,6 +98,7 @@ describe('Complete Booking Flow Integration', () => {
         segments: []
       }];
       (searchRoutesWithSegments as jest.Mock).mockResolvedValueOnce(mockSegmentResult);
+      mockPrisma.route.findMany.mockResolvedValueOnce([]);
 
       const routesResponse = await request(app)
         .get('/routes')

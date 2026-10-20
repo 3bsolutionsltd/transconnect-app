@@ -3,7 +3,7 @@ import React, { useEffect, useState } from 'react';
 import { Suspense } from 'react';
 import { useSearchParams, useRouter } from 'next/navigation';
 import Link from 'next/link';
-import { CheckCircle, Download, Printer, Calendar, MapPin, User } from 'lucide-react';
+import { CheckCircle, Clock, Download, Printer, Calendar, MapPin, User } from 'lucide-react';
 import { useAuth } from '@/contexts/AuthContext';
 import { Container, Heading, Lead, Section, StyledButton, StyledCard } from '@/components/styled';
 import PortalFooter from '@/components/PortalFooter';
@@ -84,6 +84,10 @@ function BookingSuccessContent() {
     window.print();
   };
 
+  const isPaymentConfirmed = booking?.paymentStatus === 'COMPLETED' ||
+    booking?.status === 'CONFIRMED' ||
+    booking?.status === 'COMPLETED';
+
   if (loading) {
     return (
       <div className="min-h-screen bg-gray-50 flex items-center justify-center">
@@ -119,9 +123,21 @@ function BookingSuccessContent() {
               wordmarkClassName="text-2xl"
             />
           </div>
-          <CheckCircle className="h-16 w-16 text-[#00D9A3] mx-auto mb-4" />
-          <Heading as="h3" className="text-gray-900 mb-2">Booking Confirmed!</Heading>
-          <Lead className="text-gray-600 text-base">Your ticket has been generated successfully</Lead>
+          {isPaymentConfirmed ? (
+            <CheckCircle className="h-16 w-16 text-[#00D9A3] mx-auto mb-4" />
+          ) : (
+            <Clock className="h-16 w-16 text-amber-500 mx-auto mb-4" />
+          )}
+          <Heading as="h3" className="text-gray-900 mb-2">
+            {isPaymentConfirmed ? 'Booking Confirmed!' : 'Booking Received'}
+          </Heading>
+          <Lead className="text-gray-600 text-base">
+            {isPaymentConfirmed
+              ? 'Your payment is confirmed and your ticket is ready.'
+              : booking.isCashPayment
+                ? 'Payment is pending. Your booking will be confirmed after the operator records your cash payment.'
+                : 'Payment is pending. Complete payment to confirm your booking and activate your ticket.'}
+          </Lead>
         </div>
 
         {/* Booking Details Card */}
@@ -164,37 +180,44 @@ function BookingSuccessContent() {
 
         {/* QR Code Card */}
         <StyledCard className="mb-6 text-center" hover={false}>
-          <h2 className="tc-heading-4 text-gray-900">Your Digital Ticket</h2>
+          <h2 className="tc-heading-4 text-gray-900">
+            {isPaymentConfirmed ? 'Your Digital Ticket' : 'Ticket Available After Payment'}
+          </h2>
           <div className="text-center mt-4">
             <div className="bg-white p-6 rounded-lg inline-block border-2 border-gray-200">
-              {booking.qrCode ? (
+              {isPaymentConfirmed && booking.qrCode ? (
                 <img 
                   src={booking.qrCode} 
                   alt="Booking QR Code" 
                   className="w-48 h-48 mx-auto"
                 />
               ) : (
-                <div className="w-48 h-48 bg-gray-100 flex items-center justify-center">
-                  <span className="text-gray-500">QR Code</span>
+                <div className="w-48 h-48 bg-gray-100 flex items-center justify-center p-4">
+                  <span className="text-center text-gray-600">
+                    {isPaymentConfirmed ? 'QR code unavailable' : 'Your boarding ticket will be available once payment is confirmed.'}
+                  </span>
                 </div>
               )}
             </div>
-            <p className="text-sm text-gray-600 mt-4 max-w-md mx-auto">
-              Show this QR code to the conductor when boarding. 
-              Keep this ticket safe and accessible on your phone.
-            </p>
+            {isPaymentConfirmed && (
+              <p className="text-sm text-gray-600 mt-4 max-w-md mx-auto">
+                Show this QR code to the conductor when boarding. Keep this ticket safe and accessible on your phone.
+              </p>
+            )}
             
             {/* Action Buttons */}
-            <div className="flex justify-center space-x-4 mt-6">
-              <StyledButton onClick={handleDownloadQR} variant="outline" size="sm" className="!px-5 !py-2.5">
-                <Download className="h-4 w-4 mr-2" />
-                Download QR
-              </StyledButton>
-              <StyledButton onClick={handlePrint} variant="outline" size="sm" className="!px-5 !py-2.5">
-                <Printer className="h-4 w-4 mr-2" />
-                Print Ticket
-              </StyledButton>
-            </div>
+            {isPaymentConfirmed && (
+              <div className="flex justify-center space-x-4 mt-6">
+                <StyledButton onClick={handleDownloadQR} variant="outline" size="sm" className="!px-5 !py-2.5">
+                  <Download className="h-4 w-4 mr-2" />
+                  Download QR
+                </StyledButton>
+                <StyledButton onClick={handlePrint} variant="outline" size="sm" className="!px-5 !py-2.5">
+                  <Printer className="h-4 w-4 mr-2" />
+                  Print Ticket
+                </StyledButton>
+              </div>
+            )}
           </div>
         </StyledCard>
 

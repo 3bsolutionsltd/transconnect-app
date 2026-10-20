@@ -16,7 +16,8 @@ import QRCode from 'react-native-qrcode-svg';
 import { notificationService } from '../../services/notificationService';
 
 export default function BookingConfirmationScreen({ route, navigation }: any) {
-  const { booking, route: routeData, searchParams, paymentRef, isCashPayment } = route.params;
+  const { booking, route: routeData, searchParams, paymentRef, isCashPayment, isPaymentPending } = route.params;
+  const isPendingPayment = isCashPayment || isPaymentPending;
   const [qrData, setQrData] = useState('');
 
   useEffect(() => {
@@ -32,9 +33,11 @@ export default function BookingConfirmationScreen({ route, navigation }: any) {
 
     // Schedule trip reminder notifications
     scheduleNotifications();
-  }, [booking]);
+  }, [booking, isPendingPayment]);
 
   const scheduleNotifications = async () => {
+    if (isPendingPayment) return;
+
     try {
       console.log('🔔 Scheduling trip notifications...');
       
@@ -56,7 +59,9 @@ export default function BookingConfirmationScreen({ route, navigation }: any) {
   const handleShare = async () => {
     try {
       await Share.share({
-        message: `TransConnect Booking\n\nRoute: ${searchParams.from} → ${searchParams.to}\nSeat: ${booking?.seatNumber}\nReference: ${paymentRef}\n\nShow this QR code when boarding.`,
+        message: isPendingPayment
+          ? `TransConnect Booking - Payment Pending\n\nRoute: ${searchParams.from} → ${searchParams.to}\nSeat: ${booking?.seatNumber}\nReference: ${paymentRef}\n\nYour booking will be confirmed after payment.`
+          : `TransConnect Booking\n\nRoute: ${searchParams.from} → ${searchParams.to}\nSeat: ${booking?.seatNumber}\nReference: ${paymentRef}\n\nShow this QR code when boarding.`,
       });
     } catch (error) {
       console.error('Error sharing:', error);
@@ -77,21 +82,29 @@ export default function BookingConfirmationScreen({ route, navigation }: any) {
       <ScrollView contentContainerStyle={styles.scrollContainer}>
         {/* Success Header */}
         <View style={styles.successHeader}>
-          <View style={styles.checkmarkCircle}>
-            <Ionicons name="checkmark" size={60} color="#FFFFFF" />
+          <View style={[styles.checkmarkCircle, isPendingPayment && styles.pendingCircle]}>
+            <Ionicons name={isPendingPayment ? 'time-outline' : 'checkmark'} size={60} color="#FFFFFF" />
           </View>
-          <Text style={styles.successTitle}>Booking Confirmed!</Text>
+          <Text style={styles.successTitle}>
+            {isPendingPayment ? 'Booking Received' : 'Booking Confirmed!'}
+          </Text>
           <Text style={styles.successSubtitle}>
-            {isCashPayment 
-              ? 'Please pay at our office or agent location'
+            {isPendingPayment
+              ? isCashPayment
+                ? 'Payment is pending. Your booking will be confirmed after the operator records your cash payment.'
+                : 'Payment is pending. Complete payment to confirm your booking.'
               : 'Your payment has been processed successfully'}
           </Text>
         </View>
 
         {/* QR Code Card */}
         <View style={styles.qrCard}>
-          <Text style={styles.qrTitle}>Your Ticket QR Code</Text>
-          <Text style={styles.qrSubtitle}>Show this when boarding</Text>
+          <Text style={styles.qrTitle}>
+            {isPendingPayment ? 'Reservation QR Code' : 'Your Ticket QR Code'}
+          </Text>
+          <Text style={styles.qrSubtitle}>
+            {isPendingPayment ? 'Not valid for boarding until payment is confirmed' : 'Show this when boarding'}
+          </Text>
           
           <View style={styles.qrContainer}>
             {qrData ? (
@@ -169,18 +182,20 @@ export default function BookingConfirmationScreen({ route, navigation }: any) {
             </View>
           </View>
 
-          {isCashPayment && (
+          {isPendingPayment && (
             <View style={styles.cashNotice}>
               <Ionicons name="information-circle" size={20} color="#F59E0B" />
               <Text style={styles.cashNoticeText}>
-                Please pay at our office before your travel date. Your booking will be confirmed upon payment.
+                {isCashPayment
+                  ? 'Please pay at the operator office or agent location. Your booking will be confirmed after the operator records your payment.'
+                  : 'Complete payment to confirm your booking. Your ticket will be available after payment.'}
               </Text>
             </View>
           )}
         </View>
 
         {/* Trip Reminder Info */}
-        <View style={styles.reminderInfo}>
+        {!isPendingPayment && <View style={styles.reminderInfo}>
           <Ionicons name="notifications-outline" size={20} color="#3B82F6" />
           <View style={styles.reminderTextContainer}>
             <Text style={styles.reminderTitle}>Trip Reminders Set</Text>
@@ -188,19 +203,23 @@ export default function BookingConfirmationScreen({ route, navigation }: any) {
               We'll notify you 1 day before and 2 hours before your departure time.
             </Text>
           </View>
-        </View>
+        </View>}
 
         {/* Action Buttons */}
         <View style={styles.actions}>
-          <TouchableOpacity style={styles.primaryButton} onPress={handleViewTicket}>
-            <Ionicons name="ticket-outline" size={20} color="#FFFFFF" />
-            <Text style={styles.primaryButtonText}>View Full Ticket</Text>
-          </TouchableOpacity>
+          {!isPendingPayment && (
+            <>
+              <TouchableOpacity style={styles.primaryButton} onPress={handleViewTicket}>
+                <Ionicons name="ticket-outline" size={20} color="#FFFFFF" />
+                <Text style={styles.primaryButtonText}>View Full Ticket</Text>
+              </TouchableOpacity>
 
-          <TouchableOpacity style={styles.secondaryButton} onPress={handleShare}>
-            <Ionicons name="share-social-outline" size={20} color="#3B82F6" />
-            <Text style={styles.secondaryButtonText}>Share Ticket</Text>
-          </TouchableOpacity>
+              <TouchableOpacity style={styles.secondaryButton} onPress={handleShare}>
+                <Ionicons name="share-social-outline" size={20} color="#3B82F6" />
+                <Text style={styles.secondaryButtonText}>Share Ticket</Text>
+              </TouchableOpacity>
+            </>
+          )}
 
           <TouchableOpacity 
             style={styles.outlineButton} 
@@ -235,6 +254,9 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     alignItems: 'center',
     marginBottom: 16,
+  },
+  pendingCircle: {
+    backgroundColor: '#F59E0B',
   },
   successTitle: {
     fontSize: 28,

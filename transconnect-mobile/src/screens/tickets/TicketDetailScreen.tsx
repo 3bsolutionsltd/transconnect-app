@@ -20,6 +20,7 @@ import ViewShot from 'react-native-view-shot';
 export default function TicketDetailScreen({ route, navigation }: any) {
   const { booking } = route.params;
   const viewShotRef = useRef<ViewShot>(null);
+  const isBookingConfirmed = booking.status === 'CONFIRMED' || booking.status === 'COMPLETED';
 
   const getStatusColor = (status: string) => {
     switch (status.toUpperCase()) {
@@ -121,7 +122,7 @@ Status: ${getStatusText(booking.status)}`;
         <TouchableOpacity onPress={() => navigation.goBack()} style={styles.backButton}>
           <Ionicons name="arrow-back" size={24} color="#1F2937" />
         </TouchableOpacity>
-        <Text style={styles.headerTitle}>Ticket Details</Text>
+        <Text style={styles.headerTitle}>{isBookingConfirmed ? 'Ticket Details' : 'Booking Details'}</Text>
         <View style={{ width: 24 }} />
       </View>
 
@@ -129,7 +130,9 @@ Status: ${getStatusText(booking.status)}`;
         <ViewShot ref={viewShotRef} options={{ format: 'jpg', quality: 0.9 }}>
           <View style={styles.ticketCard}>
             <View style={styles.ticketHeader}>
-              <Text style={styles.ticketTitle}>Your Ticket</Text>
+              <Text style={styles.ticketTitle}>
+                {isBookingConfirmed ? 'Your Ticket' : 'Booking Reservation'}
+              </Text>
               <View style={[
                 styles.statusBadge,
                 { backgroundColor: getStatusColor(booking.status) }
@@ -148,6 +151,11 @@ Status: ${getStatusText(booking.status)}`;
                 color="#000000"
               />
               <Text style={styles.ticketNumber}>#{booking.id.slice(0, 8).toUpperCase()}</Text>
+              {!isBookingConfirmed && (
+                <Text style={styles.instructionsText}>
+                  Payment is pending. This reservation code is not valid for boarding yet.
+                </Text>
+              )}
             </View>
 
           <View style={styles.ticketDetails}>
@@ -206,7 +214,7 @@ Status: ${getStatusText(booking.status)}`;
               <View style={styles.detailItem}>
                 <Ionicons name="card-outline" size={20} color="#6B7280" />
                 <View style={styles.detailContent}>
-                  <Text style={styles.detailLabel}>Amount Paid</Text>
+                  <Text style={styles.detailLabel}>{isBookingConfirmed ? 'Amount Paid' : 'Amount Due'}</Text>
                   <Text style={styles.detailValue}>UGX {(booking.totalAmount || 0).toLocaleString()}</Text>
                 </View>
               </View>
@@ -243,12 +251,13 @@ Status: ${getStatusText(booking.status)}`;
             </View>
           )}
 
-          {booking.status === 'PENDING' && booking.paymentMethod === 'CASH' && (
+          {booking.status === 'PENDING' && (
             <View style={[styles.instructions, { backgroundColor: '#FEF3C7' }]}>
               <Text style={[styles.instructionsTitle, { color: '#92400E' }]}>⏳ Payment Pending</Text>
               <Text style={[styles.instructionsText, { color: '#92400E' }]}>
-                Please complete your payment at the operator's office or designated payment point. Show this ticket to the cashier.{'\n\n'}
-                Your booking will be confirmed once payment is verified.
+                {booking.paymentMethod === 'CASH'
+                  ? "Please pay at the operator's office or designated payment point. Your booking will be confirmed once the operator verifies payment."
+                  : 'Your payment is being verified. Your booking will be confirmed once the payment provider confirms it.'}
               </Text>
             </View>
           )}

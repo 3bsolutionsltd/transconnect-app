@@ -244,6 +244,20 @@ class NotificationService {
     );
   }
 
+  async sendBookingReceived(
+    origin: string,
+    destination: string,
+    travelDate: string,
+    bookingRef: string
+  ): Promise<string | null> {
+    return await this.scheduleNotification(
+      'Booking Received - Payment Pending',
+      `Your trip from ${origin} to ${destination} has been reserved. Your ticket will be confirmed after payment. Ref: ${bookingRef}`,
+      null,
+      { type: 'booking_received', bookingRef, paymentStatus: 'PENDING' }
+    );
+  }
+
   /**
    * Send a payment success notification
    */
