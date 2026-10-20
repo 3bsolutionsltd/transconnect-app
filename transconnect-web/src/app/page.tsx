@@ -50,6 +50,9 @@ export default function HomePage() {
 
   const popular = [
     { text: 'Kampala -> Gulu', dest: 'Gulu', orig: 'Kampala' },
+    { text: 'Kampala -> Lira', dest: 'Lira', orig: 'Kampala' },
+    { text: 'Kampala -> Juba', dest: 'Juba', orig: 'Kampala' },
+    { text: 'Kampala -> Nairobi', dest: 'Nairobi', orig: 'Kampala' },
     { text: 'Kampala -> Mbarara', dest: 'Mbarara', orig: 'Kampala' },
     { text: 'Kampala -> Jinja', dest: 'Jinja', orig: 'Kampala' },
     { text: 'Kampala -> Mbale', dest: 'Mbale', orig: 'Kampala' },
