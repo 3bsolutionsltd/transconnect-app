@@ -81,8 +81,8 @@ export async function searchRoutesWithSegments(
       WHERE r.active = true
         AND r.segment_enabled = true
         AND o.approved = true
-        AND rs1.from_location ILIKE ${`%${origin}%`}
-        AND rs2.to_location ILIKE ${`%${destination}%`}
+        AND LOWER(TRIM(rs1.from_location)) = LOWER(TRIM(${origin.trim()}))
+        AND LOWER(TRIM(rs2.to_location)) = LOWER(TRIM(${destination.trim()}))
         AND rs1.segment_order <= rs2.segment_order
     )
     SELECT * FROM route_connections
@@ -185,7 +185,8 @@ export async function searchRoutesWithSegments(
   });
 
   const matchesLocation = (location: string, search: string) =>
-    location.toLowerCase().includes(search.trim().toLowerCase());
+    location.trim().replace(/\s+/g, ' ').toLowerCase() ===
+    search.trim().replace(/\s+/g, ' ').toLowerCase();
 
   for (const route of legacyRoutes) {
     if (results.some((result) => result.routeId === route.id)) continue;

@@ -11,7 +11,12 @@ const mockPrisma = {
 
 jest.mock('@prisma/client', () => ({
   PrismaClient: jest.fn(() => mockPrisma),
-  Prisma: { sql: jest.fn() },
+  Prisma: {
+    sql: jest.fn((strings: TemplateStringsArray, ...values: unknown[]) => ({
+      strings: [...strings],
+      values,
+    })),
+  },
 }));
 
 import { searchRoutesWithSegments } from '../../src/services/routeSegmentService';
@@ -56,6 +61,16 @@ describe('Route search display pricing', () => {
     expect(results).toHaveLength(1);
     expect(results[0].basePrice).toBe(60000);
     expect(results[0].finalPrice).toBe(configuredRoute.price);
+
+    const query = mockPrisma.$queryRaw.mock.calls[0][0] as {
+      strings: string[];
+      values: unknown[];
+    };
+    const sql = query.strings.join('?');
+    expect(sql).toContain('LOWER(TRIM(rs1.from_location)) = LOWER(TRIM(?))');
+    expect(sql).toContain('LOWER(TRIM(rs2.to_location)) = LOWER(TRIM(?))');
+    expect(query.values).toContain('Kampala');
+    expect(query.values).toContain('Masindi');
   });
 
   it('returns the configured route fare for legacy via-route results', async () => {
@@ -71,5 +86,22 @@ describe('Route search display pricing', () => {
 
     expect(results).toHaveLength(1);
     expect(results[0].finalPrice).toBe(configuredRoute.price);
+  });
+
+  it('does not match a search term inside a malformed legacy stop name', async () => {
+    mockPrisma.$queryRaw.mockResolvedValue([]);
+    mockPrisma.route.findMany
+      .mockResolvedValueOnce([])
+      .mockResolvedValueOnce([{
+        ...configuredRoute,
+        via: 'Gulu Hwy/Kampala-Masindi',
+      }]);
+
+    const results = await searchRoutesWithSegments({
+      origin: 'Kampala',
+      destination: 'Masindi',
+    });
+
+    expect(results).toHaveLength(0);
   });
 });
