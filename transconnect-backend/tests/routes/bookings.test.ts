@@ -299,7 +299,6 @@ describe('Booking Routes', () => {
         transactionId: 'CASH-123',
       }));
     });
-
     it('should return 400 for missing required fields', async () => {
       const invalidData = { routeId: 'test-route-id' }; // missing seatNumbers and travelDate
 
