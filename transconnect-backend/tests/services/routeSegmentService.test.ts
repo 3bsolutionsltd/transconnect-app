@@ -44,4 +44,42 @@ describe('Route segment search', () => {
     expect(query.values).toContain('Kampala');
     expect(query.values).toContain('Masindi');
   });
+
+  it('uses the configured route fare for the search result, not matched segment fares', async () => {
+    const configuredRoute = {
+      id: 'route-1',
+      origin: 'Kampala',
+      destination: 'Arua',
+      price: 50000,
+      distance: 300,
+      duration: 300,
+      departureTime: '08:00',
+      bus: { plateNumber: 'UBA 123A', model: 'Coach', capacity: 50 },
+      operator: { companyName: 'Test Coaches' },
+    };
+    mockPrisma.$queryRaw.mockResolvedValue([{
+      route_id: configuredRoute.id,
+      pickup: 'Kampala',
+      dropoff: 'Masindi',
+      start_order: 1,
+      end_order: 1,
+    }]);
+    mockPrisma.route.findUnique.mockResolvedValue(configuredRoute);
+    mockPrisma.routeSegment.findMany.mockResolvedValue([{
+      id: 'segment-1',
+      distanceKm: 100,
+      durationMinutes: 100,
+      basePrice: 16667,
+      priceVariations: [],
+    }]);
+
+    const results = await searchRoutesWithSegments({
+      origin: 'Kampala',
+      destination: 'Masindi',
+    });
+
+    expect(results).toHaveLength(1);
+    expect(results[0].segments[0].finalPrice).toBe(16667);
+    expect(results[0].finalPrice).toBe(configuredRoute.price);
+  });
 });
