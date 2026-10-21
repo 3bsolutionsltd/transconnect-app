@@ -77,8 +77,8 @@ export async function searchRoutesWithSegments(
       JOIN route_segments rs2 ON rs2.route_id = r.id
       WHERE r.active = true
         AND r.segment_enabled = true
-        AND rs1.from_location ILIKE ${`%${origin}%`}
-        AND rs2.to_location ILIKE ${`%${destination}%`}
+        AND LOWER(TRIM(rs1.from_location)) = LOWER(TRIM(${origin.trim()}))
+        AND LOWER(TRIM(rs2.to_location)) = LOWER(TRIM(${destination.trim()}))
         AND rs1.segment_order <= rs2.segment_order
     )
     SELECT * FROM route_connections

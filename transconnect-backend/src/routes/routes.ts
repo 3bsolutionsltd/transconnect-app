@@ -81,7 +81,7 @@ router.get('/', async (req: Request, res: Response) => {
 
       // Fall back to direct route search for routes without segments configured
       console.log('Segment search empty, falling back to direct route search');
-      const directRoutes = await prisma.route.findMany({
+      const candidateDirectRoutes = await prisma.route.findMany({
         where: {
           active: true,
           operator: { approved: true }, // Only show routes from approved operators
@@ -105,6 +105,12 @@ router.get('/', async (req: Request, res: Response) => {
         },
         take: 50 // Limit to prevent overwhelming results
       });
+      const normalizeLocation = (location: string) =>
+        location.trim().replace(/\s+/g, ' ').toLowerCase();
+      const directRoutes = candidateDirectRoutes.filter((route) =>
+        normalizeLocation(route.origin) === normalizeLocation(origin as string) &&
+        normalizeLocation(route.destination) === normalizeLocation(destination as string)
+      );
       console.log('Direct route search found:', directRoutes.length, 'routes');
       
       return res.json(directRoutes);
